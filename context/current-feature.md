@@ -37,41 +37,80 @@
   just append a correction under it.
 -->
 
-**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
+**Feature:** Backend Properties API
 
-**Spec:** <!-- context/features/<slug>/spec.md -->
+**Spec:** `context/features/backend-properties-api/spec.md`
 
 **Goal:**
-<!-- One or two sentences. What does "done" look like from the user's POV? -->
+Stand up the database layer the backend has been waiting on: a `properties` table on
+Neon Postgres, migrated with Alembic, seeded with the eight listings the homepage
+already renders, and readable over HTTP at `GET /properties/featured`. Phase 1 of
+PROJECT_OVERVIEW §9, scoped to one table and one endpoint.
 
-**Status:** `Not started | In progress | Blocked | In review/testing | Done`
+**Status:** `In progress`
 
-**Branch:** <!-- e.g. feature/property-search-filters -->
+**Branch:** `feature/backend-properties-api`
 
 ### Approach / Key Decisions
 <!--
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
--
+- **Sync SQLAlchemy 2.0 + psycopg3, not async.** The Phase 2 Gemini loop is sequential
+  and blocking; an async endpoint would end up threadpooling it anyway, and async
+  SQLAlchemy under a threadpooled blocking loop is the worst of both. psycopg3
+  specifically because it's the same driver in both modes — going async later changes
+  `create_engine` and nothing else.
+- **`image_alt` column added beyond spec §4.** Alt text describes the photograph, not
+  the listing, so it can't be derived from `title` — and `property-grid.test.tsx`
+  already asserts `not.toHaveAccessibleName(sample.title)`.
+- **Enums as `VARCHAR` + named CHECK, not native PG `ENUM`.** Adding a member later is
+  an ordinary migration instead of an `ALTER TYPE`, and the Phase 2 tool can compare
+  raw model output uncast. Needs `values_callable` or SQLAlchemy persists the member
+  *name* (`"HOUSE"`) and every lowercase query silently returns nothing.
+- **"Featured" = newest available, limit 8.** No `featured` column: with eight listings
+  a boolean would be true on every row and encode nothing.
+- **`price` as a JSON number + `currency: "LKR"` on the schema, not in the table.**
+  Note Pydantic v2 serializes `Decimal` to a *string* by default — needs an explicit
+  `field_serializer`.
+- Full plan with code sketches: `~/.claude/plans/lets-work-on-getting-dreamy-wigderson.md`
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
--
+- <!-- filled in as work proceeds -->
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
--
+- **`.gitignore:33` blocks `backend/.env.example`.** A blanket `.env*` added by the
+  `.vercel` commit `c639130` shadows the `!.env.example` negation on line 7 — last
+  match wins. Confirmed with `git check-ignore -v`. Delete line 33 first.
+- **CLAUDE.md is stale** — still says "backend does not exist yet: no requirements.txt,
+  no Python code, no database." Untrue since `b21abd5`, and more so after this.
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1.
-2.
-3.
+1. Delete `.gitignore:33`; add `backend/.env.example`; verify with `git check-ignore`.
+2. `uv add` sqlalchemy / psycopg[binary] / alembic / pydantic-settings, dev pytest + httpx.
+3. `app/config.py` (absolute `env_file`, psycopg driver rewrite); create `backend/.env`.
+4. `app/db/base.py` (naming convention — must exist *before* first autogenerate) + `session.py`.
+5. `app/models/property.py`.
+6. Alembic init, rewrite `env.py`, autogenerate, review the migration, `upgrade head`,
+   prove `downgrade base && upgrade head`.
+7. `queries.py`, `schemas/property.py`, `api/properties.py`; wire router + CORS into `main.py`.
+8. `seed_data.py` + `seed.py` (staggered `created_at`, `uuid5` ids); run it twice.
+9. pytest suite — SQLite + `dependency_overrides[get_db]`.
+10. `backend/README.md`, fix CLAUDE.md, update this file.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
--
+- **Any frontend change.** `PropertyGrid` keeps importing `lib/properties.ts`.
+- **`GET /properties` with filters** — its filters are the Phase 2 `search_properties`
+  tool's filters; building them in two places invites drift.
+- **`leads`, `conversations`, `messages` tables** — Phase 2/3.
+- **Anything Gemini.** Settings declares the key and model string; nothing reads them.
+- **`GET /leads`, auth, rate limiting.**
+- **Deployment to Render** — README notes the commands, but it isn't done.
+- **A `featured` boolean column** and **a `slug` column.**
 
 ---
 
