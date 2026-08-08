@@ -20,6 +20,8 @@ __pycache__/
 venv/
 .pytest_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 
 # Vercel — project link (root-level, since Root Directory is `frontend`)
 .vercel

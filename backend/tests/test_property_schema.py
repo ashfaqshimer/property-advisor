@@ -4,9 +4,14 @@ Asserted on raw JSON rather than the parsed model — a Pydantic round-trip woul
 happily hide the Decimal-serializes-as-a-string default this is here to catch.
 """
 
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.models.property import Property, PropertyStatus, PropertyType
 
 EXPECTED_KEYS = {
     "id",
@@ -74,3 +79,40 @@ def test_nullable_dimensions_are_present_even_when_set(client: TestClient) -> No
     assert item["bedrooms"] == 5
     assert item["bathrooms"] == 4
     assert item["sqft"] == 4200
+
+
+def test_nullable_dimensions_serialize_as_null(
+    client: TestClient, seeded: Session
+) -> None:
+    """Land and commercial listings have no beds/baths/sqft.
+
+    The keys must still be present with a null value — the frontend will branch on
+    them, and a missing key is a different failure mode from an empty one.
+    """
+    plot = Property(
+        title="Bare Land in Homagama",
+        description="A cleared residential plot with road frontage.",
+        price=Decimal("18000000"),
+        location="Homagama",
+        property_type=PropertyType.LAND,
+        bedrooms=None,
+        bathrooms=None,
+        sqft=None,
+        image_urls=["https://images.unsplash.com/photo-0000000000000-000000000000"],
+        image_alt="Cleared flat plot bounded by a low wall and palm trees",
+        status=PropertyStatus.AVAILABLE,
+        # Newest, so it sorts first and _first() picks it up.
+        created_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+    )
+    seeded.add(plot)
+    seeded.commit()
+
+    item = _first(client)
+
+    assert item["title"] == "Bare Land in Homagama"
+    assert item["property_type"] == "land"
+    assert item["bedrooms"] is None
+    assert item["bathrooms"] is None
+    assert item["sqft"] is None
+    # Present-but-null, not absent.
+    assert {"bedrooms", "bathrooms", "sqft"} <= item.keys()

@@ -37,89 +37,41 @@
   just append a correction under it.
 -->
 
-**Feature:** Backend Properties API
+**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
 
-**Spec:** `context/features/backend-properties-api/spec.md`
+**Spec:** <!-- context/features/<slug>/spec.md -->
 
 **Goal:**
-Stand up the database layer the backend has been waiting on: a `properties` table on
-Neon Postgres, migrated with Alembic, seeded with the eight listings the homepage
-already renders, and readable over HTTP at `GET /properties/featured`. Phase 1 of
-PROJECT_OVERVIEW §9, scoped to one table and one endpoint.
+<!-- One or two sentences. What does "done" look like from the user's POV? -->
 
-**Status:** `In review/testing`
+**Status:** `Not started | In progress | Blocked | In review/testing | Done`
 
-**Branch:** `feature/backend-properties-api`
+**Branch:** <!-- e.g. feature/property-search-filters -->
 
 ### Approach / Key Decisions
 <!--
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
-- **Sync SQLAlchemy 2.0 + psycopg3, not async.** The Phase 2 Gemini loop is sequential
-  and blocking; an async endpoint would end up threadpooling it anyway, and async
-  SQLAlchemy under a threadpooled blocking loop is the worst of both. psycopg3
-  specifically because it's the same driver in both modes — going async later changes
-  `create_engine` and nothing else.
-- **`image_alt` column added beyond spec §4.** Alt text describes the photograph, not
-  the listing, so it can't be derived from `title` — and `property-grid.test.tsx`
-  already asserts `not.toHaveAccessibleName(sample.title)`.
-- **Enums as `VARCHAR` + named CHECK, not native PG `ENUM`.** Adding a member later is
-  an ordinary migration instead of an `ALTER TYPE`, and the Phase 2 tool can compare
-  raw model output uncast. Needs `values_callable` or SQLAlchemy persists the member
-  *name* (`"HOUSE"`) and every lowercase query silently returns nothing.
-- **"Featured" = newest available, limit 8.** No `featured` column: with eight listings
-  a boolean would be true on every row and encode nothing.
-- **`price` as a JSON number + `currency: "LKR"` on the schema, not in the table.**
-  Note Pydantic v2 serializes `Decimal` to a *string* by default — needs an explicit
-  `field_serializer`.
-- Full plan with code sketches: `~/.claude/plans/lets-work-on-getting-dreamy-wigderson.md`
-
-**Confirmed during the build:**
-- The `values_callable` worry was real — the Postgres CHECK reads
-  `property_type IN ('house','apartment',...)`, lowercase, as intended.
-- `pyproject.toml` has no `[build-system]`, so `app` isn't installed as a package and
-  pytest couldn't import it. `pythonpath = ["."]` in `[tool.pytest.ini_options]` fixes it.
-- Starlette 1.3 deprecates httpx in `TestClient`; swapped the dev dep to `httpx2`,
-  which cleared the warning, and dropped the now-redundant explicit `httpx`.
-- Pydantic infers the OpenAPI type from the `field_serializer` return annotation, so
-  `price` advertises as `number` in `/docs`, not just at runtime.
+-
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
-- **New (backend):** `app/config.py`, `app/db/{base,session,queries,seed,seed_data}.py`,
-  `app/models/{__init__,property}.py`, `app/schemas/{__init__,property}.py`,
-  `app/api/{__init__,properties}.py`, `alembic.ini`, `alembic/env.py`,
-  `alembic/versions/20260809_da5c830b686e_create_properties_table.py`,
-  `tests/{conftest,test_health,test_seed_data,test_properties_featured,test_property_schema}.py`,
-  `.env.example`, `README.md`
-- **Modified:** `backend/app/main.py` (router + CORS), `backend/pyproject.toml`,
-  `.gitignore` (deleted the shadowing `.env*`), `CLAUDE.md` (Current state was stale in
-  both halves; added a Backend testing section)
+-
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
-- None. Both prior blockers are resolved: `.gitignore` line 33 deleted (`.env.example`
-  is trackable, real env files still ignored via line 5), and CLAUDE.md rewritten.
+-
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1. Review the diff, then commit (nothing is committed beyond the tracker).
-2. Run `complete-feature` to verify against the spec's acceptance criteria.
-3. Next slice, separately specced: wire `PropertyGrid` to the endpoint — needs a price
-   formatter (`185000000` → "LKR 185M"), `NEXT_PUBLIC_API_URL`, and an adapter for
-   `bedrooms`→`beds` / `image_urls[0]`→`imageUrl`.
+1.
+2.
+3.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
-- **Any frontend change.** `PropertyGrid` keeps importing `lib/properties.ts`.
-- **`GET /properties` with filters** — its filters are the Phase 2 `search_properties`
-  tool's filters; building them in two places invites drift.
-- **`leads`, `conversations`, `messages` tables** — Phase 2/3.
-- **Anything Gemini.** Settings declares the key and model string; nothing reads them.
-- **`GET /leads`, auth, rate limiting.**
-- **Deployment to Render** — README notes the commands, but it isn't done.
-- **A `featured` boolean column** and **a `slug` column.**
+-
 
 ---
 
@@ -130,6 +82,41 @@ PROJECT_OVERVIEW §9, scoped to one table and one endpoint.
   Goal is "remind me what this was and where the bodies are buried," not a
   full changelog (git already has that).
 -->
+
+### Backend Properties API — 2026-08-09
+- **What:** Phase 1 of the backend. `properties` table on Neon (SQLAlchemy 2.0 +
+  Alembic), seeded 1:1 from the frontend fixture, served at
+  `GET /properties/featured`. Sync SQLAlchemy + psycopg3, not async — the Phase 2
+  Gemini loop is sequential and blocking, and psycopg3 is the same driver either way.
+  Frontend untouched; it still renders from `lib/properties.ts`.
+- **Key files:** `backend/app/models/property.py`, `backend/app/db/` (session,
+  queries, seed_data, seed), `backend/app/api/properties.py`,
+  `backend/alembic/versions/20260809_da5c830b686e_create_properties_table.py`
+- **Gotchas/lessons:**
+  - **`SAEnum` persists the member NAME without `values_callable`.** The column would
+    hold `"HOUSE"` and every lowercase filter would silently match nothing — silently,
+    because it's a valid query returning zero rows. Verified in Postgres: the CHECK
+    reads `IN ('house','apartment',...)`.
+  - **Postgres `now()` is transaction-start time.** All eight seeded rows in one
+    commit share a `created_at`, so "newest first" was nondeterministic. Seed staggers
+    timestamps explicitly; the query adds `id` as a tiebreaker.
+  - **Pydantic v2 serializes `Decimal` to a JSON *string*.** `price` needed a
+    `field_serializer` to honour the number contract. Bonus: Pydantic reads the
+    serializer's return annotation, so `/docs` advertises `type: number` too.
+  - **`.gitignore` had a blanket `.env*` on the last line** (from the `.vercel`
+    commit) shadowing the `!.env.example` negation four lines up — last match wins,
+    so `.env.example` was uncommittable. Deleted it; lines 5-7 already covered it.
+  - **No `[build-system]` means `app` isn't an installed package** — pytest couldn't
+    import it until `pythonpath = ["."]` went into `[tool.pytest.ini_options]`.
+  - Starlette 1.3 deprecates httpx in `TestClient`; dev dep is `httpx2` now.
+  - Tests are SQLite-only by design (31 tests, 94% coverage). They do **not** cover
+    the real `ARRAY` type, the enum CHECKs, or `Numeric` fidelity — those were
+    verified by hand against Neon, commands in `backend/README.md`.
+  - **Deliberate spec deviations:** added `image_alt` (alt text describes the photo,
+    not the listing, and a frontend test asserts alt ≠ title); `currency` is a
+    `Literal["LKR"]` on the schema, not a column; enums are VARCHAR + CHECK, not
+    native ENUM; "featured" means newest-available-limit-8 with no flag column;
+    `GET /properties` deferred to ship with the Phase 2 `search_properties` tool.
 
 ### Chat Panel — 2026-08-02
 - **What:** The last placeholder region, and the last shell stub of any kind. Static
