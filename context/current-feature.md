@@ -47,7 +47,7 @@ Neon Postgres, migrated with Alembic, seeded with the eight listings the homepag
 already renders, and readable over HTTP at `GET /properties/featured`. Phase 1 of
 PROJECT_OVERVIEW §9, scoped to one table and one endpoint.
 
-**Status:** `In progress`
+**Status:** `In review/testing`
 
 **Branch:** `feature/backend-properties-api`
 
@@ -75,31 +75,40 @@ PROJECT_OVERVIEW §9, scoped to one table and one endpoint.
   `field_serializer`.
 - Full plan with code sketches: `~/.claude/plans/lets-work-on-getting-dreamy-wigderson.md`
 
+**Confirmed during the build:**
+- The `values_callable` worry was real — the Postgres CHECK reads
+  `property_type IN ('house','apartment',...)`, lowercase, as intended.
+- `pyproject.toml` has no `[build-system]`, so `app` isn't installed as a package and
+  pytest couldn't import it. `pythonpath = ["."]` in `[tool.pytest.ini_options]` fixes it.
+- Starlette 1.3 deprecates httpx in `TestClient`; swapped the dev dep to `httpx2`,
+  which cleared the warning, and dropped the now-redundant explicit `httpx`.
+- Pydantic infers the OpenAPI type from the `field_serializer` return annotation, so
+  `price` advertises as `number` in `/docs`, not just at runtime.
+
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
-- <!-- filled in as work proceeds -->
+- **New (backend):** `app/config.py`, `app/db/{base,session,queries,seed,seed_data}.py`,
+  `app/models/{__init__,property}.py`, `app/schemas/{__init__,property}.py`,
+  `app/api/{__init__,properties}.py`, `alembic.ini`, `alembic/env.py`,
+  `alembic/versions/20260809_da5c830b686e_create_properties_table.py`,
+  `tests/{conftest,test_health,test_seed_data,test_properties_featured,test_property_schema}.py`,
+  `.env.example`, `README.md`
+- **Modified:** `backend/app/main.py` (router + CORS), `backend/pyproject.toml`,
+  `.gitignore` (deleted the shadowing `.env*`), `CLAUDE.md` (Current state was stale in
+  both halves; added a Backend testing section)
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
-- **`.gitignore:33` blocks `backend/.env.example`.** A blanket `.env*` added by the
-  `.vercel` commit `c639130` shadows the `!.env.example` negation on line 7 — last
-  match wins. Confirmed with `git check-ignore -v`. Delete line 33 first.
-- **CLAUDE.md is stale** — still says "backend does not exist yet: no requirements.txt,
-  no Python code, no database." Untrue since `b21abd5`, and more so after this.
+- None. Both prior blockers are resolved: `.gitignore` line 33 deleted (`.env.example`
+  is trackable, real env files still ignored via line 5), and CLAUDE.md rewritten.
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1. Delete `.gitignore:33`; add `backend/.env.example`; verify with `git check-ignore`.
-2. `uv add` sqlalchemy / psycopg[binary] / alembic / pydantic-settings, dev pytest + httpx.
-3. `app/config.py` (absolute `env_file`, psycopg driver rewrite); create `backend/.env`.
-4. `app/db/base.py` (naming convention — must exist *before* first autogenerate) + `session.py`.
-5. `app/models/property.py`.
-6. Alembic init, rewrite `env.py`, autogenerate, review the migration, `upgrade head`,
-   prove `downgrade base && upgrade head`.
-7. `queries.py`, `schemas/property.py`, `api/properties.py`; wire router + CORS into `main.py`.
-8. `seed_data.py` + `seed.py` (staggered `created_at`, `uuid5` ids); run it twice.
-9. pytest suite — SQLite + `dependency_overrides[get_db]`.
-10. `backend/README.md`, fix CLAUDE.md, update this file.
+1. Review the diff, then commit (nothing is committed beyond the tracker).
+2. Run `complete-feature` to verify against the spec's acceptance criteria.
+3. Next slice, separately specced: wire `PropertyGrid` to the endpoint — needs a price
+   formatter (`185000000` → "LKR 185M"), `NEXT_PUBLIC_API_URL`, and an adapter for
+   `bedrooms`→`beds` / `image_urls[0]`→`imageUrl`.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->

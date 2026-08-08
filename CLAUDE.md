@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Frontend is scaffolded; backend is not.** `frontend/` holds a fresh create-next-app install — Next **16.2.12**, React 19.2.4, Tailwind **v4**, TypeScript, pnpm. It's still the untouched default page. `backend/` does not exist yet: no `requirements.txt`, no Python code, no database. Backend build commands referenced below don't exist until that scaffold is created (Phase 1 of the spec).
+**Frontend shell is complete; backend has its database layer and one endpoint.**
+
+`frontend/` — Next **16.2.12**, React 19.2.4, Tailwind **v4**, TypeScript, pnpm. Every region of the homepage is built (header, hero, featured grid, chat panel, footer). It still runs entirely on local fixtures: `lib/properties.ts` and `lib/chat.ts`. Nothing fetches from the backend yet — there is no API client and `NEXT_PUBLIC_API_URL` is unset.
+
+`backend/` — FastAPI on **uv + `pyproject.toml`** (not `requirements.txt`, which the spec mentions), Python 3.11. Has SQLAlchemy 2.0 + Alembic against Neon, a `properties` table, and `GET /properties/featured` alongside `GET /health`. The agent (`app/agent/`), `POST /chat`, and the `leads` / `conversations` / `messages` tables do not exist yet — Phase 2/3.
+
+Backend commands run from `backend/`: `uv sync`, `uv run alembic upgrade head`, `uv run python -m app.db.seed`, `uv run fastapi dev app/main.py`, `uv run pytest`. See [backend/README.md](backend/README.md).
 
 ## Frontend: Next 16 + Tailwind 4
 
@@ -60,6 +66,14 @@ Vitest + React Testing Library in `frontend/tests/`, run with `pnpm test` (`test
 **jsdom has no layout engine and does not apply Tailwind.** It cannot verify sticky positioning, column counts, responsive breakpoints, or overflow. Tests here cover DOM structure, landmarks, and scope boundaries (no images/links/headings in a shell that's meant to stay content-free); anything visual is still verified in a browser. Where a test asserts a Tailwind class, that's a regression guard against accidental deletion — it does not prove the layout works, and should say so in a comment.
 
 Testing Library's auto-cleanup only registers when Vitest globals are enabled. They aren't, so `tests/setup.ts` calls `afterEach(cleanup)` explicitly. Without it the DOM accumulates across tests in a file and queries start matching duplicates.
+
+## Backend testing
+
+pytest in `backend/tests/`, run with `uv run pytest`. There's no `[build-system]`, so `app` isn't installed as a package — `pythonpath = ["."]` in `pyproject.toml` is what puts `backend/` on `sys.path`.
+
+**Tests run against in-memory SQLite with `get_db` overridden, not Postgres.** No network, sub-second. This works only because the model uses `Uuid`, `func.now()`, and `ARRAY(Text).with_variant(JSON(), "sqlite")` — keep new columns portable or the suite stops building its tables. It does **not** cover the real Postgres `ARRAY` type, the enum CHECK constraints, or `Numeric` fidelity; verify those against Neon by hand (commands in [backend/README.md](backend/README.md)).
+
+`tests/conftest.py` sets a placeholder `DATABASE_URL` **before** importing anything under `app.`, because `app/db/session.py` builds its engine at module scope and `Settings.database_url` has no default. `create_engine()` doesn't connect, so the placeholder is never dialled.
 
 ## Environment
 

@@ -30,4 +30,3 @@ venv/
 
 # Worktrees created by Claude Code — checkouts of this same repo, never content.
 .claude/worktrees/
-.env*

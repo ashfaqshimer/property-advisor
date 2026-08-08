@@ -1,9 +1,31 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Home Advisor API — FastAPI backend"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "alembic>=1.14",
     "fastapi[standard]>=0.141.1",
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.7",
+    "sqlalchemy>=2.0.36",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.9.1",
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# There's no [build-system], so `app` isn't installed as a package — put backend/ on
+# sys.path the same way `uv run python -m app.db.seed` does.
+pythonpath = ["."]
+addopts = "-q"
+filterwarnings = [
+    # The suite runs on SQLite, which has no native Decimal — SQLAlchemy warns on
+    # every Numeric read. Production is Postgres, where this doesn't apply.
+    "ignore:.*does \\*not\\* support Decimal objects natively.*",
 ]
