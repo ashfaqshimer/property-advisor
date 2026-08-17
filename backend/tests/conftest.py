@@ -1,12 +1,16 @@
 """Test fixtures.
 
 The suite runs against in-memory SQLite with `get_db` overridden — no network, no
-real database. That is only possible because the model uses `Uuid`, `func.now()`, and
-`ARRAY(...).with_variant(JSON(), "sqlite")`.
+real database. That is only possible because the models use `Uuid`, `func.now()`,
+`ARRAY(...).with_variant(JSON(), "sqlite")`, and a dialect-agnostic `JSON`.
 
-What this deliberately does NOT cover: the real Postgres ARRAY type, the enum CHECK
-constraints, and Numeric fidelity. Those are verified manually against Neon — see
-backend/README.md.
+SQLite covers more than it first appears to. It enforces UNIQUE, it enforces CHECK
+constraints — so the enum `values_callable` trap is catchable here, not only against
+Neon — and it enforces foreign keys once `_enforce_foreign_keys` sets the pragma below.
+
+What this genuinely does NOT cover: the real Postgres ARRAY type, `Numeric` Decimal
+fidelity (SQLite has no native Decimal), and whether the shipped Postgres DDL matches
+what the models intend. Those are verified manually against Neon — see backend/README.md.
 """
 
 import os
@@ -20,7 +24,8 @@ os.environ.setdefault(
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy import create_engine, event  # noqa: E402
+from sqlalchemy.engine import Engine  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
@@ -31,6 +36,20 @@ from app.db.session import get_db  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
 
 
+def _enforce_foreign_keys(engine: Engine) -> None:
+    """SQLite ignores foreign keys unless asked, per connection.
+
+    Without this, `ON DELETE CASCADE` is inert: deleting a conversation leaves its
+    messages behind, so a cascade test fails looking like a broken model rather than an
+    unenforced pragma. `properties` has no foreign keys, so turning this on changes
+    nothing for the tests that predate it.
+    """
+
+    @event.listens_for(engine, "connect")
+    def _set_pragma(dbapi_connection, _connection_record):  # pragma: no cover - hook
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
+
 @pytest.fixture
 def db_session():
     engine = create_engine(
@@ -38,6 +57,7 @@ def db_session():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    _enforce_foreign_keys(engine)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with factory() as session:
