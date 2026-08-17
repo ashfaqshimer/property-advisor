@@ -78,8 +78,35 @@ agent code, no endpoints.
 - Both FKs are `ON DELETE CASCADE`; nothing depends on orphaned messages surviving.
 
 ### Files Touched
-<!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
--
+
+New:
+- `backend/app/models/conversation.py`, `message.py`, `lead.py`
+- `backend/app/models/_enum.py` — `enum_column`, moved out of `property.py`
+- `backend/alembic/versions/20260817_388fdda07622_create_chat_tables.py`
+- `backend/tests/test_chat_models.py` (17 tests)
+
+Modified:
+- `backend/app/models/__init__.py` — exports the four new names
+- `backend/app/models/property.py` — imports `enum_column` instead of defining it
+- `backend/alembic/env.py` — `include_object` filter, see below
+- `backend/tests/conftest.py` — `PRAGMA foreign_keys=ON`; docstring corrected
+- `backend/README.md` — verification commands for the new tables
+
+### Unplanned finding: autogenerate wanted to drop the properties CHECKs
+
+The first `alembic revision --autogenerate` emitted `op.drop_constraint` for
+`ck_properties_property_type` and `ck_properties_property_status` — constraints that are
+present and correct on Neon. **Not caused by the `_enum_column` move**; the metadata is
+byte-identical before and after, verified against `git show HEAD:...`. Alembic 1.19 reflects
+CHECK constraints from the database, but the ones
+`Enum(native_enum=False, create_constraint=True)` attaches are `_type_bound` and excluded
+from the model side of the comparison, so the database always looks ahead of the models.
+
+Fixed with an `include_object` filter in `alembic/env.py` rather than by hand-deleting the
+lines, because it would recur on every future autogenerate — and it now applies to
+`ck_messages_message_role` too. The filter matches on **name**: for a removed constraint the
+object passed to `include_object` is the reflected one, which carries no `_type_bound` flag
+to test. First attempt tested the flag and silently did nothing.
 
 ### Open Questions / Blockers
 
