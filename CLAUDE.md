@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `frontend/` — Next **16.2.12**, React 19.2.4, Tailwind **v4**, TypeScript, pnpm. Every region of the homepage is built (header, hero, featured grid, chat panel, footer). It still runs entirely on local fixtures: `lib/properties.ts` and `lib/chat.ts`. Nothing fetches from the backend yet — there is no API client and `NEXT_PUBLIC_API_URL` is unset.
 
-`backend/` — FastAPI on **uv + `pyproject.toml`** (not `requirements.txt`, which the spec mentions), Python 3.11. Has SQLAlchemy 2.0 + Alembic against Neon, a `properties` table, and `GET /properties/featured` alongside `GET /health`. The agent (`app/agent/`), `POST /chat`, and the `leads` / `conversations` / `messages` tables do not exist yet — Phase 2/3.
+`backend/` — FastAPI on **uv + `pyproject.toml`** (not `requirements.txt`, which the spec mentions), Python 3.11. Has SQLAlchemy 2.0 + Alembic against Neon, all four tables (`properties`, `conversations`, `messages`, `leads`), and `GET /properties/featured` alongside `GET /health`. The agent (`app/agent/`), `POST /chat`, and `GET /properties` do not exist yet — Phase 2/3. Nothing writes to the three chat tables yet; they exist so the Phase 2 loop and `capture_lead` have somewhere to persist.
 
 Backend commands run from `backend/`: `uv sync`, `uv run alembic upgrade head`, `uv run python -m app.db.seed`, `uv run fastapi dev app/main.py`, `uv run pytest`. See [backend/README.md](backend/README.md).
 
@@ -71,7 +71,11 @@ Testing Library's auto-cleanup only registers when Vitest globals are enabled. T
 
 pytest in `backend/tests/`, run with `uv run pytest`. There's no `[build-system]`, so `app` isn't installed as a package — `pythonpath = ["."]` in `pyproject.toml` is what puts `backend/` on `sys.path`.
 
-**Tests run against in-memory SQLite with `get_db` overridden, not Postgres.** No network, sub-second. This works only because the model uses `Uuid`, `func.now()`, and `ARRAY(Text).with_variant(JSON(), "sqlite")` — keep new columns portable or the suite stops building its tables. It does **not** cover the real Postgres `ARRAY` type, the enum CHECK constraints, or `Numeric` fidelity; verify those against Neon by hand (commands in [backend/README.md](backend/README.md)).
+**Tests run against in-memory SQLite with `get_db` overridden, not Postgres.** No network, sub-second. This works only because the models use `Uuid`, `func.now()`, `ARRAY(Text).with_variant(JSON(), "sqlite")`, and a dialect-agnostic `JSON` — keep new columns portable or the suite stops building its tables.
+
+SQLite covers more than it looks like it does: it enforces UNIQUE, it enforces CHECK constraints (so the enum `values_callable` trap is catchable there), and it enforces foreign keys because `tests/conftest.py` sets `PRAGMA foreign_keys=ON` — **without that pragma SQLite ignores foreign keys entirely**, and a cascade test fails looking like a broken model. It does **not** cover the real Postgres `ARRAY` type, `Numeric` Decimal fidelity, or whether the shipped DDL matches the models; verify those against Neon by hand (commands in [backend/README.md](backend/README.md), which go through `uv run python` — there is no `psql` here).
+
+**Autogenerate has a standing false positive on enum columns.** Alembic 1.19 reflects CHECK constraints but excludes the `_type_bound` ones `Enum(native_enum=False)` creates, so it emits `drop_constraint` for CHECKs that are present and correct. `alembic/env.py` filters them by name via `include_object`. If a migration ever wants to drop a `ck_*` backing an enum, that's this bug — don't apply it.
 
 `tests/conftest.py` sets a placeholder `DATABASE_URL` **before** importing anything under `app.`, because `app/db/session.py` builds its engine at module scope and `Settings.database_url` has no default. `create_engine()` doesn't connect, so the placeholder is never dialled.
 

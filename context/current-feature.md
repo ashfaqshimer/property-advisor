@@ -37,125 +37,41 @@
   just append a correction under it.
 -->
 
-**Feature:** Chat Schema (conversations, messages, leads) — chore
+**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
 
-**Spec:** `context/chores/chat-schema/spec.md`
+**Spec:** <!-- context/features/<slug>/spec.md -->
 
 **Goal:**
-Add the three remaining tables from PROJECT_OVERVIEW §4 — `conversations`, `messages`,
-`leads` — as SQLAlchemy models plus one Alembic migration, so the Phase 2 agent core has
-somewhere to persist a conversation and write a captured lead. Database layer only: no
-agent code, no endpoints.
+<!-- One or two sentences. What does "done" look like from the user's POV? -->
 
-**Status:** `In progress`
+**Status:** `Not started | In progress | Blocked | In review/testing | Done`
 
-**Branch:** `chore/chat-schema`
+**Branch:** <!-- e.g. feature/property-search-filters -->
 
 ### Approach / Key Decisions
-
-- **Split out of Phase 2 deliberately.** The overview bundles the agent loop with its
-  tools, but `capture_lead` has no table and the loop has nowhere to persist turns. The
-  properties migration surfaced three non-obvious traps; landing three more tables on
-  their own beats debugging schema and a hand-rolled tool-calling loop in one branch.
-- **`messages.seq` (int) is the ordering key, not `created_at`.** One agent loop writes a
-  user turn, a tool turn, and an assistant turn in a single transaction. Postgres `now()`
-  is transaction-start time, so all three share `created_at` — the same nondeterminism the
-  seeded properties hit — and a random UUID `id` is no tiebreaker. Consequence here is
-  worse than a scrambled grid: it replays a scrambled conversation back to Gemini.
-  Unique on `(conversation_id, seq)`; computed Python-side, which keeps it portable to the
-  SQLite suite in a way `Identity()` is not.
-- **`messages.tool_payload` (JSON, nullable) preserves the raw `function_call` args and
-  `function_response`.** §4's `content` text alone cannot faithfully replay a tool pair to
-  Gemini. Plain dialect-agnostic `JSON`, not `JSONB` — nothing queries inside it, it's read
-  back wholesale to rebuild `contents`.
-- **One lead per conversation, enforced by a UNIQUE `conversation_id`.** Makes a second
-  `capture_lead` call an update rather than a duplicate row — enforced by the constraint,
-  not by trusting the model to call the tool once.
-- **`_enum_column` becomes shared rather than copied.** `MessageRole` needs the same
-  VARCHAR + named-CHECK helper (with `values_callable`, or the column stores `"USER"`), so
-  it moves out of `app/models/property.py` into a module both import. No behaviour change
-  to the `properties` table. User approved this touch to an otherwise out-of-scope file.
-- Both FKs are `ON DELETE CASCADE`; nothing depends on orphaned messages surviving.
+<!--
+  Why you're building it this way — especially anything non-obvious.
+  This is the highest-value section: code shows WHAT, this shows WHY.
+-->
+-
 
 ### Files Touched
-
-New:
-- `backend/app/models/conversation.py`, `message.py`, `lead.py`
-- `backend/app/models/_enum.py` — `enum_column`, moved out of `property.py`
-- `backend/alembic/versions/20260817_388fdda07622_create_chat_tables.py`
-- `backend/tests/test_chat_models.py` (17 tests)
-
-Modified:
-- `backend/app/models/__init__.py` — exports the four new names
-- `backend/app/models/property.py` — imports `enum_column` instead of defining it
-- `backend/alembic/env.py` — `include_object` filter, see below
-- `backend/tests/conftest.py` — `PRAGMA foreign_keys=ON`; docstring corrected
-- `backend/README.md` — verification commands for the new tables
-
-### Unplanned finding: autogenerate wanted to drop the properties CHECKs
-
-The first `alembic revision --autogenerate` emitted `op.drop_constraint` for
-`ck_properties_property_type` and `ck_properties_property_status` — constraints that are
-present and correct on Neon. **Not caused by the `_enum_column` move**; the metadata is
-byte-identical before and after, verified against `git show HEAD:...`. Alembic 1.19 reflects
-CHECK constraints from the database, but the ones
-`Enum(native_enum=False, create_constraint=True)` attaches are `_type_bound` and excluded
-from the model side of the comparison, so the database always looks ahead of the models.
-
-Fixed with an `include_object` filter in `alembic/env.py` rather than by hand-deleting the
-lines, because it would recur on every future autogenerate — and it now applies to
-`ck_messages_message_role` too. The filter matches on **name**: for a removed constraint the
-object passed to `include_object` is the reflected one, which carries no `_type_bound` flag
-to test. First attempt tested the flag and silently did nothing.
+<!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
+-
 
 ### Open Questions / Blockers
-
-- None blocking. Testability was measured before starting (see spec Notes): Neon is live at
-  rev `da5c830b686e`, Docker is available, and there is **no `psql`** — hand-verification
-  goes through `uv run python` + SQLAlchemy.
-- Only two criteria genuinely need Neon: `Numeric` Decimal fidelity, and confirming the
-  live DDL carries the CHECK and both cascades. Everything else runs in `uv run pytest`.
+<!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
+-
 
 ### Next Steps
-
-1. Add a `PRAGMA foreign_keys=ON` connect listener to `tests/conftest.py`'s `db_session`
-   fixture. **Do this first** — SQLite silently ignores FKs without it, so a cascade test
-   written before this reads as a broken model. `properties` has no FKs; existing tests
-   are unaffected.
-2. Move `_enum_column` out of `app/models/property.py` into a shared module; update
-   `property.py`'s import. Confirm the existing 31 tests still pass — no behaviour change.
-3. Write `app/models/conversation.py` (`session_id` unique + indexed).
-4. Write `app/models/message.py` (`role` enum via the shared helper, `content`,
-   `tool_payload` JSON nullable, `seq`, `UniqueConstraint("conversation_id", "seq")`,
-   FK cascade).
-5. Write `app/models/lead.py` (all fields nullable except `conversation_id`, which is
-   unique; `budget_min`/`budget_max` as `Numeric(14, 2)`; `created_at` + `updated_at`).
-6. Export all four new names from `app/models/__init__.py` so Alembic's one-import
-   registration still picks up every table.
-7. Autogenerate the Alembic revision, chained off `create_properties_table`. Check
-   creation order is FK-safe and `downgrade()` reverses it.
-8. Add the SQLite tests: ordered round-trip, `seq` collision raises, same `seq` across two
-   conversations allowed, `tool_payload` dict + `None`, duplicate lead raises, duplicate
-   `session_id` raises, `'USER'` rejected by the CHECK, cascade delete clears children.
-9. Correct the `tests/conftest.py` docstring — it claims the suite doesn't cover enum CHECK
-   constraints, but SQLite enforces them.
-10. Run `uv run pytest`, then `alembic upgrade head` / `downgrade -1` / `alembic check`
-    against Neon.
-11. Hand-verify the two Postgres-only criteria and record the commands in
-    `backend/README.md`.
+<!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
+1.
+2.
+3.
 
 ### Explicitly Out of Scope (for now)
-
-- Any code under `backend/app/agent/` — no Gemini client, no tools, no loop. Phase 2.
-- `POST /chat`, `GET /leads`, `GET /properties`. `GET /properties` stays deferred to ship
-  with the `search_properties` tool, as the properties retro recorded.
-- Pydantic schemas in `app/schemas/` — nothing serializes these tables yet, and guessing a
-  response shape before the endpoint exists would be inventing a contract.
-- Auth on any future `/leads` view (open question in overview §10).
-- Seed data for the new tables. Conversations come from real chats, not fixtures.
-- Query helpers in `app/db/queries.py` beyond what the tests need. Get-or-create by
-  `session_id` and the lead upsert belong with the code that calls them.
-- Any frontend change. It still runs on `lib/properties.ts` and `lib/chat.ts`.
+<!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
+-
 
 ---
 
@@ -166,6 +82,51 @@ to test. First attempt tested the flag and silently did nothing.
   Goal is "remind me what this was and where the bodies are buried," not a
   full changelog (git already has that).
 -->
+
+### Chat Schema (conversations, messages, leads) — 2026-08-17
+- **What:** The last three tables from PROJECT_OVERVIEW §4, split out of Phase 2 so
+  `capture_lead` and the agent loop have somewhere to write. Models + one migration + 17
+  tests; no agent code, no endpoints. Neon is migrated to `388fdda07622`.
+- **Key files:** `backend/app/models/` (`conversation.py`, `message.py`, `lead.py`,
+  `_enum.py`), `backend/alembic/versions/20260817_388fdda07622_create_chat_tables.py`,
+  `backend/tests/test_chat_models.py`, `backend/alembic/env.py`
+- **Gotchas/lessons:**
+  - **Autogenerate wanted to drop the `properties` CHECK constraints** — constraints that
+    are present and correct. Alembic 1.19 reflects CHECKs from the database but excludes
+    the `_type_bound` ones that `Enum(native_enum=False, create_constraint=True)` attaches,
+    so the DB permanently looks ahead of the models. Silently destructive: dropping the
+    CHECK is what would let an invalid enum value in. Fixed with an `include_object` filter
+    in `env.py`, matching **by name** — for a *removed* constraint the object handed in is
+    the reflected one and carries no `_type_bound` flag, so the obvious first attempt
+    (testing the flag) compiled, ran, and did nothing. **Expect this on every future
+    autogenerate that touches an enum column.**
+  - **SQLite covers more than the properties retro claimed.** It enforces CHECK constraints
+    — the emitted DDL really is `IN ('user', 'assistant', 'tool')` — so the
+    `values_callable` trap is catchable in the fast suite, not just against Neon. Two
+    criteria moved out of hand-verification because of this. `conftest.py`'s docstring was
+    corrected; it had understated coverage.
+  - **SQLite silently ignores foreign keys without `PRAGMA foreign_keys=ON`, per
+    connection.** A cascade test written before that pragma fails looking like a broken
+    model. Verified load-bearing by commenting it out — both cascade tests fail. Relationships
+    use `passive_deletes=True` so the delete is the database's job, not SQLAlchemy's.
+  - **`seq`, not `created_at`, orders a conversation.** One pass of the agent loop writes
+    several turns in one transaction; Postgres `now()` is transaction-start time, so they
+    share a timestamp, and the random UUID `id` is no tiebreaker. Same trap as the seeded
+    properties, worse consequence — it replays a scrambled conversation to the model. The
+    test documenting this passes on SQLite for a *different* reason (statement-time,
+    one-second resolution), and says so, so nobody reads it as proof of the Postgres case.
+  - Testability was measured *before* the branch existed rather than assumed, which is what
+    surfaced the pragma and the CHECK findings and reshaped the spec. Worth repeating.
+  - **Deliberate spec deviations:** `messages.tool_payload` (JSON, nullable — `content` text
+    can't replay a `function_call`/`function_response` pair); `messages.seq`;
+    `leads.updated_at`; and UNIQUE on both `conversations.session_id` and
+    `leads.conversation_id`, which is what makes a repeat `capture_lead` an update rather
+    than a duplicate row.
+  - No `psql` on this machine — Neon verification goes through `uv run python` +
+    SQLAlchemy. Both README snippets were run verbatim before being committed.
+  - **Deferred, not rejected:** a real-Postgres test path via testcontainers (Docker is
+    available). Two migrations running have now ended in "verify by hand against Neon", so
+    the recurring cost is real. Best taken after Phase 2, since it's tooling.
 
 ### Backend Properties API — 2026-08-09
 - **What:** Phase 1 of the backend. `properties` table on Neon (SQLAlchemy 2.0 +
