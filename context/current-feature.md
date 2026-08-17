@@ -37,41 +37,98 @@
   just append a correction under it.
 -->
 
-**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
+**Feature:** Chat Schema (conversations, messages, leads) — chore
 
-**Spec:** <!-- context/features/<slug>/spec.md -->
+**Spec:** `context/chores/chat-schema/spec.md`
 
 **Goal:**
-<!-- One or two sentences. What does "done" look like from the user's POV? -->
+Add the three remaining tables from PROJECT_OVERVIEW §4 — `conversations`, `messages`,
+`leads` — as SQLAlchemy models plus one Alembic migration, so the Phase 2 agent core has
+somewhere to persist a conversation and write a captured lead. Database layer only: no
+agent code, no endpoints.
 
-**Status:** `Not started | In progress | Blocked | In review/testing | Done`
+**Status:** `In progress`
 
-**Branch:** <!-- e.g. feature/property-search-filters -->
+**Branch:** `chore/chat-schema`
 
 ### Approach / Key Decisions
-<!--
-  Why you're building it this way — especially anything non-obvious.
-  This is the highest-value section: code shows WHAT, this shows WHY.
--->
--
+
+- **Split out of Phase 2 deliberately.** The overview bundles the agent loop with its
+  tools, but `capture_lead` has no table and the loop has nowhere to persist turns. The
+  properties migration surfaced three non-obvious traps; landing three more tables on
+  their own beats debugging schema and a hand-rolled tool-calling loop in one branch.
+- **`messages.seq` (int) is the ordering key, not `created_at`.** One agent loop writes a
+  user turn, a tool turn, and an assistant turn in a single transaction. Postgres `now()`
+  is transaction-start time, so all three share `created_at` — the same nondeterminism the
+  seeded properties hit — and a random UUID `id` is no tiebreaker. Consequence here is
+  worse than a scrambled grid: it replays a scrambled conversation back to Gemini.
+  Unique on `(conversation_id, seq)`; computed Python-side, which keeps it portable to the
+  SQLite suite in a way `Identity()` is not.
+- **`messages.tool_payload` (JSON, nullable) preserves the raw `function_call` args and
+  `function_response`.** §4's `content` text alone cannot faithfully replay a tool pair to
+  Gemini. Plain dialect-agnostic `JSON`, not `JSONB` — nothing queries inside it, it's read
+  back wholesale to rebuild `contents`.
+- **One lead per conversation, enforced by a UNIQUE `conversation_id`.** Makes a second
+  `capture_lead` call an update rather than a duplicate row — enforced by the constraint,
+  not by trusting the model to call the tool once.
+- **`_enum_column` becomes shared rather than copied.** `MessageRole` needs the same
+  VARCHAR + named-CHECK helper (with `values_callable`, or the column stores `"USER"`), so
+  it moves out of `app/models/property.py` into a module both import. No behaviour change
+  to the `properties` table. User approved this touch to an otherwise out-of-scope file.
+- Both FKs are `ON DELETE CASCADE`; nothing depends on orphaned messages surviving.
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
 -
 
 ### Open Questions / Blockers
-<!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
--
+
+- None blocking. Testability was measured before starting (see spec Notes): Neon is live at
+  rev `da5c830b686e`, Docker is available, and there is **no `psql`** — hand-verification
+  goes through `uv run python` + SQLAlchemy.
+- Only two criteria genuinely need Neon: `Numeric` Decimal fidelity, and confirming the
+  live DDL carries the CHECK and both cascades. Everything else runs in `uv run pytest`.
 
 ### Next Steps
-<!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1.
-2.
-3.
+
+1. Add a `PRAGMA foreign_keys=ON` connect listener to `tests/conftest.py`'s `db_session`
+   fixture. **Do this first** — SQLite silently ignores FKs without it, so a cascade test
+   written before this reads as a broken model. `properties` has no FKs; existing tests
+   are unaffected.
+2. Move `_enum_column` out of `app/models/property.py` into a shared module; update
+   `property.py`'s import. Confirm the existing 31 tests still pass — no behaviour change.
+3. Write `app/models/conversation.py` (`session_id` unique + indexed).
+4. Write `app/models/message.py` (`role` enum via the shared helper, `content`,
+   `tool_payload` JSON nullable, `seq`, `UniqueConstraint("conversation_id", "seq")`,
+   FK cascade).
+5. Write `app/models/lead.py` (all fields nullable except `conversation_id`, which is
+   unique; `budget_min`/`budget_max` as `Numeric(14, 2)`; `created_at` + `updated_at`).
+6. Export all four new names from `app/models/__init__.py` so Alembic's one-import
+   registration still picks up every table.
+7. Autogenerate the Alembic revision, chained off `create_properties_table`. Check
+   creation order is FK-safe and `downgrade()` reverses it.
+8. Add the SQLite tests: ordered round-trip, `seq` collision raises, same `seq` across two
+   conversations allowed, `tool_payload` dict + `None`, duplicate lead raises, duplicate
+   `session_id` raises, `'USER'` rejected by the CHECK, cascade delete clears children.
+9. Correct the `tests/conftest.py` docstring — it claims the suite doesn't cover enum CHECK
+   constraints, but SQLite enforces them.
+10. Run `uv run pytest`, then `alembic upgrade head` / `downgrade -1` / `alembic check`
+    against Neon.
+11. Hand-verify the two Postgres-only criteria and record the commands in
+    `backend/README.md`.
 
 ### Explicitly Out of Scope (for now)
-<!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
--
+
+- Any code under `backend/app/agent/` — no Gemini client, no tools, no loop. Phase 2.
+- `POST /chat`, `GET /leads`, `GET /properties`. `GET /properties` stays deferred to ship
+  with the `search_properties` tool, as the properties retro recorded.
+- Pydantic schemas in `app/schemas/` — nothing serializes these tables yet, and guessing a
+  response shape before the endpoint exists would be inventing a contract.
+- Auth on any future `/leads` view (open question in overview §10).
+- Seed data for the new tables. Conversations come from real chats, not fixtures.
+- Query helpers in `app/db/queries.py` beyond what the tests need. Get-or-create by
+  `session_id` and the lead upsert belong with the code that calls them.
+- Any frontend change. It still runs on `lib/properties.ts` and `lib/chat.ts`.
 
 ---
 
