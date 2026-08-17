@@ -51,16 +51,32 @@ uv run alembic upgrade head
 uv run alembic downgrade base && uv run alembic upgrade head   # prove it reverses
 ```
 
-Always read a generated migration before applying it. In particular the two enum
-columns must render as `VARCHAR` + named CHECK, not `postgresql.ENUM`.
+Always read a generated migration before applying it. In particular the enum columns must
+render as `VARCHAR` + named CHECK, not `postgresql.ENUM`.
+
+`alembic/env.py` filters the enums' CHECK constraints out of autogenerate via
+`include_object`. Without it, every run emits `op.drop_constraint` for constraints that are
+in fact present and correct: Alembic 1.19 reflects CHECK constraints from the database, but
+the ones `Enum(native_enum=False, create_constraint=True)` attaches are `_type_bound` and
+are excluded from the model side of the comparison, so the database looks ahead of the
+models. The filter matches on name, because for a *removed* constraint the object handed to
+`include_object` is the reflected one and carries no `_type_bound` flag. **If a future
+migration wants to drop `ck_*_property_type`, `ck_*_property_status`, or
+`ck_messages_message_role`, that is this bug, not a real diff.**
 
 ## Tests
 
 `uv run pytest` runs against in-memory SQLite with `get_db` overridden — no network, no
-database. It does **not** exercise the real Postgres `ARRAY` type, the enum CHECK
-constraints, or `Numeric` fidelity. Verify those against Neon directly:
+database. SQLite does enforce UNIQUE and CHECK constraints, and enforces foreign keys via
+the `PRAGMA foreign_keys=ON` that `tests/conftest.py` sets, so constraint behaviour is
+covered there.
+
+It does **not** exercise the real Postgres `ARRAY` type, `Numeric` Decimal fidelity
+(SQLite has no native Decimal), or whether the shipped DDL matches the models. There is no
+`psql` on this machine, so verify those through SQLAlchemy:
 
 ```bash
+# properties: ARRAY type and enum values
 uv run python -c "
 from app.db.session import SessionLocal
 from sqlalchemy import text
@@ -68,7 +84,45 @@ with SessionLocal() as s:
     print(s.execute(text('select property_type, count(*), array_length(image_urls,1) from properties group by 1,3')).all())
 "
 # [('apartment', 2, 1), ('house', 6, 1)]
+
+# chat tables: shipped DDL — enum CHECK, both cascades, both uniques
+uv run python -c "
+from app.db.session import engine
+from sqlalchemy import text
+with engine.connect() as c:
+    for q in [
+        \"select conname, pg_get_constraintdef(oid) from pg_constraint where contype in ('c','f','u') and conrelid in ('messages'::regclass,'leads'::regclass) order by 1\",
+        \"select indexdef from pg_indexes where indexname='ix_conversations_session_id'\",
+    ]:
+        for row in c.execute(text(q)): print(row)
+"
+# ck_messages_message_role  CHECK ((role)::text = ANY (ARRAY['user','assistant','tool']::text[]))
+# fk_leads_conversation_id_conversations     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+# fk_messages_conversation_id_conversations  FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+# uq_leads_conversation_id     UNIQUE (conversation_id)
+# uq_messages_conversation_id  UNIQUE (conversation_id, seq)
+# CREATE UNIQUE INDEX ix_conversations_session_id ON public.conversations USING btree (session_id)
+
+# leads: Numeric(14,2) keeps Decimal exact — write, read back, cascade-delete to clean up
+uv run python -c "
+from decimal import Decimal
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+from app.db.session import engine
+from app.models import Conversation, Lead
+with Session(engine) as s:
+    c = Conversation(session_id='verify-numeric'); s.add(c); s.commit()
+    s.add(Lead(conversation_id=c.id, budget_min=Decimal('15000000.01'))); s.commit()
+    lead = s.scalar(select(Lead).where(Lead.conversation_id == c.id))
+    print(repr(lead.budget_min), lead.budget_min == Decimal('15000000.01'))
+    s.execute(delete(Conversation).where(Conversation.id == c.id)); s.commit()
+"
+# Decimal('15000000.01') True
 ```
+
+Note the last snippet writes to Neon and relies on the cascade to clean up after itself —
+deleting the conversation removes the lead. Check `select count(*) from leads` is back to
+where it started if it errors partway.
 
 ## Deploying (Render)
 

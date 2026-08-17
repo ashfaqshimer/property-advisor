@@ -9,12 +9,12 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import DateTime, Numeric, String, Text, Uuid, func
-from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
 from app.db.base import Base
+from app.models._enum import enum_column
 
 
 class PropertyType(str, enum.Enum):
@@ -28,29 +28,6 @@ class PropertyStatus(str, enum.Enum):
     AVAILABLE = "available"
     UNDER_OFFER = "under_offer"
     SOLD = "sold"
-
-
-def _enum_column(python_enum: type[enum.Enum], name: str) -> SAEnum:
-    """VARCHAR + a named CHECK constraint, rather than a native Postgres ENUM.
-
-    Adding a member to a native ENUM is an `ALTER TYPE` that can't run in the same
-    transaction as its own usage; a CHECK is an ordinary drop-and-add in a normal
-    migration. It also lets the Phase 2 `search_properties` tool compare against a
-    raw string from the model without a cast.
-
-    `values_callable` is load-bearing: SQLAlchemy persists the enum *member name* by
-    default, so without it the column would hold "HOUSE" and every query filtering
-    on "house" would silently match nothing.
-    """
-    return SAEnum(
-        python_enum,
-        name=name,
-        native_enum=False,
-        length=16,
-        create_constraint=True,
-        validate_strings=True,
-        values_callable=lambda e: [member.value for member in e],
-    )
 
 
 class Property(Base):
@@ -72,7 +49,7 @@ class Property(Base):
 
     location: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     property_type: Mapped[PropertyType] = mapped_column(
-        _enum_column(PropertyType, "property_type"), nullable=False, index=True
+        enum_column(PropertyType, "property_type"), nullable=False, index=True
     )
 
     # Nullable: land and commercial listings have none of these.
@@ -95,7 +72,7 @@ class Property(Base):
     image_alt: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
     status: Mapped[PropertyStatus] = mapped_column(
-        _enum_column(PropertyStatus, "property_status"),
+        enum_column(PropertyStatus, "property_status"),
         nullable=False,
         default=PropertyStatus.AVAILABLE,
         server_default=PropertyStatus.AVAILABLE.value,
