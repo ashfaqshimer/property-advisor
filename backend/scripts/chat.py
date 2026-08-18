@@ -4,14 +4,16 @@
     uv run python -m scripts.chat --verbose  # also show the tool-calling loop
     uv run python -m scripts.chat --neon     # the real Neon database
 
-`POST /chat` doesn't exist yet (Phase 3), so this is how the agent is exercised by hand.
-It calls exactly what the endpoint will call — `loop.run_turn` — so anything reproducible
-here is reproducible there.
+`POST /chat` now exists, so the agent is also reachable over HTTP. This REPL stays the
+faster way to iterate on the prompt: it calls exactly what the endpoint calls —
+`loop.run_turn` — so anything reproducible here is reproducible there, and `--verbose`
+shows the loop's internals that the endpoint hides.
 
-**Defaults to an in-memory database on purpose.** Every turn writes rows to `conversations`,
-`messages`, and `leads`, and a few minutes of poking around would otherwise leave a trail
-of fake leads in the production database that look exactly like real ones. Pass `--neon`
-when you specifically want to check persistence against Postgres.
+**Defaults to an in-memory database** for speed and isolation: each run starts from the
+eight seeded listings with no history, which is what you want when comparing prompt
+changes. Pass `--neon` to exercise real Postgres persistence — the Neon database is a
+**dev** database, so the conversations and leads a session leaves behind are harmless, and
+useful as test data.
 """
 
 from __future__ import annotations

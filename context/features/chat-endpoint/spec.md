@@ -31,9 +31,14 @@ multi-turn conversation against the deployed service.
 - [ ] A blank or missing `GEMINI_API_KEY` surfaces as **503** with an actionable message,
       not a 500 traceback — `client.GeminiNotConfigured` is raised on first use and must be
       mapped.
-- [ ] An error from Gemini itself (transport, quota, safety block) returns **502**. Per
-      `loop.py`'s docstring, retries and backoff stay out — a transport error propagates,
-      and this criterion only covers giving it an HTTP shape.
+- [ ] An error from Gemini itself returns **502** — `google.genai.errors.APIError`, the base
+      of `ClientError`/`ServerError`, which covers transport, quota, and upstream 5xx. Per
+      `loop.py`'s docstring, retries and backoff stay out; this only gives the failure an
+      HTTP shape, and the upstream message is not forwarded to the caller.
+      **Amended during implementation:** a *safety* block was originally listed here as a
+      502. It isn't one — it arrives as a candidate-less response rather than an exception,
+      so the loop already turns it into `FALLBACK_REPLY` and a 200, same as exhausting
+      `MAX_TOOL_ITERATIONS`.
 - [ ] Reusing a `session_id` across two requests continues the same conversation: the
       second reply demonstrably reflects the first turn, verified through the endpoint with
       a scripted fake client (not by calling `run_turn` directly).
