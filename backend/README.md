@@ -30,6 +30,30 @@ uv run fastapi dev app/main.py     # http://127.0.0.1:8000 — /docs for Swagger
 uv run pytest
 ```
 
+## Talking to the agent
+
+`POST /chat` doesn't exist yet (Phase 3), so there's no way in through `/docs` or the
+frontend. Use the terminal REPL — it calls the same `loop.run_turn` the endpoint will:
+
+```bash
+uv run python -m scripts.chat             # throwaway in-memory SQLite, seeded listings
+uv run python -m scripts.chat --verbose    # also print each function_call and tool result
+uv run python -m scripts.chat --neon       # the real database
+uv run python -m scripts.chat --session cli-abc123   # resume a conversation
+```
+
+Needs `GEMINI_API_KEY` in `.env`; without it you get a named error naming the variable
+rather than an SDK stacktrace.
+
+**It defaults to in-memory SQLite deliberately.** Every turn writes to `conversations`,
+`messages`, and `leads`, so ten minutes of poking around against `--neon` leaves a trail of
+fake leads that look exactly like real ones. Use `--neon` when you're specifically checking
+Postgres persistence, and expect to clean up after yourself.
+
+`--verbose` is the one worth running at least once: it shows the hand-rolled loop choosing a
+tool, the payload coming back, and — on a search that matches nothing — the guidance that
+stops the model claiming we have no properties in an area.
+
 ## Endpoints
 
 | Method | Path | Purpose |

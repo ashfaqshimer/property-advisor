@@ -28,7 +28,7 @@ The full spec — data models, endpoints, tool signatures, env vars, build phase
 
 ## Branding
 
-The brand is **Home Advisor** — everywhere, including the AI agent's name. `context/ui-interface.png` is a visual reference for layout, spacing, and colour only; its "Terra & Co." / "Terra AI Agent" wording is placeholder art and must never be copied into the codebase. Same goes for the mockup's property listings, prices, and contact details — illustrative, not real content. Don't ask about this again.
+The brand is **Home Advisor** — everywhere. The AI assistant is a separate persona: **Amaya**, female, early twenties, she/her, an advisor *at* Home Advisor. Don't rename her back to the brand; the persona is settled in `context/features/agent-core/spec.md`. Note the frontend still labels the assistant "Home Advisor" in `lib/chat.ts` and `components/chat/ChatPanel.tsx` (plus its tests) — a pending rename, not a second opinion. `context/ui-interface.png` is a visual reference for layout, spacing, and colour only; its "Terra & Co." / "Terra AI Agent" wording is placeholder art and must never be copied into the codebase. Same goes for the mockup's property listings, prices, and contact details — illustrative, not real content. Don't ask about this again.
 
 ## Architectural constraint (the point of the project)
 

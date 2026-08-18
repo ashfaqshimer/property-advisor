@@ -83,6 +83,61 @@
   full changelog (git already has that).
 -->
 
+### Agent Core — the hand-rolled Gemini loop — 2026-08-18
+- **What:** Phase 2. `loop.run_turn(db, session_id, message)` → history + tool declarations
+  to Gemini, execute `search_properties` / `capture_lead`, persist every turn, return
+  Amaya's reply. Raw `google-genai`, no framework, capped at 5 model calls. Plus a
+  `leads.intent` enum and a terminal REPL. No endpoint — `POST /chat` is Phase 3.
+- **Key files:** `backend/app/agent/` (`loop.py`, `tools.py`, `prompts.py`, `client.py`),
+  `backend/app/db/queries.py`, `backend/scripts/chat.py`,
+  `backend/alembic/versions/20260818_c9432564c721_add_leads_intent.py`
+- **Gotchas/lessons:**
+  - **The assistant is Amaya, not "Home Advisor".** Female, early twenties, an advisor *at*
+    the brokerage. This amended the CLAUDE.md branding line, which had said the agent was
+    named after the brand. Her age is load-bearing, not flavour: it's why she claims no
+    experience and pushes valuations, commissions, and timelines to a senior agent, so the
+    persona and the no-overclaiming rules hold each other up. **The frontend still labels
+    her "Home Advisor" in 6 code sites and 5 test assertions** — pending, Phase 4.
+  - **A tool's payload argues with the prompt, and tends to win.** `search_properties`
+    returning a bare `[]` invites "no results found" no matter what the system instruction
+    says, and the failure is silent. The zero-match payload therefore carries its own
+    `guidance` string. Belt-and-braces like this is worth it wherever a prompt rule fires
+    exactly when a tool returns nothing.
+  - **The `op.add_column` enum-CHECK worry did not hold.** Unlike the two prior migrations,
+    where CHECKs rode inside `CREATE TABLE`, this one adds an enum column to an existing
+    table — and Alembic 1.19 emits the constraint anyway. Confirmed in `pg_constraint`,
+    confirmed it rejects `'banana'`, and confirmed `downgrade` drops column/CHECK/index with
+    re-upgrade restoring all three. `_type_bound_check_names()` absorbed the new name by
+    itself (it reads the models), so the follow-up autogenerate came back empty. **Still
+    check the catalog rather than the column if this is repeated.**
+  - **A mocked Gemini proves plumbing and nothing else** — the fake supplies the reply text,
+    so no test here says anything about prompt adherence. That split is now explicit: the
+    automated half asserts the tool contract, the model-behaviour half is five manual live
+    scenarios. All five pass; `flash-lite` chained `search_properties` → `capture_lead` in
+    one conversation and extracted four search params from one sentence, so no model upgrade
+    was needed.
+  - **The prompt's contact-details rule took three passes, and the second was worse than the
+    first.** Live testing caught her re-asking for a number in disguise after being
+    declined; a flat "never ask again" then contradicted the owner's own empty-inventory
+    instruction, which *is* a second ask. Settled: one hedged re-offer when nothing
+    published matches. **When a prompt rule won't hold after two attempts, check the brief
+    for a conflict before tuning a third time.**
+  - **Two acceptance criteria were written as greps that produce false positives** — the
+    framework names appear in comments saying we don't use one, and `terra` matches
+    "terrace" in real listing copy. Both criteria were reworded rather than waved through.
+    Write criteria as *imports and dependencies* or word-boundary matches, not substrings.
+  - `scripts/chat.py` defaults to in-memory SQLite, not Neon: every turn writes to three
+    tables, and browsing against production leaves fake leads indistinguishable from real
+    ones. `--neon` exists and is the one path deliberately never run here.
+  - `pytest-cov` is now a dev dependency; the properties retro's "94%" had been measured
+    ad hoc. Agent coverage is 99% — the single uncovered line is the live
+    `generate_content` call, which by definition can't run offline.
+  - **Deliberate deviations:** `leads.intent` and its `capture_lead` param (not in
+    PROJECT_OVERVIEW §4/§5); filtered search moved *into* `db/queries.py`, reversing that
+    module's own docstring, so Phase 3's `GET /properties` needn't import from `app.agent`;
+    `scripts/` is new; the opening greeting was deferred to Phase 4 with its
+    double-greeting trap written into the archived spec.
+
 ### Chat Schema (conversations, messages, leads) — 2026-08-17
 - **What:** The last three tables from PROJECT_OVERVIEW §4, split out of Phase 2 so
   `capture_lead` and the agent loop have somewhere to write. Models + one migration + 17
