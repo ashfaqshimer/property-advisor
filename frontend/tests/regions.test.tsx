@@ -38,7 +38,7 @@ describe("ChatPanel", () => {
     // `lg:flex-1` is what gives the list the leftover space to scroll inside;
     // without it the panel grew past its cap and hid its own input.
     expect(
-      screen.getByRole("list", { name: "Conversation with Home Advisor" }),
+      screen.getByRole("list", { name: "Conversation with Amaya" }),
     ).toHaveClass("lg:overflow-y-auto", "lg:flex-1");
   });
 
@@ -77,7 +77,7 @@ describe("Footer", () => {
 
     // Class-presence guard, not a layout assertion — jsdom computes no columns.
     const brand = within(screen.getByRole("contentinfo"))
-      .getByText("Home Advisor")
+      .getByText("Property Advisor")
       .closest("div");
 
     expect(brand).toHaveClass("lg:col-span-2");

@@ -16,10 +16,12 @@ import { SEED_CONVERSATION, SUGGESTION_CHIPS } from "@/lib/chat";
  */
 
 describe("chat panel header", () => {
-  it("introduces the agent by the Home Advisor name and status", () => {
+  it("introduces the agent as Amaya, with her status", () => {
     render(<ChatPanel />);
 
-    expect(screen.getByText("Home Advisor AI Agent")).toBeInTheDocument();
+    // Amaya is the advisor; Property Advisor is the brokerage. The header names
+    // her, not the brand — the brand belongs to the navbar and footer.
+    expect(screen.getByText("Amaya — AI Advisor")).toBeInTheDocument();
     expect(screen.getByText(/Online · replies instantly/)).toBeInTheDocument();
   });
 
@@ -36,7 +38,7 @@ describe("chat panel messages", () => {
   it("renders the four seeded turns in order", () => {
     render(<ChatPanel />);
     const turns = within(
-      screen.getByRole("list", { name: "Conversation with Home Advisor" }),
+      screen.getByRole("list", { name: "Conversation with Amaya" }),
     ).getAllByRole("listitem");
 
     expect(turns).toHaveLength(4);
@@ -59,9 +61,9 @@ describe("chat panel messages", () => {
       "agent",
     ]);
     expect(turns[0]).toHaveTextContent(/^You:/);
-    expect(turns[1]).toHaveTextContent(/^Home Advisor:/);
+    expect(turns[1]).toHaveTextContent(/^Amaya:/);
     expect(turns[2]).toHaveTextContent(/^You:/);
-    expect(turns[3]).toHaveTextContent(/^Home Advisor:/);
+    expect(turns[3]).toHaveTextContent(/^Amaya:/);
   });
 
   it("tints each speaker's bubble from the theme, not a literal colour", () => {
@@ -91,7 +93,7 @@ describe("chat panel controls", () => {
   it("renders a real input and send button, both disabled", () => {
     render(<ChatPanel />);
     const input = screen.getByRole("textbox", {
-      name: "Ask the Home Advisor agent",
+      name: "Ask Amaya",
     });
 
     // Real controls so the panel does not look broken, disabled so it cannot

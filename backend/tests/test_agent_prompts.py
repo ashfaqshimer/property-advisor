@@ -19,10 +19,15 @@ class TestPersona:
         assert "You are Amaya" in SYSTEM_PROMPT
 
     def test_the_brokerage_is_not_her_name(self):
-        """Home Advisor is where she works. CLAUDE.md's branding section covers this; the
-        old rule said the agent was named after the brand and was amended deliberately."""
-        assert "You are Home Advisor" not in SYSTEM_PROMPT
-        assert "Home Advisor" in SYSTEM_PROMPT, "the brokerage is still named"
+        """Property Advisor is where she works. CLAUDE.md's branding section covers this;
+        the old rule said the agent was named after the brand and was amended
+        deliberately."""
+        assert "You are Property Advisor" not in SYSTEM_PROMPT
+        assert "Property Advisor" in SYSTEM_PROMPT, "the brokerage is still named"
+
+    def test_no_trace_of_the_old_brand(self):
+        """The brand was renamed from "Home Advisor"; nothing should still say it."""
+        assert "home advisor" not in SYSTEM_PROMPT.lower()
 
     def test_no_placeholder_branding_from_the_mockup(self):
         assert "terra" not in SYSTEM_PROMPT.lower()

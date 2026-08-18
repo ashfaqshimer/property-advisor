@@ -30,9 +30,12 @@ function menuButton(): HTMLElement {
   return screen.getByRole("button", { name: /menu/i });
 }
 
-/** The brand link. `/Home Advisor/` will not match the "Home" nav link. */
+/** The brand link. Anchoring on the full brand keeps this off the "Home" nav
+ *  link — under the old "Home Advisor" name that disambiguation was load-bearing;
+ *  "Property Advisor" no longer shares a prefix with it, but the nav item is still
+ *  there, so the full string stays. */
 function brandLink(): HTMLElement {
-  return screen.getByRole("link", { name: /Home Advisor/ });
+  return screen.getByRole("link", { name: /Property Advisor/ });
 }
 
 function openPanel(): HTMLElement {
@@ -54,8 +57,8 @@ describe("Navbar brand", () => {
     render(<Navbar />);
 
     // Guards Logo's `aria-hidden` on the mark from here too: losing it makes the
-    // link announce "H Home Advisor".
-    expect(brandLink()).toHaveAccessibleName("Home Advisor");
+    // link announce "P Property Advisor".
+    expect(brandLink()).toHaveAccessibleName("Property Advisor");
   });
 });
 

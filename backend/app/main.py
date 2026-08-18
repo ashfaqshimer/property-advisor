@@ -6,7 +6,7 @@ from app.config import get_settings
 
 settings = get_settings()
 
-app = FastAPI(title="Home Advisor API")
+app = FastAPI(title="Property Advisor API")
 
 app.add_middleware(
     CORSMiddleware,

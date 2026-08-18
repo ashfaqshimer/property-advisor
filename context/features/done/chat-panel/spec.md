@@ -1,5 +1,11 @@
 # Spec: Chat Panel
 
+> **Superseded copy — historical record.** This spec shipped when the panel header and
+> speaker prefix said "Home Advisor". The `brand-rename` chore relabelled the assistant
+> to **Amaya** ("Amaya — AI Advisor", `Amaya:`, "Conversation with Amaya", "Ask Amaya")
+> and renamed the brokerage to **Property Advisor**. Criteria left as written to preserve
+> what was agreed at the time; `CLAUDE.md` is authoritative on the brand and persona.
+
 ## Goal
 
 Replace the sticky chat panel's four placeholder blocks with the real static UI

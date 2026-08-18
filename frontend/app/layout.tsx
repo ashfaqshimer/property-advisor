@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Home Advisor — Property in Colombo and across Sri Lanka",
+  title: "Property Advisor — Property in Colombo and across Sri Lanka",
   description:
     "AI-guided property search across Sri Lanka's top locations. Tell us what you're looking for and we'll find the right address.",
 };

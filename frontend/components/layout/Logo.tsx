@@ -13,16 +13,17 @@ export default function Logo({ className = "" }: { className?: string }) {
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       {/*
         Hidden from assistive tech: the wordmark beside it already reads
-        "Home Advisor", and announcing the initial too gives "H Home Advisor".
+        "Property Advisor", and announcing the initial too gives
+        "P Property Advisor".
       */}
       <span
         aria-hidden="true"
         className="grid size-7 shrink-0 place-items-center rounded-md bg-brand text-sm font-semibold text-white"
       >
-        H
+        P
       </span>
       <span className="text-lg font-medium tracking-tight text-neutral-900">
-        Home Advisor
+        Property Advisor
       </span>
     </span>
   );

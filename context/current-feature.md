@@ -132,8 +132,9 @@ brand. External services (GitHub, Neon, Vercel) are already renamed.
     the brokerage. This amended the CLAUDE.md branding line, which had said the agent was
     named after the brand. Her age is load-bearing, not flavour: it's why she claims no
     experience and pushes valuations, commissions, and timelines to a senior agent, so the
-    persona and the no-overclaiming rules hold each other up. **The frontend still labels
-    her "Home Advisor" in 6 code sites and 5 test assertions** — pending, Phase 4.
+    persona and the no-overclaiming rules hold each other up. The frontend labelled her
+    with the brand name in 6 code sites and 5 test assertions; that was resolved by the
+    `brand-rename` chore, which also renamed the brokerage to **Property Advisor**.
   - **A tool's payload argues with the prompt, and tends to win.** `search_properties`
     returning a bare `[]` invites "no results found" no matter what the system instruction
     says, and the failure is silent. The zero-match payload therefore carries its own

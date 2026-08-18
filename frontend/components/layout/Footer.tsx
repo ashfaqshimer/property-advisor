@@ -7,7 +7,7 @@ import Logo from "@/components/layout/Logo";
  */
 const PHONE = "+94 11 200 0000";
 const PHONE_HREF = "tel:+94112000000";
-const EMAIL = "hello@homeadvisor.lk";
+const EMAIL = "hello@propertyadvisor.lk";
 
 // TODO: real URLs — no social accounts exist yet, so these are dead anchors.
 const SOCIAL_LINKS = [
@@ -116,7 +116,10 @@ export default function Footer() {
         </div>
 
         <div className="mt-10 border-t border-neutral-200 pt-6 text-xs text-neutral-500">
-          <p>© 2026 Home Advisor — a UI prototype. All imagery is illustrative.</p>
+          <p>
+            © 2026 Property Advisor — a UI prototype. All imagery is
+            illustrative.
+          </p>
         </div>
       </Container>
     </footer>
