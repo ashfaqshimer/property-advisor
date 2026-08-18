@@ -37,41 +37,80 @@
   just append a correction under it.
 -->
 
-**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
+**Feature:** `POST /chat` — HTTP surface for the agent loop
 
-**Spec:** <!-- context/features/<slug>/spec.md -->
+**Spec:** `context/features/chat-endpoint/spec.md`
 
 **Goal:**
-<!-- One or two sentences. What does "done" look like from the user's POV? -->
+Expose the existing `loop.run_turn` over HTTP so a browser can hold a conversation with
+Amaya. Phase 2 ended at a callable Python function; this is the thin, well-validated layer
+that makes it reachable. Done when `curl` can hold a multi-turn conversation against the
+deployed service — no frontend work.
 
-**Status:** `Not started | In progress | Blocked | In review/testing | Done`
+**Status:** `In progress`
 
-**Branch:** <!-- e.g. feature/property-search-filters -->
+**Branch:** `feature/chat-endpoint`
 
 ### Approach / Key Decisions
 <!--
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
--
+- TBD — to be worked out in conversation before coding. The spec pins the *constraints*
+  (see below); the shape of the router, error mapping, and test fakes is still open.
+- Two constraints from the spec that are easy to violate and invisible in tests:
+  the endpoint must be `def`, not `async def` (`run_turn` blocks on Gemini + Postgres, so
+  `async def` would serialise every concurrent user), and the Gemini client must arrive by
+  FastAPI dependency override, never `patch()`.
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
--
+- (none yet)
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
--
+- **`max_length=2000` on `message` is a guess**, not a settled number. It bounds one request
+  against an endpoint that costs money per call; revisit if it's tight for a seller
+  describing a property.
+- **`/chat` is unauthenticated and metered.** Up to five Gemini calls per request on a public
+  URL with no rate limit. Out of scope here by decision — flag before real traffic.
+- `GEMINI_API_KEY` must be set in the Render dashboard before the production verification
+  criterion can pass; it's deliberately unset today.
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1.
-2.
-3.
+1. `app/schemas/chat.py` — request/response models with the validation rules (strip before
+   `min_length`, `max_length=2000` on `message`, `max_length=128` on `session_id` to match
+   `Conversation.session_id`).
+2. `app/api/chat.py` — `def` endpoint calling `run_turn`, plus a `get_agent_client`
+   dependency for injection; mount it in `app/main.py`.
+3. Error mapping: `GeminiNotConfigured` → 503, Gemini transport/quota/safety → 502, and
+   catch the `IntegrityError` from two concurrent first requests racing on the UNIQUE
+   `session_id` → re-select, don't 500.
+4. Tests through `TestClient` with a scripted fake client: multi-turn continuity, the
+   tool-call path end to end, and each error/validation path. No network calls.
+5. Set `GEMINI_API_KEY` on Render, deploy, and verify a real multi-turn conversation that
+   triggers `search_properties` and returns a seeded listing.
+6. Update `backend/README.md` — it currently states production needs no `GEMINI_API_KEY`.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
--
+- **All frontend work.** `ChatPanel` stays on its fixture with controls disabled — that's the
+  `chat-client` feature, specced next against this endpoint once it's live.
+- **The opening greeting.** Deferred to the panel-wiring feature, because "two hellos" is
+  only observable there. It needs changes on *both* sides: persist the greeting as the
+  assistant turn at `seq 0` when the **first user message** arrives (never on page load, or
+  every bounced visit and crawler hit leaves a junk `conversations` row), plus a
+  `SYSTEM_PROMPT` line saying she has already greeted them, text kept as a constant beside
+  the persona.
+- **`GET /properties`** — deferred again; nothing in the chat path needs it.
+- **Streaming / SSE.** One request, one complete reply.
+- **Rate limiting, auth, cost telemetry.** Real exposure, not solved here.
+- **`get_property_details`**, `GET /leads`, retry/backoff on Gemini errors.
+- Returning tool metadata (matched property ids, lead-captured flag) in the response body.
+  The reply is prose; the database is the record.
+- Any agent *behaviour* change. The loop shipped in `fa8430d`; a wrong reply is a
+  `prompts.py` bug, and per CLAUDE.md the model string is not the lever.
 
 ---
 
