@@ -216,6 +216,16 @@ describe("error classification", () => {
     // Better a named error than `undefined` rendered into a bubble as Amaya's reply.
     expect((await rejectionFrom(send())).kind).toBe("unexpected");
   });
+
+  it.each([null, "a bare string", 42])(
+    "rejects a body that isn't an object at all (%s)",
+    async (body) => {
+      stubFetch(async () => jsonResponse(200, body));
+
+      // `typeof null === "object"`, so the null case is the one a naive guard lets through.
+      expect((await rejectionFrom(send())).kind).toBe("unexpected");
+    },
+  );
 });
 
 describe("caller cancellation", () => {

@@ -478,6 +478,54 @@ describe("when a turn fails", () => {
   });
 });
 
+describe("edge cases", () => {
+  it("sends and renders non-Latin input intact", async () => {
+    stubBackend(() => reply("Happy to help — an agent can follow up in Sinhala."));
+    render(<ChatPanel />);
+
+    const sinhala = "කොළඹ 7 හි නිවාස තිබේද?";
+    sendText(sinhala);
+
+    // Sent through JSON and rendered back without mangling; replies stay English by prompt.
+    expect(bodyOf(0).message).toBe(sinhala);
+    await act(async () => {});
+    expect(turns()[1]).toHaveTextContent(sinhala);
+  });
+
+  it("keeps the wrap guard that stops one long token widening the panel", async () => {
+    stubBackend(() => reply("x".repeat(200)));
+    render(<ChatPanel />);
+
+    sendText("Send me something unbroken");
+    await act(async () => {});
+
+    // jsdom cannot measure the overflow this prevents. A deletion guard for the utility
+    // that stops a single unbroken token forcing the whole panel to scroll sideways.
+    expect(turns()[2].firstElementChild).toHaveClass("wrap-break-word");
+  });
+
+  it("aborts an in-flight request when the panel unmounts", async () => {
+    const pending = deferred();
+    stubBackend(() => pending.promise);
+    const { unmount } = render(<ChatPanel />);
+
+    sendText("Hello");
+    const signal = (chatCalls()[0][1] as RequestInit).signal as AbortSignal;
+    expect(signal.aborted).toBe(false);
+
+    unmount();
+
+    // This is what lets the catch tell "nobody is listening any more" from a real failure,
+    // so a reply landing after navigation sets no state on a removed tree. Asserted on the
+    // signal rather than on console noise: React 19 no longer warns about it, so a
+    // console-error assertion here would pass whether or not the abort happened.
+    expect(signal.aborted).toBe(true);
+    await act(async () => {
+      pending.resolve(reply("Too late."));
+    });
+  });
+});
+
 describe("accessibility", () => {
   it("announces new replies through a polite live region", () => {
     stubBackend();
