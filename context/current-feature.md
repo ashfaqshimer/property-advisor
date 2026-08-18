@@ -37,147 +37,41 @@
   just append a correction under it.
 -->
 
-**Feature:** Agent Core (Phase 2) — the hand-rolled Gemini tool-calling loop
+**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
 
-**Spec:** `context/features/agent-core/spec.md`
+**Spec:** <!-- context/features/<slug>/spec.md -->
 
 **Goal:**
-A `run_turn(session_id, user_message)` entry point that sends conversation history plus
-tool declarations to Gemini, executes `search_properties` / `capture_lead` when the model
-calls them, persists every turn to the chat tables, and returns the final assistant text.
-Exercisable from pytest and a throwaway script — **no HTTP endpoint in this phase.**
+<!-- One or two sentences. What does "done" look like from the user's POV? -->
 
-**Status:** `In progress`
+**Status:** `Not started | In progress | Blocked | In review/testing | Done`
 
-**Branch:** `feature/agent-core`
+**Branch:** <!-- e.g. feature/property-search-filters -->
 
 ### Approach / Key Decisions
-
-<!-- Settled with the user in the refinement conversation before the spec was drafted —
-     not derived from the spec. Don't relitigate these while implementing. -->
-
-- **The assistant is Amaya** — female, early twenties, she/her, an advisor *at* Home
-  Advisor. Home Advisor is the brokerage, not her name. This **supersedes the old
-  CLAUDE.md branding line**, which is amended in this branch. Her age is load-bearing
-  rather than decoration: it's why the prompt forbids claiming experience and routes
-  valuations, commissions, and timelines to a senior agent — persona and
-  no-overclaiming rules reinforce each other.
-- **Amaya never claims to be human and invents no biography.** Asked directly, she says
-  she's Home Advisor's AI assistant and carries on; she doesn't lead with it unprompted,
-  doesn't volunteer her age, and improvises no university or years-in-the-business.
-- **`search_properties` never returns a bare `[]`.** Zero matches return
-  `{matches: [], guidance: "..."}` telling the model not to say we have nothing, to offer
-  an agent check including unpublished stock, and to ask for a name and number.
-  Belt-and-braces with the prompt: a bare empty list invites "no results found" no matter
-  what the system instruction says, and that failure is *silent*.
-- **`leads.intent`** — new nullable enum (`buy` | `rent` | `sell`) via the existing
-  `enum_column()` helper, plus an `intent` param on `capture_lead`. Chosen over stuffing
-  seller details into free-text `preferences` so seller leads stay filterable.
-- **The filter query goes in `app/db/queries.py`, not `tools.py`** — reversing that file's
-  current docstring, which says the opposite. Reason: the Phase 3 `GET /properties`
-  endpoint shouldn't have to import from the agent package. Update the docstring rather
-  than leaving it contradicting the code.
-- **English-only replies. Process-only seller differentiators, zero comparative claims**
-  about other agents. No valuations, commissions, or timelines.
-- Loop capped at 5 iterations; model string stays in `app/config.py`. Raw `google-genai`,
-  no framework — this is the point of the project, not an implementation detail.
+<!--
+  Why you're building it this way — especially anything non-obvious.
+  This is the highest-value section: code shows WHAT, this shows WHY.
+-->
+-
 
 ### Files Touched
-
-- `CLAUDE.md` — branding line amended for the Amaya persona
-- `context/features/agent-core/spec.md` — the spec
-- `backend/pyproject.toml` — `google-genai` 2.18.1; dev: `pytest-cov`
-- `backend/app/agent/` — `__init__.py`, `prompts.py`, `client.py`, `tools.py`, `loop.py`
-- `backend/app/models/lead.py` — `LeadIntent` + `intent` column; exported in `models/__init__.py`
-- `backend/app/db/queries.py` — `search_properties()` + reversed docstring
-- `backend/alembic/versions/20260818_c9432564c721_add_leads_intent.py`
-- `backend/tests/` — `agent_fakes.py`, `test_agent_prompts.py`, `test_agent_tools.py`,
-  `test_agent_loop.py`, and a `TestLeadIntent` block in `test_chat_models.py`
-- `backend/scripts/chat.py` — terminal REPL for talking to Amaya, since there's no endpoint
-  until Phase 3. Defaults to throwaway in-memory SQLite; `--neon` writes to the real
-  database; `--verbose` prints the loop's function calls and tool payloads.
-- `backend/README.md` — a "Talking to the agent" section covering the above
-
-### Resolved While Building
-
-- **`op.add_column` *does* emit the type-bound CHECK.** The open question on the migration
-  turned out not to bite: Neon holds `ck_leads_lead_intent` with `IN ('buy','rent','sell')`
-  and rejects `'banana'`. Checked in the catalog rather than inferred from the column.
-  A follow-up autogenerate came back empty, so `_type_bound_check_names()` absorbed the new
-  constraint by itself, as designed.
-- **140 tests, 0.9s, no network.** `app/agent/` coverage: `loop.py` 100%, `tools.py` 100%,
-  `prompts.py` 100%, `client.py` 96% — the one uncovered line is the live
-  `generate_content` call, which by definition can't run offline. Project total 97%.
-  `pytest-cov` is now a dev dependency; the properties retro's "94%" had been measured
-  ad hoc.
-- **Live `flash-lite` chains tools fine** and extracted four parameters from one sentence
-  ("3 bedroom house in Jaffna, budget around 40 million" → `location`, `property_type`,
-  `bedrooms`, `budget_max`). No model upgrade needed.
-
-### Live Verification Results (gemini-3.1-flash-lite)
-
-Run against in-memory SQLite seeded with the eight real listings — deliberately *not* Neon,
-so throwaway conversations leave no rows in production.
-
-- ✅ **Zero match (the headline criterion).** Jaffna search → `match_count=0`. She named no
-  property, did not say we have nothing or that we don't cover Jaffna, offered a senior
-  agent check "including unpublished stock", and asked for a name and number.
-- ✅ **Seller.** Asked point-blank "why you and not another agent", she answered with
-  process only — walkthrough, comparables pricing, in-house photography, pre-qualified
-  buyers — and made no comparative claim. Refused both the valuation and the commission,
-  deferring to a senior agent.
-- ✅ **Sinhala in, English out.** Romanised Sinhala got an English reply (with "Ayubowan!"),
-  and she asked one clarifying question before searching rather than guessing.
-- ✅ **AI disclosure.** "Are you a real person or a bot?" → "I'm Home Advisor's AI
-  assistant", then straight back to helping. No deflection, no claim to be human.
-- ✅ **Declines contact details** — after the rule below was settled and the prompt
-  reconciled to it. She takes the "no" ("no pressure at all") and keeps helping without
-  re-asking; then, when nothing else is published, makes exactly one offer of a senior-agent
-  check and closes with "Either way, I am happy to keep monitoring the new listings for you
-  here." Took three passes at the wording: the first live run re-asked in disguise, a flat
-  ban then contradicted the brief, and the third encodes the decision.
-
-### Resolved Decisions
-
-- **The re-ask rule.** "Ask once then drop it" and "on empty inventory, offer the agent
-  check and try for their details" genuinely conflict — the second *is* a second ask — and
-  the conflict was in the original brief, not the implementation. **Settled: one low-key
-  re-offer is allowed** when nothing published matches and an agent would have to dig,
-  provided she says in the same breath that she'll keep looking either way. Repeating the ask
-  turn after turn is still wrong. `prompts.py` and the spec's manual criterion both say this
-  now; an earlier, stricter wording that forbade it has been removed so the two can't fight.
-- **The opening greeting: deferred to Phase 4.** A *generated* greeting was rejected — a
-  model call before the user types costs tokens per page view, stacks latency on Render's
-  cold start, and can't say anything useful. The static one belongs with the panel that
-  renders it. **The trap is written into the spec's Out of Scope section**: a greeting shown
-  in the UI but never persisted makes the model greet a second time, and no test can see it.
+<!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
+-
 
 ### Open Questions / Blockers
-
-- Retries/backoff on Gemini transport errors are deliberately absent — a transport error
-  propagates out of `run_turn`. Deferred to Phase 5, on purpose: a silent retry now would
-  hide the flakiness worth measuring first.
-- `scripts/chat.py --neon` is the one path never run: it writes real rows, so it was left
-  for the owner rather than exercised here.
+<!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
+-
 
 ### Next Steps
-
-1. Commit (nothing is committed yet beyond the earlier tracker/spec commit).
-2. `complete-feature agent-core`.
+<!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
+1.
+2.
+3.
 
 ### Explicitly Out of Scope (for now)
-
-- **`POST /chat`** — Phase 3, its own feature. This phase ends at a callable Python function.
-- **`GET /properties`** — deferred again to Phase 3. The *filter query* ships here; the
-  endpoint doesn't, because this phase is deliberately endpoint-free.
-- **`get_property_details`** — optional per the overview; a small addition once the loop
-  exists.
-- **The frontend rename to Amaya** — it still says "Home Advisor" in 6 code sites plus 5
-  test assertions (`lib/chat.ts`, `components/chat/ChatPanel.tsx`,
-  `tests/chat-panel.test.tsx`). Pending work, not a second opinion; Phase 4 touches those
-  files anyway.
-- `GET /leads` and auth on it; streaming responses; all other frontend work; Sinhala or
-  Tamil *generation*; retry/backoff, rate limiting, cost telemetry.
+<!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
+-
 
 ---
 
@@ -188,6 +82,61 @@ so throwaway conversations leave no rows in production.
   Goal is "remind me what this was and where the bodies are buried," not a
   full changelog (git already has that).
 -->
+
+### Agent Core — the hand-rolled Gemini loop — 2026-08-18
+- **What:** Phase 2. `loop.run_turn(db, session_id, message)` → history + tool declarations
+  to Gemini, execute `search_properties` / `capture_lead`, persist every turn, return
+  Amaya's reply. Raw `google-genai`, no framework, capped at 5 model calls. Plus a
+  `leads.intent` enum and a terminal REPL. No endpoint — `POST /chat` is Phase 3.
+- **Key files:** `backend/app/agent/` (`loop.py`, `tools.py`, `prompts.py`, `client.py`),
+  `backend/app/db/queries.py`, `backend/scripts/chat.py`,
+  `backend/alembic/versions/20260818_c9432564c721_add_leads_intent.py`
+- **Gotchas/lessons:**
+  - **The assistant is Amaya, not "Home Advisor".** Female, early twenties, an advisor *at*
+    the brokerage. This amended the CLAUDE.md branding line, which had said the agent was
+    named after the brand. Her age is load-bearing, not flavour: it's why she claims no
+    experience and pushes valuations, commissions, and timelines to a senior agent, so the
+    persona and the no-overclaiming rules hold each other up. **The frontend still labels
+    her "Home Advisor" in 6 code sites and 5 test assertions** — pending, Phase 4.
+  - **A tool's payload argues with the prompt, and tends to win.** `search_properties`
+    returning a bare `[]` invites "no results found" no matter what the system instruction
+    says, and the failure is silent. The zero-match payload therefore carries its own
+    `guidance` string. Belt-and-braces like this is worth it wherever a prompt rule fires
+    exactly when a tool returns nothing.
+  - **The `op.add_column` enum-CHECK worry did not hold.** Unlike the two prior migrations,
+    where CHECKs rode inside `CREATE TABLE`, this one adds an enum column to an existing
+    table — and Alembic 1.19 emits the constraint anyway. Confirmed in `pg_constraint`,
+    confirmed it rejects `'banana'`, and confirmed `downgrade` drops column/CHECK/index with
+    re-upgrade restoring all three. `_type_bound_check_names()` absorbed the new name by
+    itself (it reads the models), so the follow-up autogenerate came back empty. **Still
+    check the catalog rather than the column if this is repeated.**
+  - **A mocked Gemini proves plumbing and nothing else** — the fake supplies the reply text,
+    so no test here says anything about prompt adherence. That split is now explicit: the
+    automated half asserts the tool contract, the model-behaviour half is five manual live
+    scenarios. All five pass; `flash-lite` chained `search_properties` → `capture_lead` in
+    one conversation and extracted four search params from one sentence, so no model upgrade
+    was needed.
+  - **The prompt's contact-details rule took three passes, and the second was worse than the
+    first.** Live testing caught her re-asking for a number in disguise after being
+    declined; a flat "never ask again" then contradicted the owner's own empty-inventory
+    instruction, which *is* a second ask. Settled: one hedged re-offer when nothing
+    published matches. **When a prompt rule won't hold after two attempts, check the brief
+    for a conflict before tuning a third time.**
+  - **Two acceptance criteria were written as greps that produce false positives** — the
+    framework names appear in comments saying we don't use one, and `terra` matches
+    "terrace" in real listing copy. Both criteria were reworded rather than waved through.
+    Write criteria as *imports and dependencies* or word-boundary matches, not substrings.
+  - `scripts/chat.py` defaults to in-memory SQLite, not Neon: every turn writes to three
+    tables, and browsing against production leaves fake leads indistinguishable from real
+    ones. `--neon` exists and is the one path deliberately never run here.
+  - `pytest-cov` is now a dev dependency; the properties retro's "94%" had been measured
+    ad hoc. Agent coverage is 99% — the single uncovered line is the live
+    `generate_content` call, which by definition can't run offline.
+  - **Deliberate deviations:** `leads.intent` and its `capture_lead` param (not in
+    PROJECT_OVERVIEW §4/§5); filtered search moved *into* `db/queries.py`, reversing that
+    module's own docstring, so Phase 3's `GET /properties` needn't import from `app.agent`;
+    `scripts/` is new; the opening greeting was deferred to Phase 4 with its
+    double-greeting trap written into the archived spec.
 
 ### Chat Schema (conversations, messages, leads) — 2026-08-17
 - **What:** The last three tables from PROJECT_OVERVIEW §4, split out of Phase 2 so
