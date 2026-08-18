@@ -56,16 +56,32 @@ deployed service — no frontend work.
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
-- TBD — to be worked out in conversation before coding. The spec pins the *constraints*
-  (see below); the shape of the router, error mapping, and test fakes is still open.
-- Two constraints from the spec that are easy to violate and invisible in tests:
-  the endpoint must be `def`, not `async def` (`run_turn` blocks on Gemini + Postgres, so
-  `async def` would serialise every concurrent user), and the Gemini client must arrive by
-  FastAPI dependency override, never `patch()`.
+- **`def`, not `async def`.** `run_turn` blocks on Gemini + Postgres for the whole turn;
+  under `async def` it would hold the event loop and serialise every concurrent user.
+- **`get_agent_client` dependency**, overridden in `conftest.py` like `get_db`. Resolved per
+  request, not at import, so a missing key is a 503 on first call rather than a boot crash.
+  No test patches the network boundary.
+- **503 via an app-level exception handler**, not a try/except in the endpoint. The client is
+  built in a dependency, which resolves *before* the route function runs — a handler in the
+  body would never see `GeminiNotConfigured`.
+- **`str_strip_whitespace=True` on `ChatRequest`** rather than a custom validator. Pydantic
+  strips before applying length constraints, so `"   "` becomes a `string_too_short` 422 and
+  surrounding whitespace doesn't count toward the 2000-char cap. Verified, not assumed.
+- **Session race handled by one retry** after `db.rollback()`. Safe because the turn is
+  atomic: nothing was committed, so the losing attempt's rows vanish and the retry finds the
+  winner's conversation. Costs one extra model call in a rare race.
+- **502 maps `google.genai.errors.APIError`** (base of `ClientError`/`ServerError`). The
+  upstream message is deliberately not forwarded.
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
-- (none yet)
+- `backend/app/schemas/chat.py` (new) — `ChatRequest` / `ChatResponse` + the two caps
+- `backend/app/api/chat.py` (new) — endpoint, `get_agent_client`, session-race retry
+- `backend/app/main.py` — mount the router, `GeminiNotConfigured` → 503 handler
+- `backend/tests/test_chat_endpoint.py` (new) — 17 tests, 100% of the new modules
+- `backend/tests/conftest.py` — `chat_client` factory fixture
+- `backend/README.md` — endpoint docs, error table, `GEMINI_API_KEY` now required
+- `context/features/chat-endpoint/spec.md` — amended the safety-block criterion
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
@@ -79,19 +95,31 @@ deployed service — no frontend work.
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1. `app/schemas/chat.py` — request/response models with the validation rules (strip before
-   `min_length`, `max_length=2000` on `message`, `max_length=128` on `session_id` to match
-   `Conversation.session_id`).
-2. `app/api/chat.py` — `def` endpoint calling `run_turn`, plus a `get_agent_client`
-   dependency for injection; mount it in `app/main.py`.
-3. Error mapping: `GeminiNotConfigured` → 503, Gemini transport/quota/safety → 502, and
-   catch the `IntegrityError` from two concurrent first requests racing on the UNIQUE
-   `session_id` → re-select, don't 500.
-4. Tests through `TestClient` with a scripted fake client: multi-turn continuity, the
-   tool-call path end to end, and each error/validation path. No network calls.
-5. Set `GEMINI_API_KEY` on Render, deploy, and verify a real multi-turn conversation that
-   triggers `search_properties` and returns a seeded listing.
-6. Update `backend/README.md` — it currently states production needs no `GEMINI_API_KEY`.
+1. ~~`app/schemas/chat.py`~~ — done.
+2. ~~`app/api/chat.py` + mount in `main.py`~~ — done.
+3. ~~Error mapping (503 / 502 / session-race retry)~~ — done.
+4. ~~Tests through `TestClient` with a scripted fake~~ — done. 159 pass, 100% coverage of
+   `app/api/chat.py`, `app/schemas/chat.py`, `app/main.py`.
+5. ~~Update `backend/README.md`~~ — done.
+6. **Remaining:** set `GEMINI_API_KEY` in the Render dashboard, deploy, and verify a real
+   multi-turn conversation against `https://property-advisor-96sg.onrender.com/chat` —
+   including one turn that triggers `search_properties` and returns a seeded listing. This
+   is the last acceptance criterion and it needs the dashboard.
+7. ~~Verify against the real model~~ — **done locally, and it passed.** Three-turn
+   conversation through `POST /chat` on `fastapi dev` against Neon
+   (`session_id: local-real-check-c9e58a0`), all 200s in 4–6s each:
+   - Turn 1 (vague "a place in Colombo") → clarifying question, **no** premature search.
+   - Turn 2 → `search_properties({location: "Colombo 5", budget_max: 50000000,
+     property_type: "apartment"})` → matched the seeded Havelock Residences, described in
+     prose with the real LKR 48M price.
+   - Turn 3 (name + phone) → `capture_lead(...)` → a real `leads` row: `intent=BUY`,
+     `budget_max=Decimal('50000000.00')`, name and phone intact.
+   - 10 `messages` rows in `seq` order with both tool calls and both tool responses.
+   - The four 422 paths re-verified against the live server.
+
+   **This settles an open question in CLAUDE.md:** `gemini-3.1-flash-lite` *does* chain
+   `search_properties` → `capture_lead` across one conversation, so there's no reason to
+   move to the non-lite Flash model.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
