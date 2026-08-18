@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Frontend shell is complete; backend has its database layer and one endpoint.**
+**Frontend shell is complete; the backend is deployed on Render with its database layer and agent module, but the two are not yet connected.**
 
 `frontend/` — Next **16.2.12**, React 19.2.4, Tailwind **v4**, TypeScript, pnpm. Every region of the homepage is built (header, hero, featured grid, chat panel, footer). It still runs entirely on local fixtures: `lib/properties.ts` and `lib/chat.ts`. Nothing fetches from the backend yet — there is no API client and `NEXT_PUBLIC_API_URL` is unset.
 
-`backend/` — FastAPI on **uv + `pyproject.toml`** (not `requirements.txt`, which the spec mentions), Python 3.11. Has SQLAlchemy 2.0 + Alembic against Neon, all four tables (`properties`, `conversations`, `messages`, `leads`), and `GET /properties/featured` alongside `GET /health`. The agent (`app/agent/`), `POST /chat`, and `GET /properties` do not exist yet — Phase 2/3. Nothing writes to the three chat tables yet; they exist so the Phase 2 loop and `capture_lead` have somewhere to persist.
+`backend/` — FastAPI on **uv + `pyproject.toml`** (not `requirements.txt`, which the spec mentions), Python 3.11. Has SQLAlchemy 2.0 + Alembic against Neon, all four tables (`properties`, `conversations`, `messages`, `leads`), and `GET /properties/featured` alongside `GET /health`. `app/agent/` now exists and is tested — `loop.run_turn`, `tools.search_properties`/`tools.capture_lead`, `prompts.SYSTEM_PROMPT`, and the `client.GeminiClient` wrapper — but **nothing calls it over HTTP**: `POST /chat` and `GET /properties` still don't exist, so the loop is unreachable from the outside and the three chat tables stay empty in production. Wiring that endpoint is the next backend step.
+
+Deployed to Render's free tier off `main`, with `/health` and `/properties/featured` verified against Neon in production. `GEMINI_API_KEY` is deliberately unset there until `POST /chat` lands. Note that migrations and seeding are run **locally** against Neon rather than on Render — the free tier has no shell — so a deploy alone never changes the schema. Details in [backend/README.md](backend/README.md).
 
 Backend commands run from `backend/`: `uv sync`, `uv run alembic upgrade head`, `uv run python -m app.db.seed`, `uv run fastapi dev app/main.py`, `uv run pytest`. See [backend/README.md](backend/README.md).
 
@@ -86,6 +88,6 @@ SQLite covers more than it looks like it does: it enforces UNIQUE, it enforces C
 ## Environment
 
 Backend `.env`: `DATABASE_URL` (Neon), `GEMINI_API_KEY` (AI Studio), `ALLOWED_ORIGINS`.
-Frontend `.env.local`: `NEXT_PUBLIC_API_URL` (the Render backend URL).
+Frontend `.env.local`: `NEXT_PUBLIC_API_URL` — the deployed backend is `https://property-advisor-96sg.onrender.com`.
 
 The Render free tier spins down when idle, so the first request after inactivity is slow — expected, not a bug.
