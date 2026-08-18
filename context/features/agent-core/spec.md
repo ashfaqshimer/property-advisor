@@ -13,8 +13,11 @@ throwaway script — **no HTTP endpoint in this phase.**
 ### Dependency and client
 
 - [ ] `google-genai` is a runtime dependency in `backend/pyproject.toml`; `uv sync` succeeds.
-- [ ] `grep -riE 'langchain|langgraph|llama_index|crewai' backend/pyproject.toml backend/app`
-      returns nothing. The loop is hand-rolled — this is the point of the project.
+- [ ] No agent framework is imported or declared: no `langchain` / `langgraph` /
+      `llama_index` / `crewai` in `pyproject.toml`, and no import of one anywhere in `app/`.
+      The loop is hand-rolled — this is the point of the project. (Checked as *imports and
+      dependencies*, not a bare substring grep: the framework names legitimately appear in
+      comments explaining that we don't use one.)
 - [ ] `app/agent/client.py` wraps the SDK and is the only module that constructs a
       `genai.Client`.
 - [ ] The model string is read from `get_settings().gemini_model`. `grep -rn
@@ -33,8 +36,9 @@ throwaway script — **no HTTP endpoint in this phase.**
       `"Amaya"` is in `SYSTEM_PROMPT`, and that the prompt does not name the assistant
       "Home Advisor" (that's the brokerage, not the person).
 - [ ] No persona/instruction strings live in `loop.py`, `tools.py`, or `client.py`.
-- [ ] `grep -ri 'terra' backend/app` returns nothing (brand rule — the mockup's wording is
-      placeholder art).
+- [ ] No "Terra" branding from the mockup anywhere in `app/` (brand rule — that wording is
+      placeholder art). Match on a word boundary, not a bare substring: two seeded listings
+      legitimately mention a *terrace*, and `Beachside Terrace House` is real content.
 
 ### Tools
 
@@ -119,8 +123,13 @@ throwaway script — **no HTTP endpoint in this phase.**
 - [ ] One seller conversation: the agent stays process-only, makes no comparative claim
       about other agents, and quotes no valuation, commission, or timeline.
 - [ ] One message written in Sinhala gets an English reply.
-- [ ] A conversation where the user declines to give contact details: the agent asks once,
-      then drops it and keeps helping.
+- [ ] A conversation where the user declines to give contact details: the agent accepts it
+      and keeps helping rather than nagging. **Amended after live testing** — a flat "never
+      ask again" turned out to contradict the owner's empty-inventory instruction ("an agent
+      will have to check and get back to you, and try to get their details"), which *is* a
+      second ask. Settled rule: one low-key re-offer is allowed when nothing published
+      matches and an agent would have to dig, provided she makes clear in the same breath
+      that she'll keep looking either way. Repeating the ask turn after turn is still a fail.
 - [ ] Asked "are you a real person?" / "am I talking to a human?", Amaya says plainly she's
       Home Advisor's AI assistant and carries on — she does not deflect and does not claim
       to be human.
@@ -142,6 +151,18 @@ throwaway script — **no HTTP endpoint in this phase.**
 - Any frontend work. `ChatPanel` stays on its fixture and its controls stay disabled.
 - Sinhala or Tamil *generation* (replies are English-only by decision).
 - Retry/backoff on Gemini errors, rate limiting, and cost telemetry.
+- **The opening greeting — deferred to Phase 4 by decision.** A *generated* greeting was
+  rejected outright: a model call before the user has typed costs tokens on every page view,
+  stacks latency on top of Render's cold start, and can't say anything useful yet. A static
+  one is right, and it belongs with the panel that renders it.
+  **Trap for whoever wires the panel up:** a greeting shown in the UI but never persisted
+  leaves the model's first turn seeing a conversation that opens with the *user's* message —
+  so it greets them a second time and the user sees two hellos. Every test passes; this is
+  only visible in the real panel. Fix it on both sides — persist the greeting as the
+  assistant turn at `seq 0` when the **first user message** arrives (not on page load, or
+  every bounced visit and crawler hit leaves a junk `conversations` row), and add a line to
+  `SYSTEM_PROMPT` saying she has already greeted them. Keep the text as a constant beside
+  the persona so it can't drift from her voice or get renamed back to the brand.
 
 ## Edge Cases
 
@@ -207,8 +228,17 @@ contact details.
 
 ## Contact details
 Earn them, don't demand them. Help first; ask once, naturally, once you have
-something worth following up on. If they decline, drop it and keep helping —
-do not ask again. Capture whatever you get, even a number without a name.
+something worth following up on.
+
+If they decline, accept it and carry on helping. Don't nag, don't repeat the
+ask turn after turn, and don't dress the same ask up as a fresh question.
+
+One exception, and only once: if the situation genuinely changes — nothing
+published matches what they want, and a senior agent would have to check
+unpublished stock — you may say so and let them decide. Make it clear in the
+same breath that you're happy to keep looking with them either way.
+
+Capture whatever you get, even a number without a name.
 
 ## Language
 Respond in English. If someone writes in Sinhala or Tamil, reply in English

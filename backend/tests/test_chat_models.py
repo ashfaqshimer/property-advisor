@@ -18,7 +18,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Conversation, Lead, Message, MessageRole
+from app.models import Conversation, Lead, LeadIntent, Message, MessageRole
 
 
 def _conversation(session: Session, session_id: str = "sess-1") -> Conversation:
@@ -130,6 +130,41 @@ class TestMessageRole:
                 ),
                 {"id": uuid.uuid4().hex, "cid": conversation.id.hex},
             )
+
+
+class TestLeadIntent:
+    """`leads.intent` — added with the agent's seller lane, so "show me every seller lead"
+    isn't a substring search over the free-text `preferences` blob."""
+
+    def test_persists_lowercase_value_not_member_name(self, db_session: Session):
+        conversation = _conversation(db_session)
+        db_session.add(Lead(conversation_id=conversation.id, intent=LeadIntent.SELL))
+        db_session.commit()
+
+        assert db_session.scalar(text("SELECT intent FROM leads")) == "sell"
+
+    def test_check_constraint_rejects_an_invalid_value(self, db_session: Session):
+        """Verified in Neon too: `op.add_column` did emit `ck_leads_lead_intent`, which was
+        the open question on that migration — see its docstring."""
+        conversation = _conversation(db_session)
+        with pytest.raises(IntegrityError):
+            db_session.execute(
+                text(
+                    "INSERT INTO leads (id, conversation_id, intent) "
+                    "VALUES (:id, :cid, 'banana')"
+                ),
+                {"id": uuid.uuid4().hex, "cid": conversation.id.hex},
+            )
+
+    def test_is_nullable(self, db_session: Session):
+        """Intent is often clear from the first message, but not always, and guessing wrong
+        is worse than leaving it unset."""
+        conversation = _conversation(db_session)
+        lead = Lead(conversation_id=conversation.id, phone="0771234567")
+        db_session.add(lead)
+        db_session.commit()
+
+        assert lead.intent is None
 
 
 class TestToolPayload:

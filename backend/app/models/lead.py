@@ -4,6 +4,7 @@ What the agent's `capture_lead` tool writes. Every field except the conversation
 nullable, because a lead is assembled over several turns rather than arriving complete.
 """
 
+import enum
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -12,6 +13,20 @@ from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models._enum import enum_column
+
+
+class LeadIntent(str, enum.Enum):
+    """Which side of the transaction this person is on.
+
+    NOT IN PROJECT_OVERVIEW.md §4 — added when the agent persona grew a seller lane. The
+    alternative was recording "wants to sell" inside the free-text `preferences` blob,
+    which makes "show me every seller lead" a substring search over prose.
+    """
+
+    BUY = "buy"
+    RENT = "rent"
+    SELL = "sell"
 
 
 class Lead(Base):
@@ -31,6 +46,13 @@ class Lead(Base):
     # comparable without a cast.
     budget_min: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     budget_max: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+
+    # Nullable like the rest: intent is often clear from the first message, but not always,
+    # and guessing it wrong is worse than leaving it unset. Indexed because the point of
+    # having the column at all is "show me the sellers".
+    intent: Mapped[LeadIntent | None] = mapped_column(
+        enum_column(LeadIntent, "lead_intent"), nullable=True, index=True
+    )
 
     # Free-form notes the agent distils from the conversation, not a structured filter.
     preferences: Mapped[str | None] = mapped_column(Text, nullable=True)

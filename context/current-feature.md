@@ -84,48 +84,86 @@ Exercisable from pytest and a throwaway script — **no HTTP endpoint in this ph
 
 ### Files Touched
 
-<!-- Running list; nothing built yet. -->
-- `CLAUDE.md` — branding line amended for the Amaya persona (done)
-- `context/features/agent-core/spec.md` — the spec (done)
-- Expected: `backend/pyproject.toml` (`google-genai`),
-  `backend/app/agent/{__init__,client,prompts,tools,loop}.py`,
-  `backend/app/models/lead.py`, `backend/app/db/queries.py`,
-  a new `backend/alembic/versions/` migration, `backend/tests/` (new agent tests)
+- `CLAUDE.md` — branding line amended for the Amaya persona
+- `context/features/agent-core/spec.md` — the spec
+- `backend/pyproject.toml` — `google-genai` 2.18.1; dev: `pytest-cov`
+- `backend/app/agent/` — `__init__.py`, `prompts.py`, `client.py`, `tools.py`, `loop.py`
+- `backend/app/models/lead.py` — `LeadIntent` + `intent` column; exported in `models/__init__.py`
+- `backend/app/db/queries.py` — `search_properties()` + reversed docstring
+- `backend/alembic/versions/20260818_c9432564c721_add_leads_intent.py`
+- `backend/tests/` — `agent_fakes.py`, `test_agent_prompts.py`, `test_agent_tools.py`,
+  `test_agent_loop.py`, and a `TestLeadIntent` block in `test_chat_models.py`
+- `backend/scripts/chat.py` — terminal REPL for talking to Amaya, since there's no endpoint
+  until Phase 3. Defaults to throwaway in-memory SQLite; `--neon` writes to the real
+  database; `--verbose` prints the loop's function calls and tool payloads.
+- `backend/README.md` — a "Talking to the agent" section covering the above
+
+### Resolved While Building
+
+- **`op.add_column` *does* emit the type-bound CHECK.** The open question on the migration
+  turned out not to bite: Neon holds `ck_leads_lead_intent` with `IN ('buy','rent','sell')`
+  and rejects `'banana'`. Checked in the catalog rather than inferred from the column.
+  A follow-up autogenerate came back empty, so `_type_bound_check_names()` absorbed the new
+  constraint by itself, as designed.
+- **140 tests, 0.9s, no network.** `app/agent/` coverage: `loop.py` 100%, `tools.py` 100%,
+  `prompts.py` 100%, `client.py` 96% — the one uncovered line is the live
+  `generate_content` call, which by definition can't run offline. Project total 97%.
+  `pytest-cov` is now a dev dependency; the properties retro's "94%" had been measured
+  ad hoc.
+- **Live `flash-lite` chains tools fine** and extracted four parameters from one sentence
+  ("3 bedroom house in Jaffna, budget around 40 million" → `location`, `property_type`,
+  `bedrooms`, `budget_max`). No model upgrade needed.
+
+### Live Verification Results (gemini-3.1-flash-lite)
+
+Run against in-memory SQLite seeded with the eight real listings — deliberately *not* Neon,
+so throwaway conversations leave no rows in production.
+
+- ✅ **Zero match (the headline criterion).** Jaffna search → `match_count=0`. She named no
+  property, did not say we have nothing or that we don't cover Jaffna, offered a senior
+  agent check "including unpublished stock", and asked for a name and number.
+- ✅ **Seller.** Asked point-blank "why you and not another agent", she answered with
+  process only — walkthrough, comparables pricing, in-house photography, pre-qualified
+  buyers — and made no comparative claim. Refused both the valuation and the commission,
+  deferring to a senior agent.
+- ✅ **Sinhala in, English out.** Romanised Sinhala got an English reply (with "Ayubowan!"),
+  and she asked one clarifying question before searching rather than guessing.
+- ✅ **AI disclosure.** "Are you a real person or a bot?" → "I'm Home Advisor's AI
+  assistant", then straight back to helping. No deflection, no claim to be human.
+- ✅ **Declines contact details** — after the rule below was settled and the prompt
+  reconciled to it. She takes the "no" ("no pressure at all") and keeps helping without
+  re-asking; then, when nothing else is published, makes exactly one offer of a senior-agent
+  check and closes with "Either way, I am happy to keep monitoring the new listings for you
+  here." Took three passes at the wording: the first live run re-asked in disguise, a flat
+  ban then contradicted the brief, and the third encodes the decision.
+
+### Resolved Decisions
+
+- **The re-ask rule.** "Ask once then drop it" and "on empty inventory, offer the agent
+  check and try for their details" genuinely conflict — the second *is* a second ask — and
+  the conflict was in the original brief, not the implementation. **Settled: one low-key
+  re-offer is allowed** when nothing published matches and an agent would have to dig,
+  provided she says in the same breath that she'll keep looking either way. Repeating the ask
+  turn after turn is still wrong. `prompts.py` and the spec's manual criterion both say this
+  now; an earlier, stricter wording that forbade it has been removed so the two can't fight.
+- **The opening greeting: deferred to Phase 4.** A *generated* greeting was rejected — a
+  model call before the user types costs tokens per page view, stacks latency on Render's
+  cold start, and can't say anything useful. The static one belongs with the panel that
+  renders it. **The trap is written into the spec's Out of Scope section**: a greeting shown
+  in the UI but never persisted makes the model greet a second time, and no test can see it.
 
 ### Open Questions / Blockers
 
-- **Will `op.add_column` emit the type-bound CHECK for `leads.intent`?** The two prior
-  migrations got their enum CHECKs for free inside `CREATE TABLE`; adding an enum column
-  to an *existing* table may not. `leads.intent` could land in Neon as a bare VARCHAR
-  while the SQLite suite passes anyway. **Verify in the Neon catalog, don't infer it from
-  the column existing.** If absent, write the constraint explicitly in the migration.
-- **A mocked Gemini cannot prove prompt adherence** — the fake supplies the reply text. The
-  headline truthfulness criterion is therefore split: the automated half asserts the *tool
-  payload*; the model-behaviour half ("names no property, doesn't deny coverage") is a
-  manual live check against `gemini-3.1-flash-lite`. Don't let a green suite read as proof
-  the persona works.
-- Whether `flash-lite` will chain `search_properties` → `capture_lead` at all. If not, fix
-  the prompt first; the non-lite Flash is a one-string change but reaching for it to paper
-  over a prompt bug is out of bounds.
+- Retries/backoff on Gemini transport errors are deliberately absent — a transport error
+  propagates out of `run_turn`. Deferred to Phase 5, on purpose: a silent retry now would
+  hide the flakiness worth measuring first.
+- `scripts/chat.py --neon` is the one path never run: it writes real rows, so it was left
+  for the owner rather than exercised here.
 
 ### Next Steps
 
-1. Add `google-genai` to `backend/pyproject.toml`, `uv sync`.
-2. `app/agent/prompts.py` — `SYSTEM_PROMPT` with the settled Amaya text verbatim from the
-   spec; test asserts `"Amaya"` present and no `terra` anywhere in `app/`.
-3. `app/agent/client.py` — thin `genai.Client` wrapper, model from
-   `get_settings().gemini_model`, clear named error on a missing API key at *first use*
-   (the suite imports `app.agent` without a key).
-4. `leads.intent` — model column, migration, apply to Neon, **verify the CHECK exists**,
-   then confirm a follow-up autogenerate is empty.
-5. Filter query into `app/db/queries.py` (+ fix its docstring); `app/agent/tools.py` with
-   `search_properties` (max 5, available-only, guidance on zero) and `capture_lead`
-   (upsert by `conversation_id`, no empty rows).
-6. `app/agent/loop.py` — the cycle, capped at 5, persisting turns with contiguous `seq`
-   and `tool_payload`; replay history ordered by `seq`, not `created_at`.
-7. Tests with a scripted fake client: zero-match guidance, loop cap, unknown tool,
-   `capture_lead` upsert, `seq` ordering. No live API calls.
-8. Manual pass against live `flash-lite`; record the transcript here.
+1. Commit (nothing is committed yet beyond the earlier tracker/spec commit).
+2. `complete-feature agent-core`.
 
 ### Explicitly Out of Scope (for now)
 
