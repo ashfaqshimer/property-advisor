@@ -1,7 +1,23 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+
 import {
-  SEED_CONVERSATION,
+  ChatError,
+  MAX_MESSAGE_LENGTH,
+  sendChatMessage,
+  wakeBackend,
+} from "@/lib/api";
+import {
+  AGENT_STATUS_LINE,
+  ERROR_COPY,
+  GREETING,
+  PENDING_LABEL,
+  SLOW_PENDING_AFTER_MS,
+  SLOW_PENDING_LABEL,
   SPEAKER_LABELS,
   SUGGESTION_CHIPS,
+  type ChatMessage,
 } from "@/lib/chat";
 
 /**
@@ -37,11 +53,54 @@ const SendIcon = () => (
 );
 
 /**
- * The agent chat, as static markup — a server component with no state and no
- * handlers. Every control below is rendered `disabled` on purpose: the panel
- * has to look live, but `POST /chat` does not exist yet, so a control that
- * responded to a click would be lying. They get enabled by the backend chat
- * feature, which is when this file gains `'use client'`.
+ * Three dots while we wait. `aria-hidden` because the pending bubble carries real text for
+ * assistive tech — animation alone announces nothing. `motion-safe:` so a visitor who asked
+ * for less motion gets three static dots instead.
+ */
+const TypingDots = () => (
+  <span aria-hidden="true" className="flex items-center gap-1 py-1">
+    {[0, 150, 300].map((delay) => (
+      <span
+        key={delay}
+        style={{ animationDelay: `${delay}ms` }}
+        className="size-1.5 rounded-full bg-muted motion-safe:animate-bounce"
+      />
+    ))}
+  </span>
+);
+
+/** What we know about a turn that failed, and everything needed to send it again. */
+type Failure = {
+  /** The user bubble left on screen, so it can be marked rather than removed. */
+  messageId: string;
+  /** Resent verbatim on retry — the server discarded the turn, so nothing duplicates. */
+  text: string;
+  error: ChatError;
+};
+
+/**
+ * The agent chat, wired to `POST /chat`.
+ *
+ * Client component because everything here is interaction: `app/page.tsx` stays a server
+ * component and simply renders it, which is allowed in either direction.
+ *
+ * Decisions worth knowing before editing:
+ *
+ * **`session_id` is minted once per page load and never stored.** A reload deliberately
+ * starts a fresh conversation, because the panel does not rehydrate history — persisting the
+ * id would leave the visitor looking at an empty panel while the model replayed a
+ * conversation they cannot see. It is generated lazily on first send rather than in a
+ * `useState` initializer, which would also run during SSR.
+ *
+ * **A failed turn is recoverable, not discarded.** `run_turn` commits once at the very end,
+ * so a failure persists nothing at all — not even the user's message. That is what makes
+ * resending the same text safe, and why the failed bubble stays on screen instead of being
+ * rolled back into the input.
+ *
+ * **The service is asleep more often than not.** Render's free tier cold-starts in ~22s, so
+ * the panel pings `/health` on mount to spend that during reading time, and the pending
+ * state grows a "still waking up" line after {@link SLOW_PENDING_AFTER_MS} rather than
+ * sitting silent long enough to look broken.
  *
  * Sticky from `lg` up, capped to `--spacing-panel-max` so the panel always fits
  * the viewport. Header, chips, and input are `shrink-0`; the message list is
@@ -54,6 +113,112 @@ const SendIcon = () => (
  * to the viewport edge and then nudged down a beat later.
  */
 export default function ChatPanel() {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: "greeting", role: "agent", text: GREETING },
+  ]);
+  const [draft, setDraft] = useState("");
+  const [pending, setPending] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(null);
+
+  const sessionIdRef = useRef<string | null>(null);
+  const messageCountRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listEndRef = useRef<HTMLLIElement | null>(null);
+  const hasRenderedRef = useRef(false);
+
+  /** Lazy so it never runs on the server, where `crypto.randomUUID` would be pointless. */
+  const sessionId = () => (sessionIdRef.current ??= crypto.randomUUID());
+
+  /** A counter, not a UUID: these ids only have to be unique within one mounted panel. */
+  const nextId = (role: ChatMessage["role"]) => `${role}-${++messageCountRef.current}`;
+
+  useEffect(() => {
+    // Fire-and-forget, and deliberately not awaited or reported: it exists only to start the
+    // cold boot early. React's dev-mode double effect sends it twice, which is harmless.
+    wakeBackend();
+
+    return () => {
+      // A reply that lands after the panel is gone must not set state. Aborting here is what
+      // makes the in-flight request observable as cancelled rather than as a failure.
+      abortRef.current?.abort();
+      if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Skipped on the very first render: the greeting is already in place, and scrolling to it
+    // on mount would drag the page down to the panel before the visitor has done anything.
+    if (!hasRenderedRef.current) {
+      hasRenderedRef.current = true;
+      return;
+    }
+    // `?.()` because jsdom has no layout engine and does not implement scrollIntoView; this
+    // is a browser-only behaviour and the test suite must not trip over it. `nearest` keeps
+    // the movement inside the scrolling list rather than jumping the whole window.
+    listEndRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [messages, pending, failure]);
+
+  const runTurn = useCallback(async (text: string, messageId: string) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setPending(true);
+    setSlow(false);
+    setFailure(null);
+    slowTimerRef.current = setTimeout(() => setSlow(true), SLOW_PENDING_AFTER_MS);
+
+    try {
+      const response = await sendChatMessage({
+        sessionId: sessionId(),
+        message: text,
+        signal: controller.signal,
+      });
+      setMessages((current) => [
+        ...current,
+        { id: nextId("agent"), role: "agent", text: response.reply },
+      ]);
+    } catch (error) {
+      // Our own abort — the panel unmounted mid-request. There is nobody left to tell.
+      if (controller.signal.aborted) return;
+      setFailure({
+        messageId,
+        text,
+        error:
+          error instanceof ChatError
+            ? error
+            : new ChatError("unexpected", String(error)),
+      });
+    } finally {
+      if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
+      if (!controller.signal.aborted) {
+        setPending(false);
+        setSlow(false);
+      }
+    }
+  }, []);
+
+  const submit = (text: string) => {
+    const trimmed = text.trim();
+    // Whitespace-only costs no request. The backend would return a 422; there is no reason
+    // to find that out over the network.
+    if (!trimmed || pending) return;
+
+    const id = nextId("user");
+    setMessages((current) => [...current, { id, role: "user", text: trimmed }]);
+    setDraft("");
+    void runTurn(trimmed, id);
+  };
+
+  const retry = () => {
+    if (!failure || pending) return;
+    // No second bubble: the first one is still on screen, and the server kept nothing.
+    void runTurn(failure.text, failure.messageId);
+  };
+
+  const canSend = draft.trim().length > 0 && !pending;
+
   return (
     <section
       id="chat"
@@ -96,14 +261,18 @@ export default function ChatPanel() {
               aria-hidden="true"
               className="size-1.5 shrink-0 rounded-full bg-brand"
             />
-            Online · replies instantly
+            {AGENT_STATUS_LINE}
           </p>
         </div>
       </div>
 
       {/*
-        A list, not a stack of divs, so a screen reader announces four turns
+        A list, not a stack of divs, so a screen reader announces each turn
         rather than one run-on paragraph.
+
+        `aria-live="polite"` is what tells a screen-reader user the answer arrived: replies
+        appear without any focus change, so nothing else would announce them. Polite rather
+        than assertive — an answer is worth hearing at the next pause, not mid-sentence.
 
         `min-h-72` gives the region a usable floor before it has grown into its
         content. At `lg` that floor drops to `min-h-64` and `flex-1` takes over:
@@ -114,10 +283,12 @@ export default function ChatPanel() {
       */}
       <ul
         aria-label="Conversation with Amaya"
+        aria-live="polite"
         className="flex min-h-72 flex-col gap-3 px-4 py-4 lg:min-h-64 lg:flex-1 lg:overflow-y-auto"
       >
-        {SEED_CONVERSATION.map((message) => {
+        {messages.map((message) => {
           const isUser = message.role === "user";
+          const hasFailed = failure?.messageId === message.id;
 
           return (
             <li
@@ -135,6 +306,10 @@ export default function ChatPanel() {
                   isUser
                     ? "rounded-br-md bg-brand text-on-brand"
                     : "rounded-bl-md bg-agent-bubble text-ink"
+                } ${
+                  /* Dimmed so the failed turn reads as unsent without removing it. The
+                     adjacent alert carries the actual explanation. */
+                  hasFailed ? "opacity-60" : ""
                 }`}
               >
                 {/*
@@ -143,11 +318,59 @@ export default function ChatPanel() {
                 */}
                 <span className="sr-only">{SPEAKER_LABELS[message.role]}: </span>
                 {message.text}
+                {hasFailed && <span className="sr-only"> (not sent)</span>}
               </p>
             </li>
           );
         })}
+
+        {pending && (
+          <li className="flex justify-start">
+            <p className="max-w-[85%] rounded-2xl rounded-bl-md bg-agent-bubble px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+              {/*
+                Real text either way — dots alone are invisible to a screen reader. Once the
+                wait has gone on long enough to look broken, the reassurance becomes visible
+                to everyone rather than staying screen-reader-only.
+              */}
+              {slow ? (
+                <span className="text-muted">{SLOW_PENDING_LABEL}</span>
+              ) : (
+                <>
+                  <span className="sr-only">{PENDING_LABEL}</span>
+                  <TypingDots />
+                </>
+              )}
+            </p>
+          </li>
+        )}
+
+        {/* Scroll anchor. An empty <li> so the list keeps only <li> children. */}
+        <li ref={listEndRef} aria-hidden="true" />
       </ul>
+
+      {failure && (
+        /*
+          `role="alert"` announces immediately and without focus moving — a failure is the
+          one thing here worth interrupting for. It sits directly under the dimmed bubble it
+          refers to, which is always the last message, so the two read as one unit.
+        */
+        <div
+          role="alert"
+          className="shrink-0 px-4 pb-3 text-xs leading-relaxed text-muted"
+        >
+          <p>{ERROR_COPY[failure.error.kind]}</p>
+          {failure.error.retryable && (
+            <button
+              type="button"
+              onClick={retry}
+              disabled={pending}
+              className="mt-1.5 rounded-full border border-neutral-200 px-3 py-1.5 font-medium text-ink hover:bg-band-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+            >
+              Try again
+            </button>
+          )}
+        </div>
+      )}
 
       {/* `items-start` shrink-wraps each pill to its label, as in the mockup;
           `max-w-full` keeps the longest one inside the panel at 375px. */}
@@ -156,8 +379,9 @@ export default function ChatPanel() {
           <button
             key={chip}
             type="button"
-            disabled
-            className="max-w-full rounded-full border border-neutral-200 px-3.5 py-2 text-left text-xs text-muted"
+            onClick={() => submit(chip)}
+            disabled={pending}
+            className="max-w-full rounded-full border border-neutral-200 px-3.5 py-2 text-left text-xs text-muted hover:bg-band-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
           >
             {chip}
           </button>
@@ -165,11 +389,25 @@ export default function ChatPanel() {
       </div>
 
       <div className="shrink-0 border-t border-neutral-200 px-4 py-3">
-        <div className="flex items-center gap-2 rounded-full border border-neutral-200 py-1.5 pr-1.5 pl-4">
+        {/*
+          A real <form>, which is what makes Enter send with no keydown handler of our own,
+          and what lets the browser own the semantics of a submit button.
+        */}
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit(draft);
+          }}
+          className="flex items-center gap-2 rounded-full border border-neutral-200 py-1.5 pr-1.5 pl-4"
+        >
           {/* No visible label in the mockup, and a placeholder is not a name. */}
           <input
             type="text"
-            disabled
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            disabled={pending}
+            /* Mirrors the backend's own limit, so its 422 is unreachable from the UI. */
+            maxLength={MAX_MESSAGE_LENGTH}
             aria-label="Ask Amaya"
             placeholder="Ask about a neighbourhood, budget, or style…"
             /*
@@ -177,17 +415,17 @@ export default function ChatPanel() {
               placeholder. `text-ellipsis` is what makes it trail off cleanly
               instead of being sliced mid-word against the send button.
             */
-            className="min-w-0 flex-1 bg-transparent text-sm text-ellipsis text-ink placeholder:text-muted focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-sm text-ellipsis text-ink placeholder:text-muted focus:outline-none disabled:opacity-60"
           />
           <button
-            type="button"
-            disabled
+            type="submit"
+            disabled={!canSend}
             aria-label="Send message"
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-brand text-on-brand"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-brand text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
           >
             <SendIcon />
           </button>
-        </div>
+        </form>
       </div>
     </section>
   );

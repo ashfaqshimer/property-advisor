@@ -57,27 +57,56 @@ alongside the frontend work.
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
-- TBD — to be worked out in conversation before `start-feature`.
+- **A failed turn keeps its bubble, dimmed, with a "Try again" beneath it** — chosen over
+  restoring the text to the input. `run_turn` commits once at the very end, so a failure
+  persists *nothing*; resending the identical text duplicates nothing, which is what makes
+  the bubble-stays option safe rather than just tidier.
+- **Errors are classified in `lib/api.ts`, not merged into one throw.** A `ChatError` carries
+  a `kind` (`config` / `timeout` / `network` / `upstream` / `unavailable` / `unexpected`) and
+  a `retryable` getter. `unavailable` (503) is the one that must read differently and offer
+  no retry — the key is missing server-side. Copy lives in `chat.ts`, keyed by kind, so the
+  client stays free of user-facing wording.
+- **A caller abort is not a failure.** The panel aborts on unmount, and `sendChatMessage`
+  re-throws that original `AbortError` untouched rather than wrapping it, so the catch can
+  tell "nobody is listening any more" from "the request timed out".
+- **The greeting is inserted at `seq 0`, not generated.** Guarded by `if seq == 0`, which is
+  safe because nothing has been recorded at that point and an atomic-commit failure rolls the
+  conversation row back too. `SYSTEM_PROMPT` gains a "you have already greeted them" section
+  because the greeting is replayed *to* her as a model turn.
+- **The duplicated greeting is guarded by a real test, not a comment.** The spec asked for
+  cross-referencing comments; comments don't fail a build, so
+  `test_agent_prompts.py::test_it_matches_the_frontend_constant_verbatim` reads
+  `frontend/lib/chat.ts` from the Python suite. No assertion inside one stack can catch drift.
+- **CORS: production origin only.** Vercel preview URLs are per-branch, so exact-match can't
+  cover them without a regex origin setting; previews will error on send, by decision.
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
--
+- `backend/app/agent/prompts.py` — `GREETING`, the "already greeted" prompt section
+- `backend/app/agent/loop.py` — `seq 0` greeting insert + docstring note
+- `backend/tests/test_agent_loop.py` — 7 shifted `seq`/role assertions, `TestGreeting` (6 new)
+- `backend/tests/test_agent_prompts.py` — `TestGreeting`, incl. the cross-stack verbatim guard
+- `frontend/lib/api.ts` — **new**: `sendChatMessage`, `ChatError`, `wakeBackend`
+- `frontend/lib/chat.ts` — `SEED_CONVERSATION` deleted; `GREETING`, `ERROR_COPY`, pending copy
+- `frontend/components/chat/ChatPanel.tsx` — `'use client'`, the whole wiring
+- `frontend/tests/chat-api.test.ts` — **new**, 20 tests
+- `frontend/tests/chat-panel.test.tsx` — rewritten, 34 tests
+- `frontend/.env.local` — `NEXT_PUBLIC_API_URL` (gitignored, local only)
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
-- **Read the Next 16 docs, not memory** (`frontend/node_modules/next/dist/docs/01-app/`).
-  Tailwind v4 via `@theme` in `app/globals.css` — no `tailwind.config.ts`. pnpm, from
-  `frontend/`.
-- **jsdom has no layout engine and no Tailwind** — sticky panel, scroll-into-view, the typing
-  animation, and long-conversation scrolling stay browser-verified. Class assertions are
-  deletion guards and should say so.
-- **CORS is an exact-match origin list**, so Vercel *preview* deployments are blocked unless
-  added to `ALLOWED_ORIGINS` by hand. Needs a decision: production origin only, or previews too.
-- Two deploy-side steps aren't code and need doing by hand: `NEXT_PUBLIC_API_URL` in the Vercel
-  project, and the Vercel production origin in Render's `ALLOWED_ORIGINS` (verify in a real
-  browser — curl sends no `Origin` and never trips CORS).
-- The greeting text lives as both a Python and a TypeScript constant; each file needs a comment
-  pointing at the other, since editing one alone is the failure mode.
+**Remaining, and all of it is deploy-side — no code is outstanding.**
+
+- **`GEMINI_API_KEY` is still unset on Render**, deliberately, from before `POST /chat` shipped
+  (CLAUDE.md says so). Until it's set, the deployed backend answers **503** — which the panel
+  now handles honestly, but it isn't a working chat. This has to be set first.
+- **`NEXT_PUBLIC_API_URL` in the Vercel project** → `https://property-advisor-96sg.onrender.com`.
+  Inlined at *build* time, so it needs a redeploy after being set, not just a save.
+- **Render's `ALLOWED_ORIGINS` must include the Vercel production origin.** Verify from a real
+  browser: curl sends no `Origin` header and so never trips CORS at all.
+- The last acceptance criterion — a multi-turn conversation **against the deployed backend** —
+  is blocked on the three above. The same scenario passed in full against a local backend and
+  live Neon (35 browser checks, real model calls, a real `leads` row).
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
