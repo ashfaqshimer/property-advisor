@@ -150,7 +150,46 @@ where it started if it errors partway.
 
 ## Deploying (Render)
 
-Not yet done. When it is: build with `uv sync --frozen --no-dev`, start with
-`uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT`, and run
-`uv run alembic upgrade head` as a pre-deploy command. Render's free tier spins down
-when idle, so the first request after inactivity is slow — expected, not a bug.
+Live at **https://property-advisor-96sg.onrender.com** on Render's free tier, as a web
+service off `main`.
+
+```bash
+curl https://property-advisor-96sg.onrender.com/health
+# {"status":"ok"}
+curl https://property-advisor-96sg.onrender.com/properties/featured
+# the seeded listings, straight out of Neon
+curl -i "https://property-advisor-96sg.onrender.com/properties/featured?limit=0"
+# 422 — Query(ge=1) rejects it before the DB is touched
+```
+
+That last one matters as a smoke test: it proves FastAPI validation, not just routing,
+survived the deploy. All three are verified in production.
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `backend` |
+| Build Command | `pip install uv && uv sync --frozen --no-dev` |
+| Start Command | `uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+
+The `pip install uv` prefix is load-bearing: Render's native Python runtime doesn't
+ship uv, and the build dies on `uv: command not found` without it.
+
+Env vars are `DATABASE_URL`, `ALLOWED_ORIGINS`, and `PYTHON_VERSION=3.11` — set that
+last one explicitly rather than trusting Render to find `.python-version` inside the
+`backend/` root directory. Add `MIGRATION_DATABASE_URL` only if `DATABASE_URL` points
+at the `-pooler` endpoint (see Setup above). `GEMINI_API_KEY` is unset in production;
+`Settings` defaults it to `""` and no route reads it yet.
+
+**Migrations and seeding run from a laptop, not from Render.** The free tier has no
+SSH shell and Pre-Deploy Command is a paid feature, so `uv run alembic upgrade head`
+and `uv run python -m app.db.seed` are run locally against the same Neon database
+before deploying. A `200` with `[]` from `/properties/featured` therefore means the
+app and its DB connection are both fine and the table is merely empty — re-seed,
+don't redeploy.
+
+`ALLOWED_ORIGINS` is an exact-match list (`Settings.cors_origins` just splits on
+commas), so Vercel **preview** deployments are blocked — each one gets its own
+subdomain. Only the production origin works unless previews are added by hand.
+
+Render's free tier spins down when idle, so the first request after inactivity is
+slow — expected, not a bug.
