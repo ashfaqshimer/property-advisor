@@ -88,7 +88,7 @@ export default function ChatPanel() {
         {/* `min-w-0` so a narrow panel wraps the name instead of overflowing. */}
         <div className="min-w-0">
           <p className="font-display text-[0.9375rem] leading-tight text-ink">
-            Home Advisor AI Agent
+            Amaya — AI Advisor
           </p>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
             {/* Status colour is decorative; the word "Online" carries it. */}
@@ -113,7 +113,7 @@ export default function ChatPanel() {
         viewport, or the panel would push its own input off-screen.
       */}
       <ul
-        aria-label="Conversation with Home Advisor"
+        aria-label="Conversation with Amaya"
         className="flex min-h-72 flex-col gap-3 px-4 py-4 lg:min-h-64 lg:flex-1 lg:overflow-y-auto"
       >
         {SEED_CONVERSATION.map((message) => {
@@ -170,7 +170,7 @@ export default function ChatPanel() {
           <input
             type="text"
             disabled
-            aria-label="Ask the Home Advisor agent"
+            aria-label="Ask Amaya"
             placeholder="Ask about a neighbourhood, budget, or style…"
             /*
               The panel column is ~300px at `lg`, too narrow for the full

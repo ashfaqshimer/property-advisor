@@ -1,5 +1,11 @@
 # Spec: Footer
 
+> **Superseded copy — historical record.** This spec shipped when the brand was
+> "Home Advisor". The `brand-rename` chore renamed it to **Property Advisor**, so the
+> wordmark, copyright line, and email below now read "Property Advisor" and
+> `hello@propertyadvisor.lk`. Criteria left as written to preserve what was agreed at
+> the time; `CLAUDE.md` is authoritative on the brand.
+
 ## Goal
 
 Replace the four `Placeholder` stubs in `frontend/components/layout/Footer.tsx`

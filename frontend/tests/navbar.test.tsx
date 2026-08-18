@@ -30,9 +30,10 @@ function menuButton(): HTMLElement {
   return screen.getByRole("button", { name: /menu/i });
 }
 
-/** The brand link. `/Home Advisor/` will not match the "Home" nav link. */
+/** The brand link. Anchored on the full brand string so it cannot match the
+ *  separate "Home" nav link. */
 function brandLink(): HTMLElement {
-  return screen.getByRole("link", { name: /Home Advisor/ });
+  return screen.getByRole("link", { name: /Property Advisor/ });
 }
 
 function openPanel(): HTMLElement {
@@ -54,8 +55,8 @@ describe("Navbar brand", () => {
     render(<Navbar />);
 
     // Guards Logo's `aria-hidden` on the mark from here too: losing it makes the
-    // link announce "H Home Advisor".
-    expect(brandLink()).toHaveAccessibleName("Home Advisor");
+    // link announce "P Property Advisor".
+    expect(brandLink()).toHaveAccessibleName("Property Advisor");
   });
 });
 

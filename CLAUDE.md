@@ -28,7 +28,11 @@ The full spec — data models, endpoints, tool signatures, env vars, build phase
 
 ## Branding
 
-The brand is **Home Advisor** — everywhere. The AI assistant is a separate persona: **Amaya**, female, early twenties, she/her, an advisor *at* Home Advisor. Don't rename her back to the brand; the persona is settled in `context/features/agent-core/spec.md`. Note the frontend still labels the assistant "Home Advisor" in `lib/chat.ts` and `components/chat/ChatPanel.tsx` (plus its tests) — a pending rename, not a second opinion. `context/ui-interface.png` is a visual reference for layout, spacing, and colour only; its "Terra & Co." / "Terra AI Agent" wording is placeholder art and must never be copied into the codebase. Same goes for the mockup's property listings, prices, and contact details — illustrative, not real content. Don't ask about this again.
+The brand is **Property Advisor** — everywhere. It was renamed from "Home Advisor" (see `context/chores/done/brand-rename/spec.md`): the old name collided with HomeAdvisor.com, Angi's US home-services marketplace, on search and trademark, and "Home" excluded bare land, which is in scope. Scope is **land, homes, and apartments** — vehicles were considered as a future category and explicitly dropped, which is what settled "Property" as the umbrella term. Don't reopen the naming question.
+
+The AI assistant is a separate persona: **Amaya**, female, early twenties, she/her, an advisor *at* Property Advisor. Don't rename her to the brand; the persona is settled in `context/features/done/agent-core/spec.md`. The split is load-bearing in the UI — the navbar and footer carry the brand, while the chat panel names Amaya ("Amaya — AI Advisor", `SPEAKER_LABELS.agent`, and both of the panel's `aria-label`s). Distinctiveness lives in the persona, which is why a plainly descriptive brand name is fine.
+
+`context/ui-interface.png` is a visual reference for layout, spacing, and colour only; its "Terra & Co." / "Terra AI Agent" wording is placeholder art and must never be copied into the codebase. Same goes for the mockup's property listings, prices, and contact details — illustrative, not real content. Don't ask about this again.
 
 ## Architectural constraint (the point of the project)
 

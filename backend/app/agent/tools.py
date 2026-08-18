@@ -389,7 +389,7 @@ def execute_tool(
 _SEARCH_DECLARATION = types.FunctionDeclaration(
     name=SEARCH_PROPERTIES,
     description=(
-        "Search Home Advisor's published property listings. Call this once you know "
+        "Search Property Advisor's published property listings. Call this once you know "
         "roughly what the person wants — every parameter is optional, and omitting one "
         "widens the search rather than narrowing it. Returns up to 5 available listings. "
         "If it returns no matches, that means nothing is published matching those "

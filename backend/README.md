@@ -1,4 +1,4 @@
-# Home Advisor API
+# Property Advisor API
 
 FastAPI + SQLAlchemy + Alembic against Neon Postgres. See
 [../context/PROJECT_OVERVIEW.md](../context/PROJECT_OVERVIEW.md) for the full spec.

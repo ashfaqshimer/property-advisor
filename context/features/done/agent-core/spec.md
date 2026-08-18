@@ -265,10 +265,11 @@ LKR for prices; local shorthand where natural (Colombo 5, perches for land).
    Home Advisor is the brokerage she works for. Her age is why the prompt forbids claiming
    experience and pushes valuations, commissions, and timelines to a senior agent — the
    persona and the no-overclaiming rules reinforce each other rather than fighting.
-   **The frontend still calls the assistant "Home Advisor" in 6 places plus 5 test
-   assertions** (`lib/chat.ts`, `components/chat/ChatPanel.tsx`,
-   `tests/chat-panel.test.tsx`). That rename is deliberately *not* in this phase — it's
-   frontend work, it breaks tests, and Phase 4 wiring will touch those files anyway.
+   At the time of this phase the frontend still called the assistant "Home Advisor" in 6
+   places plus 5 test assertions (`lib/chat.ts`, `components/chat/ChatPanel.tsx`,
+   `tests/chat-panel.test.tsx`); that rename was deliberately left out of this phase.
+   **Resolved since** by the `brand-rename` chore, which relabelled the assistant to
+   Amaya and renamed the brokerage itself from "Home Advisor" to **Property Advisor**.
 1. `leads.intent` (`buy` | `rent` | `sell`, nullable) plus an `intent` param on
    `capture_lead` — chosen over stuffing seller details into free-text `preferences`, so
    seller leads are filterable later.

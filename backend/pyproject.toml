@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Home Advisor API — FastAPI backend"
+description = "Property Advisor API — FastAPI backend"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -83,6 +83,34 @@
   full changelog (git already has that).
 -->
 
+### Brand rename: Home Advisor → Property Advisor — 2026-08-19
+- **What:** Renamed the brokerage everywhere (UI, system prompt, metadata, docs, and
+  GitHub/Neon/Vercel), and landed the deferred relabel so the chat panel names **Amaya**
+  rather than the brand. Scope settled as land/homes/apartments; vehicles considered and
+  dropped, which is what made "Property" the right umbrella term.
+- **Key files:** `frontend/components/layout/Logo.tsx`, `frontend/components/chat/ChatPanel.tsx`,
+  `frontend/lib/chat.ts`, `backend/app/agent/prompts.py`, `CLAUDE.md`
+- **Gotchas/lessons:**
+  - **Two occurrences no brand-name grep can find.** `pyproject.toml`'s `description`
+    field, and a bare `"H"` assertion in `footer.test.tsx` checking the logo glyph. The
+    test caught the second one; the first only surfaced on a final sweep of *every* file
+    rather than a search for the old name. On a rename, grep the artefacts, not the string.
+  - **Two "zero match" acceptance criteria were unmeetable as written.** A test asserting
+    the old brand is absent from `SYSTEM_PROMPT` must contain that string. Criterion was
+    amended with the exception documented rather than dropping the guard — the prompt is
+    the one surface where a stale name reaches users with no rendered output to catch it.
+  - **Neon: the connection string already carried the database name.** `DATABASE_URL` has
+    the role (`neondb_owner`) and database (`/neondb`) embedded, so a "rename the database
+    too" plan was dropped after inspection — invisible to users, pure risk. Renaming the
+    Neon *project* is cosmetic and leaves the connection string untouched, because the host
+    derives from the endpoint ID.
+  - **Archived specs were annotated, not rewritten.** Three shipped specs under
+    `context/features/done/` assert copy that is now stale. Rewriting them would falsify
+    what was agreed at the time, so each got a "superseded copy" header note instead.
+  - Vercel's OIDC warning on project rename is a non-issue here: the `sub` claim embeds the
+    project name, but nothing uses OIDC federation. Also note the project name and the
+    `.vercel.app` domain are separate settings — renaming one does not re-point the other.
+
 ### Agent Core — the hand-rolled Gemini loop — 2026-08-18
 - **What:** Phase 2. `loop.run_turn(db, session_id, message)` → history + tool declarations
   to Gemini, execute `search_properties` / `capture_lead`, persist every turn, return
@@ -96,8 +124,9 @@
     the brokerage. This amended the CLAUDE.md branding line, which had said the agent was
     named after the brand. Her age is load-bearing, not flavour: it's why she claims no
     experience and pushes valuations, commissions, and timelines to a senior agent, so the
-    persona and the no-overclaiming rules hold each other up. **The frontend still labels
-    her "Home Advisor" in 6 code sites and 5 test assertions** — pending, Phase 4.
+    persona and the no-overclaiming rules hold each other up. The frontend labelled her
+    with the brand name in 6 code sites and 5 test assertions; that was resolved by the
+    `brand-rename` chore, which also renamed the brokerage to **Property Advisor**.
   - **A tool's payload argues with the prompt, and tends to win.** `search_properties`
     returning a bare `[]` invites "no results found" no matter what the system instruction
     says, and the failure is silent. The zero-match payload therefore carries its own

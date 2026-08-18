@@ -23,7 +23,7 @@ describe("Logo", () => {
   it("renders the wordmark as real, selectable text", () => {
     render(<Logo />);
 
-    expect(screen.getByText("Home Advisor")).toBeInTheDocument();
+    expect(screen.getByText("Property Advisor")).toBeInTheDocument();
   });
 
   it("adds no image file", () => {
@@ -37,7 +37,7 @@ describe("Logo", () => {
 
     // The initial sits in an aria-hidden box; only the wordmark is announced.
     expect(container.querySelector("[aria-hidden='true']")?.textContent).toBe(
-      "H",
+      "P",
     );
   });
 });
@@ -47,7 +47,7 @@ describe("Footer content", () => {
     render(<Footer />);
 
     const footer = screen.getByRole("contentinfo");
-    expect(within(footer).getByText("Home Advisor")).toBeInTheDocument();
+    expect(within(footer).getByText("Property Advisor")).toBeInTheDocument();
     expect(
       within(footer).getByText(/Colombo-based, island-wide reach/),
     ).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe("Footer content", () => {
     render(<Footer />);
 
     expect(
-      screen.getByText(/© 2026 Home Advisor — a UI prototype/),
+      screen.getByText(/© 2026 Property Advisor — a UI prototype/),
     ).toBeInTheDocument();
   });
 
@@ -107,8 +107,8 @@ describe("Footer links", () => {
     render(<Footer />);
 
     expect(
-      screen.getByRole("link", { name: "hello@homeadvisor.lk" }),
-    ).toHaveAttribute("href", "mailto:hello@homeadvisor.lk");
+      screen.getByRole("link", { name: "hello@propertyadvisor.lk" }),
+    ).toHaveAttribute("href", "mailto:hello@propertyadvisor.lk");
   });
 
   it("leaves the street address as plain text", () => {

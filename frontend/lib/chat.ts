@@ -54,5 +54,5 @@ export const SUGGESTION_CHIPS: string[] = [
  *  alignment carry that distinction visually and neither is perceivable. */
 export const SPEAKER_LABELS: Record<ChatMessage["role"], string> = {
   user: "You",
-  agent: "Home Advisor",
+  agent: "Amaya",
 };

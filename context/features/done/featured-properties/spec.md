@@ -1,5 +1,9 @@
 # Spec: Featured Properties
 
+> **Superseded copy — historical record.** Where this spec says the brand is
+> "Home Advisor", it is now **Property Advisor** (`brand-rename` chore). The rule it was
+> making — never use the mockup's "Terra & Co." wording — still stands.
+
 ## Goal
 
 Replace the property grid's placeholder skeletons with a real section header and
