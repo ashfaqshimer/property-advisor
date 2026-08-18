@@ -22,6 +22,12 @@ the microsecond.
 result isn't something the user said, but it's what the Gemini API expects: contents
 alternate user/model, and a tool result is an input to the model's next turn.
 
+**The greeting is inserted, not generated.** A new conversation's `seq 0` is Amaya's canned
+opening — the same string the panel renders before the visitor types — and it is written
+only when the *first user message* actually arrives. Doing it on page load instead would
+leave a junk `conversations` row behind every bounced visit and every crawler hit.
+`SYSTEM_PROMPT` tells her she has already greeted them, so she doesn't do it twice.
+
 **The iteration cap counts model calls, not tool calls.** Five `generate()` calls, then the
 loop gives up with prose rather than spinning — a model that keeps re-calling the same tool
 is a prompt bug, and it must not become an unbounded bill.
@@ -42,7 +48,7 @@ from sqlalchemy.orm import Session
 
 from app.agent import tools
 from app.agent.client import SupportsGenerate, get_gemini_client
-from app.agent.prompts import FALLBACK_REPLY, SYSTEM_PROMPT
+from app.agent.prompts import FALLBACK_REPLY, GREETING, SYSTEM_PROMPT
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
 
@@ -171,6 +177,12 @@ def run_turn(
         )
         seq += 1
         db.flush()
+
+    if seq == 0:
+        # Nothing has been recorded yet, so a seq of 0 means this conversation has no
+        # messages at all — it was created moments ago by the call above. The greeting the
+        # visitor has already seen becomes seq 0, and their message lands at seq 1.
+        record(MessageRole.ASSISTANT, content=GREETING)
 
     record(MessageRole.USER, content=text)
 

@@ -43,6 +43,19 @@ export const SEED_CONVERSATION: ChatMessage[] = [
   },
 ];
 
+/**
+ * Amaya's opening bubble, rendered as soon as the panel mounts — before any request is
+ * made, which is the whole reason this string lives on the client at all.
+ *
+ * DUPLICATED, DELIBERATELY: the same text is `GREETING` in
+ * `backend/app/agent/prompts.py`, where `loop.run_turn` persists it as the conversation's
+ * `seq 0` so the model replays exactly what the visitor has on screen. Editing one alone is
+ * the failure mode, so `backend/tests/test_agent_prompts.py` asserts the two match
+ * verbatim and reads *this* file to do it — change both, or that test fails.
+ */
+export const GREETING =
+  "Hi, I'm Amaya, an advisor at Property Advisor. Whether you're after land, a house, or an apartment — buying, renting, or selling — tell me what you have in mind and I'll take it from there.";
+
 /** Rendered as disabled buttons; wiring them up is a backend-era feature. */
 export const SUGGESTION_CHIPS: string[] = [
   "3-bedroom homes in Colombo under LKR 50M",
