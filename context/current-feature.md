@@ -37,23 +37,27 @@
   just append a correction under it.
 -->
 
-**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
+**Feature:** Chat client — wire `ChatPanel` to `POST /chat`
 
-**Spec:** <!-- context/features/<slug>/spec.md -->
+**Spec:** `context/features/chat-client/spec.md`
 
 **Goal:**
-<!-- One or two sentences. What does "done" look like from the user's POV? -->
+Make the chat panel real. A visitor types a question, Amaya answers from the live database
+through `POST /chat`, and leads land in Neon. This replaces the `SEED_CONVERSATION` fixture and
+enables the controls currently rendered `disabled` on purpose. Also closes the greeting gap
+`agent-core` deferred to "whoever wires up the panel", which needs a small backend change
+alongside the frontend work.
 
-**Status:** `Not started | In progress | Blocked | In review/testing | Done`
+**Status:** `In progress`
 
-**Branch:** <!-- e.g. feature/property-search-filters -->
+**Branch:** `feature/chat-client`
 
 ### Approach / Key Decisions
 <!--
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
--
+- TBD — to be worked out in conversation before `start-feature`.
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
@@ -61,17 +65,64 @@
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
--
+- **Read the Next 16 docs, not memory** (`frontend/node_modules/next/dist/docs/01-app/`).
+  Tailwind v4 via `@theme` in `app/globals.css` — no `tailwind.config.ts`. pnpm, from
+  `frontend/`.
+- **jsdom has no layout engine and no Tailwind** — sticky panel, scroll-into-view, the typing
+  animation, and long-conversation scrolling stay browser-verified. Class assertions are
+  deletion guards and should say so.
+- **CORS is an exact-match origin list**, so Vercel *preview* deployments are blocked unless
+  added to `ALLOWED_ORIGINS` by hand. Needs a decision: production origin only, or previews too.
+- Two deploy-side steps aren't code and need doing by hand: `NEXT_PUBLIC_API_URL` in the Vercel
+  project, and the Vercel production origin in Render's `ALLOWED_ORIGINS` (verify in a real
+  browser — curl sends no `Origin` and never trips CORS).
+- The greeting text lives as both a Python and a TypeScript constant; each file needs a comment
+  pointing at the other, since editing one alone is the failure mode.
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1.
-2.
-3.
+1. Backend greeting: add `GREETING` to `app/agent/prompts.py`, the "already greeted" line in
+   `SYSTEM_PROMPT`, and persist it at `seq 0` in `run_turn` on a conversation's **first user
+   message** (never on page load). Tests: `seq 0` on a new conversation, not re-inserted on a
+   second turn, and the Gemini `contents` opening with it as a model turn.
+2. `frontend/lib/api.ts` — typed `sendChatMessage({ sessionId, message, signal })`, base URL
+   from `NEXT_PUBLIC_API_URL` (missing/empty fails naming the variable), ~45s
+   `AbortSignal.timeout`, and *distinguishable* error types (503 vs transient 502/network/
+   timeout; 422 can fall to generic).
+3. `frontend/lib/chat.ts` — delete `SEED_CONVERSATION`, add mirrored `GREETING`; keep
+   `ChatMessage`, `SPEAKER_LABELS`, `SUGGESTION_CHIPS`.
+4. `ChatPanel` → `'use client'`: lazy per-page-load `crypto.randomUUID()` session id (no
+   storage), `<form>` + `onSubmit` for Enter-to-send, optimistic user append, pending state
+   disabling input/send/chips, `maxLength={2000}`, trimmed-empty is a no-op, chips send their
+   text, newest message scrolled into view, fire-and-forget `GET /health` on mount, and
+   replacement copy for "Online · replies instantly".
+5. Error + pending states: failed message stays visible with a **retry** that resends the same
+   text (the server discarded the turn), distinct honest copy for 503, and a "still waking up"
+   message after ~8–10s. Don't set state after unmount.
+6. Accessibility: `aria-live="polite"` message list, "Amaya is typing…" as real text,
+   `role="alert"` errors, and the existing `sr-only` speaker labels + both panel `aria-label`s
+   preserved.
+7. Update `frontend/tests/chat-panel.test.tsx` (seeded turns ~L46/~L57, chip count ~L84, the
+   "replies instantly" copy, disabled input/send ~L93 — all now wrong by design) and add new
+   `fetch`-stubbed tests: optimistic append, pending, success, each error class, retry,
+   Enter-to-send, chip send, disabled-when-empty, 2000-char cap.
+8. Config: `NEXT_PUBLIC_API_URL` in `frontend/.env.local` (`http://127.0.0.1:8000` locally),
+   then Vercel + Render `ALLOWED_ORIGINS`.
+9. Verify: `pnpm test` and `pnpm build` from `frontend/`, `uv run pytest` from `backend/`, plus
+   a real multi-turn browser conversation against the deployed backend that returns a seeded
+   listing and captures a lead.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
--
+- **Streaming / token-by-token replies.** The endpoint is one request, one complete reply.
+- **Rehydrating history after a reload.** Decided: a reload starts a fresh conversation. Doing
+  it properly needs `GET /chat/{session_id}`, which is v2.
+- **`GET /properties` and the featured grid.** The grid stays on `lib/properties.ts` fixtures.
+- **Markdown or rich rendering** of replies. Plain text in a bubble, as today.
+- **Rate limiting, auth, analytics, cost telemetry.**
+- **Dynamic suggestion chips.** They stay the three hardcoded strings.
+- **Any lead-confirmation UI.** The reply prose is the only feedback; the database is the record.
+- **Retry/backoff inside the backend.** Client-side retry is a button the user presses.
 
 ---
 
