@@ -5,7 +5,7 @@ and the iteration cap; everything here is validation, dependency wiring, and giv
 failures an HTTP shape.
 """
 
-from typing import Annotated
+from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from google.genai import errors as genai_errors
@@ -57,8 +57,23 @@ def post_chat(
     return ChatResponse(reply=reply, session_id=payload.session_id)
 
 
+class TurnRunner(Protocol):
+    """`loop.run_turn`'s shape, so the retry below can be tested by injection."""
+
+    def __call__(
+        self,
+        db: Session,
+        session_id: str,
+        user_message: str,
+        client: SupportsGenerate | None = None,
+    ) -> str: ...
+
+
 def _run_turn_handling_session_race(
-    db: Session, payload: ChatRequest, client: SupportsGenerate
+    db: Session,
+    payload: ChatRequest,
+    client: SupportsGenerate,
+    runner: TurnRunner = run_turn,
 ) -> str:
     """Run the turn, retrying once if a concurrent request created the conversation first.
 
@@ -70,9 +85,13 @@ def _run_turn_handling_session_race(
     discards the losing attempt's rows entirely and `get_or_create_conversation` finds the
     winner's row on the second pass. It costs one extra model call in a rare race, which is
     the cheaper side of the trade against answering with half a conversation.
+
+    `runner` is injectable for the same reason `run_turn` takes `client`: a genuine race
+    needs two concurrent transactions, which the SQLite-backed suite can't stage, so the
+    test supplies a runner that fails once. Injection beats patching a module global.
     """
     try:
-        return run_turn(db, payload.session_id, payload.message, client=client)
+        return runner(db, payload.session_id, payload.message, client=client)
     except IntegrityError:
         db.rollback()
-        return run_turn(db, payload.session_id, payload.message, client=client)
+        return runner(db, payload.session_id, payload.message, client=client)

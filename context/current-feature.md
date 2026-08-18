@@ -37,108 +37,41 @@
   just append a correction under it.
 -->
 
-**Feature:** `POST /chat` — HTTP surface for the agent loop
+**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
 
-**Spec:** `context/features/chat-endpoint/spec.md`
+**Spec:** <!-- context/features/<slug>/spec.md -->
 
 **Goal:**
-Expose the existing `loop.run_turn` over HTTP so a browser can hold a conversation with
-Amaya. Phase 2 ended at a callable Python function; this is the thin, well-validated layer
-that makes it reachable. Done when `curl` can hold a multi-turn conversation against the
-deployed service — no frontend work.
+<!-- One or two sentences. What does "done" look like from the user's POV? -->
 
-**Status:** `In progress`
+**Status:** `Not started | In progress | Blocked | In review/testing | Done`
 
-**Branch:** `feature/chat-endpoint`
+**Branch:** <!-- e.g. feature/property-search-filters -->
 
 ### Approach / Key Decisions
 <!--
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
-- **`def`, not `async def`.** `run_turn` blocks on Gemini + Postgres for the whole turn;
-  under `async def` it would hold the event loop and serialise every concurrent user.
-- **`get_agent_client` dependency**, overridden in `conftest.py` like `get_db`. Resolved per
-  request, not at import, so a missing key is a 503 on first call rather than a boot crash.
-  No test patches the network boundary.
-- **503 via an app-level exception handler**, not a try/except in the endpoint. The client is
-  built in a dependency, which resolves *before* the route function runs — a handler in the
-  body would never see `GeminiNotConfigured`.
-- **`str_strip_whitespace=True` on `ChatRequest`** rather than a custom validator. Pydantic
-  strips before applying length constraints, so `"   "` becomes a `string_too_short` 422 and
-  surrounding whitespace doesn't count toward the 2000-char cap. Verified, not assumed.
-- **Session race handled by one retry** after `db.rollback()`. Safe because the turn is
-  atomic: nothing was committed, so the losing attempt's rows vanish and the retry finds the
-  winner's conversation. Costs one extra model call in a rare race.
-- **502 maps `google.genai.errors.APIError`** (base of `ClientError`/`ServerError`). The
-  upstream message is deliberately not forwarded.
+-
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
-- `backend/app/schemas/chat.py` (new) — `ChatRequest` / `ChatResponse` + the two caps
-- `backend/app/api/chat.py` (new) — endpoint, `get_agent_client`, session-race retry
-- `backend/app/main.py` — mount the router, `GeminiNotConfigured` → 503 handler
-- `backend/tests/test_chat_endpoint.py` (new) — 17 tests, 100% of the new modules
-- `backend/tests/conftest.py` — `chat_client` factory fixture
-- `backend/README.md` — endpoint docs, error table, `GEMINI_API_KEY` now required
-- `context/features/chat-endpoint/spec.md` — amended the safety-block criterion
+-
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
-- **`max_length=2000` on `message` is a guess**, not a settled number. It bounds one request
-  against an endpoint that costs money per call; revisit if it's tight for a seller
-  describing a property.
-- **`/chat` is unauthenticated and metered.** Up to five Gemini calls per request on a public
-  URL with no rate limit. Out of scope here by decision — flag before real traffic.
-- `GEMINI_API_KEY` must be set in the Render dashboard before the production verification
-  criterion can pass; it's deliberately unset today.
+-
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1. ~~`app/schemas/chat.py`~~ — done.
-2. ~~`app/api/chat.py` + mount in `main.py`~~ — done.
-3. ~~Error mapping (503 / 502 / session-race retry)~~ — done.
-4. ~~Tests through `TestClient` with a scripted fake~~ — done. 159 pass, 100% coverage of
-   `app/api/chat.py`, `app/schemas/chat.py`, `app/main.py`.
-5. ~~Update `backend/README.md`~~ — done.
-6. **Remaining:** set `GEMINI_API_KEY` in the Render dashboard, deploy, and verify a real
-   multi-turn conversation against `https://property-advisor-96sg.onrender.com/chat` —
-   including one turn that triggers `search_properties` and returns a seeded listing. This
-   is the last acceptance criterion and it needs the dashboard.
-7. ~~Verify against the real model~~ — **done locally, and it passed.** Three-turn
-   conversation through `POST /chat` on `fastapi dev` against Neon
-   (`session_id: local-real-check-c9e58a0`), all 200s in 4–6s each:
-   - Turn 1 (vague "a place in Colombo") → clarifying question, **no** premature search.
-   - Turn 2 → `search_properties({location: "Colombo 5", budget_max: 50000000,
-     property_type: "apartment"})` → matched the seeded Havelock Residences, described in
-     prose with the real LKR 48M price.
-   - Turn 3 (name + phone) → `capture_lead(...)` → a real `leads` row: `intent=BUY`,
-     `budget_max=Decimal('50000000.00')`, name and phone intact.
-   - 10 `messages` rows in `seq` order with both tool calls and both tool responses.
-   - The four 422 paths re-verified against the live server.
-
-   **This settles an open question in CLAUDE.md:** `gemini-3.1-flash-lite` *does* chain
-   `search_properties` → `capture_lead` across one conversation, so there's no reason to
-   move to the non-lite Flash model.
+1.
+2.
+3.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
-- **All frontend work.** `ChatPanel` stays on its fixture with controls disabled — that's the
-  `chat-client` feature, specced next against this endpoint once it's live.
-- **The opening greeting.** Deferred to the panel-wiring feature, because "two hellos" is
-  only observable there. It needs changes on *both* sides: persist the greeting as the
-  assistant turn at `seq 0` when the **first user message** arrives (never on page load, or
-  every bounced visit and crawler hit leaves a junk `conversations` row), plus a
-  `SYSTEM_PROMPT` line saying she has already greeted them, text kept as a constant beside
-  the persona.
-- **`GET /properties`** — deferred again; nothing in the chat path needs it.
-- **Streaming / SSE.** One request, one complete reply.
-- **Rate limiting, auth, cost telemetry.** Real exposure, not solved here.
-- **`get_property_details`**, `GET /leads`, retry/backoff on Gemini errors.
-- Returning tool metadata (matched property ids, lead-captured flag) in the response body.
-  The reply is prose; the database is the record.
-- Any agent *behaviour* change. The loop shipped in `fa8430d`; a wrong reply is a
-  `prompts.py` bug, and per CLAUDE.md the model string is not the lever.
+-
 
 ---
 
@@ -149,6 +82,38 @@ deployed service — no frontend work.
   Goal is "remind me what this was and where the bodies are buried," not a
   full changelog (git already has that).
 -->
+
+### `POST /chat` — HTTP surface for the agent loop — 2026-08-19
+- **What:** Thin endpoint over `loop.run_turn` — schemas, a `get_agent_client` dependency,
+  and error mapping (422 validation / 502 `APIError` / 503 missing key), plus a one-retry
+  guard for the UNIQUE `session_id` race. No agent behaviour changed. Verified in
+  production: clarifying question → `search_properties` → prose → `capture_lead` writing a
+  real `leads` row.
+- **Key files:** `backend/app/api/chat.py`, `backend/app/schemas/chat.py`,
+  `backend/tests/test_chat_endpoint.py`
+- **Gotchas/lessons:**
+  - **`GeminiNotConfigured` needs an app-level handler, not a try/except.** The client is
+    built in a dependency, which resolves *before* the route function runs — a handler in
+    the endpoint body never sees it.
+  - **A safety block is not an exception.** It arrives as a candidate-less response, so it
+    becomes a 200 carrying `FALLBACK_REPLY`, same as exhausting `MAX_TOOL_ITERATIONS`. The
+    spec originally called it a 502 and had to be amended.
+  - **`str_strip_whitespace=True` strips *before* length constraints run**, which is what
+    makes `"   "` a `string_too_short` 422 instead of an empty string reaching the loop.
+    Verified rather than assumed.
+  - **A test asserting "nothing persisted" passed for the wrong reason at first.** The
+    suite overrides `get_db` with `lambda: seeded` — not a generator — so FastAPI never
+    closes it and flushed-but-uncommitted rows stay visible in the open transaction.
+    Production's `get_db` closes and rolls back. The test now calls `seeded.rollback()` to
+    stand in for that; without it the assertion is meaningless.
+  - **`gemini-3.1-flash-lite` does chain `search_properties` → `capture_lead`** across one
+    conversation, first try. CLAUDE.md flags the non-lite Flash as the upgrade if it
+    didn't; it isn't needed.
+  - **Render cold start measured at ~22s** on `/health` alone; add 4–8s of model time per
+    turn. The `chat-client` spec needs to design its timeout and pending state around that.
+  - **The Galle no-match path got verified by accident** and is worth keeping in mind: the
+    one Galle house is LKR 130M, so a 120M ceiling legitimately returns zero, and the
+    `guidance` payload correctly stopped the model denying coverage.
 
 ### Brand rename: Home Advisor → Property Advisor — 2026-08-19
 - **What:** Renamed the brokerage everywhere (UI, system prompt, metadata, docs, and

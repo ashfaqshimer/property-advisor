@@ -17,11 +17,16 @@ from google.genai import errors as genai_errors
 
 import app.api.chat as chat_module
 from app.agent.client import GeminiNotConfigured
+from app.agent.loop import run_turn
 from app.agent.prompts import FALLBACK_REPLY
 from app.api.chat import get_agent_client
 from app.main import app as fastapi_app
 from app.models import Conversation, Message, MessageRole
-from app.schemas.chat import MAX_MESSAGE_LENGTH, MAX_SESSION_ID_LENGTH
+from app.schemas.chat import (
+    MAX_MESSAGE_LENGTH,
+    MAX_SESSION_ID_LENGTH,
+    ChatRequest,
+)
 from tests.agent_fakes import (
     ScriptedGemini,
     always_calls,
@@ -272,33 +277,31 @@ def test_a_failed_turn_persists_nothing(chat_client, seeded: Session) -> None:
     assert _messages(seeded) == []
 
 
-def test_concurrent_first_requests_do_not_500(
-    chat_client, seeded: Session, monkeypatch
-) -> None:
+def test_session_race_retries_once_instead_of_failing(seeded: Session) -> None:
     """Two first requests for one session race on the UNIQUE `session_id`; the loser's
-    INSERT raises IntegrityError and the endpoint retries once.
+    INSERT raises IntegrityError and the turn is retried once.
 
-    Patching `run_turn` rather than the Gemini client here: a genuine race needs two
-    concurrent transactions, which the single in-memory SQLite session can't stage. The
-    no-patch rule protects the *network* boundary, and that still holds — this fake never
-    reaches Gemini either.
+    Driven through the helper's injectable `runner` rather than by patching a module
+    global — a genuine race needs two concurrent transactions, which one SQLite session
+    can't stage. The second pass runs the *real* `run_turn` against a scripted model, so
+    the retry is proven to work rather than just to be attempted.
     """
     calls: list[str] = []
-    real_run_turn = chat_module.run_turn
 
     def flaky(db, session_id, user_message, client=None):
         calls.append(session_id)
         if len(calls) == 1:
             raise IntegrityError("INSERT", {}, Exception("duplicate key"))
-        return real_run_turn(db, session_id, user_message, client=client)
+        return run_turn(db, session_id, user_message, client=client)
 
-    monkeypatch.setattr("app.api.chat.run_turn", flaky)
-    client = chat_client(ScriptedGemini(responses=[text_response("Second time lucky.")]))
+    reply = chat_module._run_turn_handling_session_race(
+        seeded,
+        ChatRequest(session_id=SESSION, message="Hi"),
+        ScriptedGemini(responses=[text_response("Second time lucky.")]),
+        runner=flaky,
+    )
 
-    response = _post(client, "Hi")
-
-    assert response.status_code == 200
-    assert response.json()["reply"] == "Second time lucky."
+    assert reply == "Second time lucky."
     assert len(calls) == 2
     assert len(seeded.execute(select(Conversation)).scalars().all()) == 1
 
