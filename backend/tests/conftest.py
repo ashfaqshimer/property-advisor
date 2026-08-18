@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
 import app.models  # noqa: E402,F401  — registers Property on Base.metadata
+from app.api.chat import get_agent_client  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.seed import seed_into  # noqa: E402
 from app.db.session import get_db  # noqa: E402
@@ -86,4 +87,22 @@ def empty_client(db_session: Session):
     fastapi_app.dependency_overrides[get_db] = lambda: db_session
     with TestClient(fastapi_app) as test_client:
         yield test_client
+    fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def chat_client(seeded: Session):
+    """Factory: hands back a TestClient wired to a scripted stand-in for Gemini.
+
+    A factory rather than a plain fixture because each test scripts its own model
+    responses. Overriding `get_agent_client` is what keeps the suite off the network
+    without patching anything — `POST /chat` resolves its client through that dependency.
+    """
+
+    def build(fake) -> TestClient:
+        fastapi_app.dependency_overrides[get_db] = lambda: seeded
+        fastapi_app.dependency_overrides[get_agent_client] = lambda: fake
+        return TestClient(fastapi_app)
+
+    yield build
     fastapi_app.dependency_overrides.clear()

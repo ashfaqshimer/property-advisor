@@ -32,8 +32,9 @@ uv run pytest
 
 ## Talking to the agent
 
-`POST /chat` doesn't exist yet (Phase 3), so there's no way in through `/docs` or the
-frontend. Use the terminal REPL — it calls the same `loop.run_turn` the endpoint will:
+`POST /chat` is live, so `/docs` works — but the terminal REPL is still the better tool for
+poking at the agent, because it defaults to a throwaway database and prints the loop's
+internals. It calls the same `loop.run_turn` the endpoint does:
 
 ```bash
 uv run python -m scripts.chat             # throwaway in-memory SQLite, seeded listings
@@ -45,10 +46,11 @@ uv run python -m scripts.chat --session cli-abc123   # resume a conversation
 Needs `GEMINI_API_KEY` in `.env`; without it you get a named error naming the variable
 rather than an SDK stacktrace.
 
-**It defaults to in-memory SQLite deliberately.** Every turn writes to `conversations`,
-`messages`, and `leads`, so ten minutes of poking around against `--neon` leaves a trail of
-fake leads that look exactly like real ones. Use `--neon` when you're specifically checking
-Postgres persistence, and expect to clean up after yourself.
+**It defaults to in-memory SQLite** for speed and isolation — each run starts from the eight
+seeded listings with no history, which is what you want when comparing prompt changes. Use
+`--neon` to check Postgres persistence for real. **Neon here is a dev database**, so the
+conversations and leads left behind are fine to keep; they're useful as test data, and
+there's no cleanup obligation.
 
 `--verbose` is the one worth running at least once: it shows the hand-rolled loop choosing a
 tool, the payload coming back, and — on a search that matches nothing — the guidance that
@@ -60,9 +62,40 @@ stops the model claiming we have no properties in an area.
 |---|---|---|
 | GET | `/health` | Smoke test |
 | GET | `/properties/featured` | Homepage grid — newest available listings (`?limit=1..24`) |
+| POST | `/chat` | One user message → one complete reply, running the full tool loop |
 
 `price` is a raw JSON number with a separate `currency` field; formatting is the
 frontend's job. Field names are snake_case, matching the columns.
+
+### `POST /chat`
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id": "cli-abc123", "message": "Anything in Galle under LKR 80M?"}'
+# {"reply":"...","session_id":"cli-abc123"}
+```
+
+`session_id` is **client-generated** — the server never mints one. Reuse it to continue a
+conversation; history is replayed from `messages` every turn, so any worker can serve it.
+
+| Status | When |
+|---|---|
+| 422 | Blank/whitespace-only or >2000-char `message`; blank or >128-char `session_id` |
+| 502 | Gemini transport, quota, or server error. No retry — see `loop.py`'s docstring |
+| 503 | `GEMINI_API_KEY` missing or blank |
+
+A turn is **atomic**: `run_turn` commits once at the end, so a mid-loop failure discards the
+user's message too. That's deliberate — a half-written conversation would poison every later
+turn, since history is replayed from the table. It also means failed turns leave no trace in
+the database.
+
+Two things a *safety* block is not: it arrives as a candidate-less response, not an
+exception, so it becomes a 200 carrying `FALLBACK_REPLY` rather than a 502 — as does
+exhausting `MAX_TOOL_ITERATIONS`.
+
+Note the endpoint is unauthenticated and metered: up to five Gemini calls per request, with
+no rate limit. The length caps bound one request, not request volume.
 
 ## Migrations
 
@@ -177,8 +210,9 @@ ship uv, and the build dies on `uv: command not found` without it.
 Env vars are `DATABASE_URL`, `ALLOWED_ORIGINS`, and `PYTHON_VERSION=3.11` — set that
 last one explicitly rather than trusting Render to find `.python-version` inside the
 `backend/` root directory. Add `MIGRATION_DATABASE_URL` only if `DATABASE_URL` points
-at the `-pooler` endpoint (see Setup above). `GEMINI_API_KEY` is unset in production;
-`Settings` defaults it to `""` and no route reads it yet.
+at the `-pooler` endpoint (see Setup above). **`GEMINI_API_KEY` is now required** — `POST
+/chat` reads it, and a blank key means every chat request answers 503 while `/health` and
+`/properties/featured` keep working, so the service looks healthy while the agent is dead.
 
 **Migrations and seeding run from a laptop, not from Render.** The free tier has no
 SSH shell and Pre-Deploy Command is a paid feature, so `uv run alembic upgrade head`
