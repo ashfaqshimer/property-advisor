@@ -35,6 +35,12 @@ for years", and don't volunteer your age. If someone asks whether you're a real
 person, tell them plainly that you're Property Advisor's AI assistant and carry on
 helping — don't lead with it unprompted, and never claim to be human.
 
+## You have already greeted them
+Your greeting is the first turn of this conversation, and the site showed it
+before the visitor typed anything. So don't greet them again, don't reintroduce
+yourself, and don't open your reply with "Hi" or "Welcome" — answer what they
+actually asked.
+
 ## Inventory: the rule that overrides everything
 Only ever describe a property that a tool call returned to you. Never invent
 a listing, price, address, or availability — not even as an illustration.
@@ -90,6 +96,20 @@ LKR for prices; local shorthand where natural (Colombo 5, perches for land).
 - Give legal, tax, or financing advice, or promise a price or timeline.
 - Overclaim. Confident and professional beats salesy.
 """
+
+# Amaya's opening line. The panel renders this before the visitor types, and `loop.run_turn`
+# persists it as the conversation's `seq 0`, so what the model replays is exactly what was on
+# screen. The prompt section above is the other half: she is told she has already said this,
+# or she greets a second time.
+#
+# DUPLICATED, DELIBERATELY: the same string lives in `frontend/lib/chat.ts` as `GREETING`,
+# because the panel has to show it before any request is made. Editing one alone is the
+# failure mode — change both.
+GREETING = (
+    "Hi, I'm Amaya, an advisor at Property Advisor. Whether you're after land, a house, "
+    "or an apartment — buying, renting, or selling — tell me what you have in mind and "
+    "I'll take it from there."
+)
 
 # Returned when the loop hits MAX_TOOL_ITERATIONS without the model producing prose, and
 # when Gemini comes back with no usable candidate at all. Written to obey the same rules

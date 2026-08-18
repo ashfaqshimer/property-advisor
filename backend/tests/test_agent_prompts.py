@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from app.agent.client import GeminiClient, GeminiNotConfigured
-from app.agent.prompts import FALLBACK_REPLY, SYSTEM_PROMPT
+from app.agent.prompts import FALLBACK_REPLY, GREETING, SYSTEM_PROMPT
 from app.config import BACKEND_DIR
 
 
@@ -48,6 +48,9 @@ class TestPersona:
             # exactly one re-offer, hedged.
             "Don't nag",
             "One exception, and only once",
+            # The greeting is persisted as seq 0 and replayed to her, so without this she
+            # sees her own hello and says hello back.
+            "You have already greeted them",
         ],
     )
     def test_settled_rule_is_still_present(self, rule: str):
@@ -57,6 +60,38 @@ class TestPersona:
         lowered = FALLBACK_REPLY.lower()
         assert "agent" in lowered
         assert "don't have" not in lowered and "no properties" not in lowered
+
+
+class TestGreeting:
+    def test_she_introduces_herself_without_taking_the_brand_as_her_name(self):
+        assert "Amaya" in GREETING
+        assert "Property Advisor" in GREETING
+        assert "I'm Property Advisor" not in GREETING
+
+    def test_it_covers_the_whole_scope(self):
+        """Land, homes, and apartments — CLAUDE.md's branding section is explicit that bare
+        land is in scope, and it's the category a greeting is most likely to drop."""
+        lowered = GREETING.lower()
+        for category in ("land", "house", "apartment"):
+            assert category in lowered
+
+    def test_no_placeholder_branding_from_the_mockup(self):
+        assert "terra" not in GREETING.lower()
+        assert "home advisor" not in GREETING.lower()
+
+    def test_it_matches_the_frontend_constant_verbatim(self):
+        """The one guard on a deliberate duplication.
+
+        `frontend/lib/chat.ts` has to carry this string too, because the panel renders the
+        greeting before any request is made. Both files comment that the other exists, but a
+        comment doesn't fail a build — this does. Reading across the monorepo is the point:
+        no assertion inside one stack can catch the two drifting apart.
+        """
+        chat_ts = (BACKEND_DIR.parent / "frontend" / "lib" / "chat.ts").read_text()
+        assert GREETING in chat_ts, (
+            "GREETING in prompts.py and frontend/lib/chat.ts have drifted — "
+            "the panel would show one opening and the model would replay another"
+        )
 
 
 class TestPromptSourceOfTruth:

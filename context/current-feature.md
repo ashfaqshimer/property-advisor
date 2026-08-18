@@ -37,41 +37,121 @@
   just append a correction under it.
 -->
 
-**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
+**Feature:** Chat client — wire `ChatPanel` to `POST /chat`
 
-**Spec:** <!-- context/features/<slug>/spec.md -->
+**Spec:** `context/features/chat-client/spec.md`
 
 **Goal:**
-<!-- One or two sentences. What does "done" look like from the user's POV? -->
+Make the chat panel real. A visitor types a question, Amaya answers from the live database
+through `POST /chat`, and leads land in Neon. This replaces the `SEED_CONVERSATION` fixture and
+enables the controls currently rendered `disabled` on purpose. Also closes the greeting gap
+`agent-core` deferred to "whoever wires up the panel", which needs a small backend change
+alongside the frontend work.
 
-**Status:** `Not started | In progress | Blocked | In review/testing | Done`
+**Status:** `In progress`
 
-**Branch:** <!-- e.g. feature/property-search-filters -->
+**Branch:** `feature/chat-client`
 
 ### Approach / Key Decisions
 <!--
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
--
+- **A failed turn keeps its bubble, dimmed, with a "Try again" beneath it** — chosen over
+  restoring the text to the input. `run_turn` commits once at the very end, so a failure
+  persists *nothing*; resending the identical text duplicates nothing, which is what makes
+  the bubble-stays option safe rather than just tidier.
+- **Errors are classified in `lib/api.ts`, not merged into one throw.** A `ChatError` carries
+  a `kind` (`config` / `timeout` / `network` / `upstream` / `unavailable` / `unexpected`) and
+  a `retryable` getter. `unavailable` (503) is the one that must read differently and offer
+  no retry — the key is missing server-side. Copy lives in `chat.ts`, keyed by kind, so the
+  client stays free of user-facing wording.
+- **A caller abort is not a failure.** The panel aborts on unmount, and `sendChatMessage`
+  re-throws that original `AbortError` untouched rather than wrapping it, so the catch can
+  tell "nobody is listening any more" from "the request timed out".
+- **The greeting is inserted at `seq 0`, not generated.** Guarded by `if seq == 0`, which is
+  safe because nothing has been recorded at that point and an atomic-commit failure rolls the
+  conversation row back too. `SYSTEM_PROMPT` gains a "you have already greeted them" section
+  because the greeting is replayed *to* her as a model turn.
+- **The duplicated greeting is guarded by a real test, not a comment.** The spec asked for
+  cross-referencing comments; comments don't fail a build, so
+  `test_agent_prompts.py::test_it_matches_the_frontend_constant_verbatim` reads
+  `frontend/lib/chat.ts` from the Python suite. No assertion inside one stack can catch drift.
+- **CORS: production origin only.** Vercel preview URLs are per-branch, so exact-match can't
+  cover them without a regex origin setting; previews will error on send, by decision.
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
--
+- `backend/app/agent/prompts.py` — `GREETING`, the "already greeted" prompt section
+- `backend/app/agent/loop.py` — `seq 0` greeting insert + docstring note
+- `backend/tests/test_agent_loop.py` — 7 shifted `seq`/role assertions, `TestGreeting` (6 new)
+- `backend/tests/test_agent_prompts.py` — `TestGreeting`, incl. the cross-stack verbatim guard
+- `frontend/lib/api.ts` — **new**: `sendChatMessage`, `ChatError`, `wakeBackend`
+- `frontend/lib/chat.ts` — `SEED_CONVERSATION` deleted; `GREETING`, `ERROR_COPY`, pending copy
+- `frontend/components/chat/ChatPanel.tsx` — `'use client'`, the whole wiring
+- `frontend/tests/chat-api.test.ts` — **new**, 20 tests
+- `frontend/tests/chat-panel.test.tsx` — rewritten, 34 tests
+- `frontend/.env.local` — `NEXT_PUBLIC_API_URL` (gitignored, local only)
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
--
+**Remaining, and all of it is deploy-side — no code is outstanding.**
+
+- **`GEMINI_API_KEY` is still unset on Render**, deliberately, from before `POST /chat` shipped
+  (CLAUDE.md says so). Until it's set, the deployed backend answers **503** — which the panel
+  now handles honestly, but it isn't a working chat. This has to be set first.
+- **`NEXT_PUBLIC_API_URL` in the Vercel project** → `https://property-advisor-96sg.onrender.com`.
+  Inlined at *build* time, so it needs a redeploy after being set, not just a save.
+- **Render's `ALLOWED_ORIGINS` must include the Vercel production origin.** Verify from a real
+  browser: curl sends no `Origin` header and so never trips CORS at all.
+- The last acceptance criterion — a multi-turn conversation **against the deployed backend** —
+  is blocked on the three above. The same scenario passed in full against a local backend and
+  live Neon (35 browser checks, real model calls, a real `leads` row).
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1.
-2.
-3.
+1. Backend greeting: add `GREETING` to `app/agent/prompts.py`, the "already greeted" line in
+   `SYSTEM_PROMPT`, and persist it at `seq 0` in `run_turn` on a conversation's **first user
+   message** (never on page load). Tests: `seq 0` on a new conversation, not re-inserted on a
+   second turn, and the Gemini `contents` opening with it as a model turn.
+2. `frontend/lib/api.ts` — typed `sendChatMessage({ sessionId, message, signal })`, base URL
+   from `NEXT_PUBLIC_API_URL` (missing/empty fails naming the variable), ~45s
+   `AbortSignal.timeout`, and *distinguishable* error types (503 vs transient 502/network/
+   timeout; 422 can fall to generic).
+3. `frontend/lib/chat.ts` — delete `SEED_CONVERSATION`, add mirrored `GREETING`; keep
+   `ChatMessage`, `SPEAKER_LABELS`, `SUGGESTION_CHIPS`.
+4. `ChatPanel` → `'use client'`: lazy per-page-load `crypto.randomUUID()` session id (no
+   storage), `<form>` + `onSubmit` for Enter-to-send, optimistic user append, pending state
+   disabling input/send/chips, `maxLength={2000}`, trimmed-empty is a no-op, chips send their
+   text, newest message scrolled into view, fire-and-forget `GET /health` on mount, and
+   replacement copy for "Online · replies instantly".
+5. Error + pending states: failed message stays visible with a **retry** that resends the same
+   text (the server discarded the turn), distinct honest copy for 503, and a "still waking up"
+   message after ~8–10s. Don't set state after unmount.
+6. Accessibility: `aria-live="polite"` message list, "Amaya is typing…" as real text,
+   `role="alert"` errors, and the existing `sr-only` speaker labels + both panel `aria-label`s
+   preserved.
+7. Update `frontend/tests/chat-panel.test.tsx` (seeded turns ~L46/~L57, chip count ~L84, the
+   "replies instantly" copy, disabled input/send ~L93 — all now wrong by design) and add new
+   `fetch`-stubbed tests: optimistic append, pending, success, each error class, retry,
+   Enter-to-send, chip send, disabled-when-empty, 2000-char cap.
+8. Config: `NEXT_PUBLIC_API_URL` in `frontend/.env.local` (`http://127.0.0.1:8000` locally),
+   then Vercel + Render `ALLOWED_ORIGINS`.
+9. Verify: `pnpm test` and `pnpm build` from `frontend/`, `uv run pytest` from `backend/`, plus
+   a real multi-turn browser conversation against the deployed backend that returns a seeded
+   listing and captures a lead.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
--
+- **Streaming / token-by-token replies.** The endpoint is one request, one complete reply.
+- **Rehydrating history after a reload.** Decided: a reload starts a fresh conversation. Doing
+  it properly needs `GET /chat/{session_id}`, which is v2.
+- **`GET /properties` and the featured grid.** The grid stays on `lib/properties.ts` fixtures.
+- **Markdown or rich rendering** of replies. Plain text in a bubble, as today.
+- **Rate limiting, auth, analytics, cost telemetry.**
+- **Dynamic suggestion chips.** They stay the three hardcoded strings.
+- **Any lead-confirmation UI.** The reply prose is the only feedback; the database is the record.
+- **Retry/backoff inside the backend.** Client-side retry is a button the user presses.
 
 ---
 
