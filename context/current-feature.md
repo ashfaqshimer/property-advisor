@@ -37,77 +37,41 @@
   just append a correction under it.
 -->
 
-**Feature:** Rename brand to Property Advisor (chore)
+**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
 
-**Spec:** `context/chores/brand-rename/spec.md`
+**Spec:** <!-- context/features/<slug>/spec.md -->
 
 **Goal:**
-Rename the brokerage from "Home Advisor" to **Property Advisor** everywhere —
-frontend UI, backend agent prompts, page metadata, tests, and docs — and land the
-pending fix that labels the assistant **Amaya** in the chat UI rather than the
-brand. External services (GitHub, Neon, Vercel) are already renamed.
+<!-- One or two sentences. What does "done" look like from the user's POV? -->
 
-**Status:** `In progress`
+**Status:** `Not started | In progress | Blocked | In review/testing | Done`
 
-**Branch:** `chore/brand-rename`
+**Branch:** <!-- e.g. feature/property-search-filters -->
 
 ### Approach / Key Decisions
 <!--
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
-- **Why the name changed:** "Home Advisor" collided with HomeAdvisor.com (Angi's
-  US home-services marketplace) on search and trademark, and "Home" excluded bare
-  land, which is in scope. Vehicles were considered as a future category and
-  explicitly dropped — scope is land, homes, apartments — which is what made
-  "Property" the right umbrella rather than a category-free coined name.
-- **Generic brand + distinctive persona is deliberate.** Distinctiveness lives in
-  Amaya, so the brand itself can be plainly descriptive.
-- **Not a blind find-and-replace.** Two spots need real edits: the logo glyph
-  (`H` → `P`) plus the comment explaining why it is `aria-hidden`, and
-  `navbar.test.tsx`'s brand-link regex whose comment reasons about colliding with
-  the "Home" nav item.
-- **Neon database/role rename dropped** after inspecting the connection string —
-  `DATABASE_URL` already carries `neondb_owner` and `/neondb`, and neither is
-  brand-visible. Pure risk, no benefit. Project label rename was enough.
+-
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
-- (none yet)
+-
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
-- `propertyadvisor.lk` availability unverified, and no Sri Lankan trademark search
-  done. Both are out of scope, but a bad answer to either would force a *second*
-  rename.
-- Stray live `OPENAI_API_KEY` in `backend/.env` on a Gemini-only project; nothing
-  reads it. Unrelated to this chore — flagged, not actioned.
+-
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1. Frontend brand surfaces: `Logo.tsx` (wordmark + `P` glyph + comment),
-   `layout.tsx` metadata title, `Footer.tsx` copyright and `EMAIL`.
-2. Chat panel → Amaya: `ChatPanel.tsx` header "Amaya — AI Advisor", both
-   `aria-label`s, and `SPEAKER_LABELS.agent` in `lib/chat.ts`.
-3. Backend: `prompts.py` (3 spots), `tools.py` search description, `main.py`
-   FastAPI title.
-4. Update all test assertions — `page-structure`, `footer`, `chat-panel`,
-   `navbar`, `regions`, `test_agent_prompts.py`.
-5. Docs: `CLAUDE.md` Branding section (and delete its now-stale note about the
-   frontend still saying "Home Advisor"), `context/PROJECT_OVERVIEW.md`.
-6. Verify: `pnpm build`, `pnpm test` from `frontend/`; `uv run pytest` from
-   `backend/`; then a zero-match grep for the old name.
+1.
+2.
+3.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
-- Renaming the local working directory — stays `home-advisor` on disk.
-- Render: not deployed. Its rename and `ALLOWED_ORIGINS` update are a for-later
-  checklist in the spec.
-- Buying or verifying `propertyadvisor.lk`; trademark search.
-- Renaming the Neon database or role.
-- Any logo/visual redesign beyond the `H` → `P` glyph swap.
-- Renaming Amaya or changing her persona, tone, or behaviour rules.
-- Hand-editing `frontend/coverage/coverage-final.json` — generated output.
+-
 
 ---
 
@@ -118,6 +82,34 @@ brand. External services (GitHub, Neon, Vercel) are already renamed.
   Goal is "remind me what this was and where the bodies are buried," not a
   full changelog (git already has that).
 -->
+
+### Brand rename: Home Advisor → Property Advisor — 2026-08-19
+- **What:** Renamed the brokerage everywhere (UI, system prompt, metadata, docs, and
+  GitHub/Neon/Vercel), and landed the deferred relabel so the chat panel names **Amaya**
+  rather than the brand. Scope settled as land/homes/apartments; vehicles considered and
+  dropped, which is what made "Property" the right umbrella term.
+- **Key files:** `frontend/components/layout/Logo.tsx`, `frontend/components/chat/ChatPanel.tsx`,
+  `frontend/lib/chat.ts`, `backend/app/agent/prompts.py`, `CLAUDE.md`
+- **Gotchas/lessons:**
+  - **Two occurrences no brand-name grep can find.** `pyproject.toml`'s `description`
+    field, and a bare `"H"` assertion in `footer.test.tsx` checking the logo glyph. The
+    test caught the second one; the first only surfaced on a final sweep of *every* file
+    rather than a search for the old name. On a rename, grep the artefacts, not the string.
+  - **Two "zero match" acceptance criteria were unmeetable as written.** A test asserting
+    the old brand is absent from `SYSTEM_PROMPT` must contain that string. Criterion was
+    amended with the exception documented rather than dropping the guard — the prompt is
+    the one surface where a stale name reaches users with no rendered output to catch it.
+  - **Neon: the connection string already carried the database name.** `DATABASE_URL` has
+    the role (`neondb_owner`) and database (`/neondb`) embedded, so a "rename the database
+    too" plan was dropped after inspection — invisible to users, pure risk. Renaming the
+    Neon *project* is cosmetic and leaves the connection string untouched, because the host
+    derives from the endpoint ID.
+  - **Archived specs were annotated, not rewritten.** Three shipped specs under
+    `context/features/done/` assert copy that is now stale. Rewriting them would falsify
+    what was agreed at the time, so each got a "superseded copy" header note instead.
+  - Vercel's OIDC warning on project rename is a non-issue here: the `sub` claim embeds the
+    project name, but nothing uses OIDC federation. Also note the project name and the
+    `.vercel.app` domain are separate settings — renaming one does not re-point the other.
 
 ### Agent Core — the hand-rolled Gemini loop — 2026-08-18
 - **What:** Phase 2. `loop.run_turn(db, session_id, message)` → history + tool declarations

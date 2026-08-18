@@ -44,7 +44,13 @@ and "Home" excludes bare land, which is in scope for this market.
 
 ### Code — backend
 
-- [ ] `grep -ri "home advisor"` over `backend/` returns zero matches.
+- [x] `grep -ri "home advisor"` over tracked files in `backend/` returns zero
+      matches, **with one deliberate exception**: `test_agent_prompts.py`'s
+      `test_no_trace_of_the_old_brand` guard. A test asserting the old name is
+      absent from `SYSTEM_PROMPT` must necessarily contain that string. Criterion
+      amended during verification rather than dropping the guard — the system
+      prompt is the one place a stale brand name would reach users without any
+      rendered surface to catch it.
 - [ ] [prompts.py](../../../backend/app/agent/prompts.py) names the brokerage
       "Property Advisor" in all three places, and the persona guard still reads
       that Amaya works there rather than being named after it.

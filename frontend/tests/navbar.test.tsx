@@ -30,10 +30,8 @@ function menuButton(): HTMLElement {
   return screen.getByRole("button", { name: /menu/i });
 }
 
-/** The brand link. Anchoring on the full brand keeps this off the "Home" nav
- *  link — under the old "Home Advisor" name that disambiguation was load-bearing;
- *  "Property Advisor" no longer shares a prefix with it, but the nav item is still
- *  there, so the full string stays. */
+/** The brand link. Anchored on the full brand string so it cannot match the
+ *  separate "Home" nav link. */
 function brandLink(): HTMLElement {
   return screen.getByRole("link", { name: /Property Advisor/ });
 }
