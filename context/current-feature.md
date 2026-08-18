@@ -37,41 +37,77 @@
   just append a correction under it.
 -->
 
-**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
+**Feature:** Rename brand to Property Advisor (chore)
 
-**Spec:** <!-- context/features/<slug>/spec.md -->
+**Spec:** `context/chores/brand-rename/spec.md`
 
 **Goal:**
-<!-- One or two sentences. What does "done" look like from the user's POV? -->
+Rename the brokerage from "Home Advisor" to **Property Advisor** everywhere —
+frontend UI, backend agent prompts, page metadata, tests, and docs — and land the
+pending fix that labels the assistant **Amaya** in the chat UI rather than the
+brand. External services (GitHub, Neon, Vercel) are already renamed.
 
-**Status:** `Not started | In progress | Blocked | In review/testing | Done`
+**Status:** `In progress`
 
-**Branch:** <!-- e.g. feature/property-search-filters -->
+**Branch:** `chore/brand-rename`
 
 ### Approach / Key Decisions
 <!--
   Why you're building it this way — especially anything non-obvious.
   This is the highest-value section: code shows WHAT, this shows WHY.
 -->
--
+- **Why the name changed:** "Home Advisor" collided with HomeAdvisor.com (Angi's
+  US home-services marketplace) on search and trademark, and "Home" excluded bare
+  land, which is in scope. Vehicles were considered as a future category and
+  explicitly dropped — scope is land, homes, apartments — which is what made
+  "Property" the right umbrella rather than a category-free coined name.
+- **Generic brand + distinctive persona is deliberate.** Distinctiveness lives in
+  Amaya, so the brand itself can be plainly descriptive.
+- **Not a blind find-and-replace.** Two spots need real edits: the logo glyph
+  (`H` → `P`) plus the comment explaining why it is `aria-hidden`, and
+  `navbar.test.tsx`'s brand-link regex whose comment reasons about colliding with
+  the "Home" nav item.
+- **Neon database/role rename dropped** after inspecting the connection string —
+  `DATABASE_URL` already carries `neondb_owner` and `/neondb`, and neither is
+  brand-visible. Pure risk, no benefit. Project label rename was enough.
 
 ### Files Touched
 <!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
--
+- (none yet)
 
 ### Open Questions / Blockers
 <!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
--
+- `propertyadvisor.lk` availability unverified, and no Sri Lankan trademark search
+  done. Both are out of scope, but a bad answer to either would force a *second*
+  rename.
+- Stray live `OPENAI_API_KEY` in `backend/.env` on a Gemini-only project; nothing
+  reads it. Unrelated to this chore — flagged, not actioned.
 
 ### Next Steps
 <!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1.
-2.
-3.
+1. Frontend brand surfaces: `Logo.tsx` (wordmark + `P` glyph + comment),
+   `layout.tsx` metadata title, `Footer.tsx` copyright and `EMAIL`.
+2. Chat panel → Amaya: `ChatPanel.tsx` header "Amaya — AI Advisor", both
+   `aria-label`s, and `SPEAKER_LABELS.agent` in `lib/chat.ts`.
+3. Backend: `prompts.py` (3 spots), `tools.py` search description, `main.py`
+   FastAPI title.
+4. Update all test assertions — `page-structure`, `footer`, `chat-panel`,
+   `navbar`, `regions`, `test_agent_prompts.py`.
+5. Docs: `CLAUDE.md` Branding section (and delete its now-stale note about the
+   frontend still saying "Home Advisor"), `context/PROJECT_OVERVIEW.md`.
+6. Verify: `pnpm build`, `pnpm test` from `frontend/`; `uv run pytest` from
+   `backend/`; then a zero-match grep for the old name.
 
 ### Explicitly Out of Scope (for now)
 <!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
--
+- Renaming the local working directory — stays `home-advisor` on disk.
+- Render: not deployed. Its rename and `ALLOWED_ORIGINS` update are a for-later
+  checklist in the spec.
+- Buying or verifying `propertyadvisor.lk`; trademark search.
+- Renaming the Neon database or role.
+- Any logo/visual redesign beyond the `H` → `P` glyph swap.
+- Renaming Amaya or changing her persona, tone, or behaviour rules.
+- Hand-editing `frontend/coverage/coverage-final.json` — generated output.
 
 ---
 
