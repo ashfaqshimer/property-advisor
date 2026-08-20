@@ -44,10 +44,10 @@ class Settings(BaseSettings):
 
     allowed_origins: str = "http://localhost:3000"
 
-    # Phase 2 (agent). Parked here so the model string lives in exactly one place, per
-    # CLAUDE.md. Nothing reads either of these yet.
+    # Agent settings are required so deployment configuration, rather than source code,
+    # chooses the model.
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.1-flash-lite"
+    gemini_model: str
 
     @property
     def cors_origins(self) -> list[str]:

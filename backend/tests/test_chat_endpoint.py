@@ -235,7 +235,9 @@ def test_the_real_dependency_raises_when_the_key_is_blank(monkeypatch) -> None:
 
     def blank_key_settings() -> Settings:
         return Settings(
-            database_url="postgresql+psycopg://x:x@localhost/x", gemini_api_key=""
+            database_url="postgresql+psycopg://x:x@localhost/x",
+            gemini_api_key="",
+            gemini_model="gemini-3.1-flash-lite",
         )
 
     monkeypatch.setattr(client_module, "get_settings", blank_key_settings)
