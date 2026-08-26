@@ -3,14 +3,15 @@ import { describe, expect, it } from "vitest";
 
 import ChatPanel from "@/components/chat/ChatPanel";
 import Footer from "@/components/layout/Footer";
-import PropertyGrid from "@/components/properties/PropertyGrid";
+import { PropertyGridContent } from "@/components/properties/PropertyGrid";
+import { FEATURED_PROPERTIES } from "@/lib/properties";
 
 // The property grid is no longer a placeholder region — its header, cards, and
 // fixture data are covered by `property-grid.test.tsx`. Only its place in the
 // shell is asserted here, alongside the other regions' layout guards.
 describe("PropertyGrid", () => {
   it("is the target of the header's Listings link", () => {
-    render(<PropertyGrid />);
+    render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
     const section = screen.getByRole("region", { name: "Featured properties" });
 
     expect(section).toHaveAttribute("id", "featured-properties");

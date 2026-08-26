@@ -78,12 +78,55 @@ export type ChatResponse = {
   session_id: string;
 };
 
+export type PropertyApiRecord = {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  currency: "LKR";
+  location: string;
+  property_type: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  sqft: number | null;
+  image_urls: string[];
+  image_alt: string;
+  status: string;
+  created_at: string;
+};
+
 function isChatResponse(value: unknown): value is ChatResponse {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;
   return (
     typeof candidate.reply === "string" && typeof candidate.session_id === "string"
   );
+}
+
+function isPropertyApiRecord(value: unknown): value is PropertyApiRecord {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.title === "string" &&
+    typeof candidate.description === "string" &&
+    typeof candidate.price === "number" &&
+    candidate.currency === "LKR" &&
+    typeof candidate.location === "string" &&
+    typeof candidate.property_type === "string" &&
+    (typeof candidate.bedrooms === "number" || candidate.bedrooms === null) &&
+    (typeof candidate.bathrooms === "number" || candidate.bathrooms === null) &&
+    (typeof candidate.sqft === "number" || candidate.sqft === null) &&
+    Array.isArray(candidate.image_urls) &&
+    candidate.image_urls.every((url) => typeof url === "string") &&
+    typeof candidate.image_alt === "string" &&
+    typeof candidate.status === "string" &&
+    typeof candidate.created_at === "string"
+  );
+}
+
+function isPropertyApiResponse(value: unknown): value is PropertyApiRecord[] {
+  return Array.isArray(value) && value.every(isPropertyApiRecord);
 }
 
 /**
@@ -191,6 +234,35 @@ export async function sendChatMessage({
   }
 
   if (!isChatResponse(payload)) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised body.");
+  }
+
+  return payload;
+}
+
+export async function getFeaturedProperties(): Promise<PropertyApiRecord[]> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl()}/properties/featured`, {
+      method: "GET",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw classifyTransportFailure(error);
+  }
+
+  if (!response.ok) {
+    throw classifyStatus(response.status);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new ChatError("unexpected", "The backend returned a malformed body.");
+  }
+
+  if (!isPropertyApiResponse(payload)) {
     throw new ChatError("unexpected", "The backend returned an unrecognised body.");
   }
 

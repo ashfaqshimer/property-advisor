@@ -1,5 +1,8 @@
+import type { PropertyApiRecord } from "@/lib/api";
+
 /**
- * PLACEHOLDER DATA — replaced by `GET /properties` once the backend exists.
+ * Card presentation data. API records are mapped here so snake_case wire fields do not
+ * leak into the UI components.
  *
  * Eight illustrative listings so the grid has something real to lay out. The
  * names, prices, and copy come from `context/ui-interface.png`, which is
@@ -19,13 +22,35 @@ export type Property = {
   /** Pre-formatted for display — the API will send a number and a currency. */
   priceLkr: string;
   description: string;
-  beds: number;
-  baths: number;
-  sqft: number;
-  imageUrl: string;
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  imageUrl: string | null;
   /** Describes the photo, not the listing — the title is already adjacent. */
   imageAlt: string;
 };
+
+export function formatPrice(price: number, currency: "LKR"): string {
+  if (price >= 1_000_000 && price % 1_000_000 === 0) {
+    return `${currency} ${(price / 1_000_000).toLocaleString("en-US")}M`;
+  }
+  return `${currency} ${price.toLocaleString("en-US")}`;
+}
+
+export function mapProperty(record: PropertyApiRecord): Property {
+  return {
+    id: record.id,
+    title: record.title,
+    location: record.location,
+    priceLkr: formatPrice(record.price, record.currency),
+    description: record.description,
+    beds: record.bedrooms,
+    baths: record.bathrooms,
+    sqft: record.sqft,
+    imageUrl: record.image_urls[0] ?? null,
+    imageAlt: record.image_alt,
+  };
+}
 
 /** Shared Unsplash transform: caps the source the optimizer downloads. */
 const photo = (id: string) =>

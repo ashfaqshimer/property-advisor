@@ -37,45 +37,14 @@
   just append a correction under it.
 -->
 
-**Feature:** <!-- e.g. "Property search filters (price range, bedrooms, location)" -->
-
-**Spec:** <!-- context/features/<slug>/spec.md -->
-
-**Goal:**
-<!-- One or two sentences. What does "done" look like from the user's POV? -->
-
-**Status:** `Not started | In progress | Blocked | In review/testing | Done`
-
-**Branch:** <!-- e.g. feature/property-search-filters -->
-
-### Approach / Key Decisions
-<!--
-  Why you're building it this way — especially anything non-obvious.
-  This is the highest-value section: code shows WHAT, this shows WHY.
--->
--
-
-### Files Touched
-<!-- Running list so Claude Code doesn't have to grep the whole repo to find scope -->
--
-
-### Open Questions / Blockers
-<!-- Anything unresolved. Delete once resolved, don't let these pile up stale. -->
--
-
-### Next Steps
-<!-- Ordered, small, actionable. This is what Claude Code should tackle first. -->
-1.
-2.
-3.
-
-### Explicitly Out of Scope (for now)
-<!-- Prevents Claude Code from "helpfully" expanding scope mid-task. -->
--
-
 ---
 
 ## 📜 Feature History
+
+### Frontend live property data — 2026-08-27
+- **What:** Replaced the homepage property fixtures with live `GET /properties/featured` data while keeping the existing card layout, accessible section structure, and state handling for loading, empty, and error cases.
+- **Key files:** `frontend/lib/api.ts`, `frontend/lib/properties.ts`, `frontend/components/properties/PropertyGrid.tsx`, `frontend/app/loading.tsx`, `frontend/tests/property-api.test.ts`
+- **Gotchas/lessons:** `NEXT_PUBLIC_API_URL` must be present in the frontend env, and the backend must be running against Neon or the browser never makes a real fetch. The tests cover the request, validation, mapping, nullable metadata, empty result, and visible states.
 
 <!--
   Append-only, most recent first. Each entry should be short — 3-5 lines max.

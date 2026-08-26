@@ -76,18 +76,17 @@ export default function PropertyCard({ property }: { property: Property }) {
         neutral background is what shows through in that case.
       */}
       <div className="relative aspect-4/3 w-full bg-band">
-        <Image
-          src={property.imageUrl}
-          alt={property.imageAlt}
-          fill
-          /*
-            Full width on mobile; from `sm` the grid is two-up inside a column
-            that is itself two-thirds of a 1200px page from `lg`. Without this
-            Next assumes 100vw and ships a ~1200px file into a ~360px slot.
-          */
-          sizes="(min-width: 1024px) 360px, (min-width: 640px) 50vw, 100vw"
-          className="object-cover"
-        />
+        {property.imageUrl ? (
+          <Image
+            src={property.imageUrl}
+            alt={property.imageAlt}
+            fill
+            sizes="(min-width: 1024px) 360px, (min-width: 640px) 50vw, 100vw"
+            className="object-cover"
+          />
+        ) : (
+          <div role="img" aria-label={property.imageAlt} className="size-full" />
+        )}
 
         <p className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-surface/90 px-2 py-1 text-[0.6875rem] font-medium text-ink backdrop-blur-sm">
           <PinIcon />
@@ -123,18 +122,9 @@ export default function PropertyCard({ property }: { property: Property }) {
           their dividers aligned when descriptions differ in length.
         */}
         <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-200/80 pt-3 text-xs text-muted [&>span]:inline-flex [&>span]:items-center [&>span]:gap-1.5">
-          <span>
-            <BedIcon />
-            {plural(property.beds, "bed")}
-          </span>
-          <span>
-            <BathIcon />
-            {plural(property.baths, "bath")}
-          </span>
-          <span>
-            <AreaIcon />
-            {property.sqft.toLocaleString("en-US")} sqft
-          </span>
+          {property.beds !== null && <span><BedIcon />{plural(property.beds, "bed")}</span>}
+          {property.baths !== null && <span><BathIcon />{plural(property.baths, "bath")}</span>}
+          {property.sqft !== null && <span><AreaIcon />{property.sqft.toLocaleString("en-US")} sqft</span>}
         </div>
       </div>
     </article>

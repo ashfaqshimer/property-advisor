@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import PropertyCard from "@/components/properties/PropertyCard";
-import PropertyGrid from "@/components/properties/PropertyGrid";
+import { PropertyGridContent } from "@/components/properties/PropertyGrid";
 import { FEATURED_PROPERTIES, type Property } from "@/lib/properties";
 
 /** A card is only ever rendered from fixture data, so tests start from one. */
@@ -10,7 +10,7 @@ const sample: Property = FEATURED_PROPERTIES[0];
 
 describe("PropertyGrid", () => {
   it("renders one card per fixture", () => {
-    const { container } = render(<PropertyGrid />);
+    const { container } = render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
 
     // Counted off the fixture length, not a literal, so dropping or adding a
     // listing does not need a test edit — including to an odd number.
@@ -20,7 +20,7 @@ describe("PropertyGrid", () => {
   });
 
   it("takes its accessible name from the heading, not a duplicate label", () => {
-    render(<PropertyGrid />);
+    render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
     const section = screen.getByRole("region", { name: "Featured properties" });
 
     expect(section).toHaveAttribute(
@@ -31,7 +31,7 @@ describe("PropertyGrid", () => {
   });
 
   it("renders the section header above the cards", () => {
-    render(<PropertyGrid />);
+    render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
 
     expect(
       screen.getByRole("heading", { level: 2, name: "Featured properties" }),
@@ -41,7 +41,7 @@ describe("PropertyGrid", () => {
   });
 
   it("titles every card at h3, one level below the section heading", () => {
-    render(<PropertyGrid />);
+    render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
 
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(
       FEATURED_PROPERTIES.length,
@@ -133,7 +133,7 @@ describe("property fixtures", () => {
   });
 
   it("renders each fixture's title exactly once in the grid", () => {
-    render(<PropertyGrid />);
+    render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
     const grid = screen.getByRole("region", { name: "Featured properties" });
 
     for (const property of FEATURED_PROPERTIES) {
