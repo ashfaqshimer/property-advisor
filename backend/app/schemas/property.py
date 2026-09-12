@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from app.models.property import (
     FurnishingStatus,
@@ -58,3 +58,25 @@ class PropertyRead(BaseModel):
         and JSON doubles are exact to 2^53 (~9e15).
         """
         return float(value) if value is not None else None
+
+
+class PropertyCreate(BaseModel):
+    title: str
+    description: str = ""
+    listing_type: ListingType
+    price: Decimal
+    is_price_per_perch: bool = False
+    location: str
+    property_type: PropertyType
+    bedrooms: int | None = None
+    bathrooms: int | None = None
+    land_size_perches: Decimal | None = None
+    floor_area_sqft: int | None = None
+    parking_spaces: int | None = None
+    build_year: int | None = None
+    road_access_ft: int | None = None
+    furnishing_status: FurnishingStatus | None = None
+    amenities: dict | None = None
+    image_urls: list[str] = Field(default_factory=list)
+    image_alt: str = ""
+    status: PropertyStatus = PropertyStatus.AVAILABLE

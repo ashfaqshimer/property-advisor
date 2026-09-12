@@ -49,6 +49,21 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str
 
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+    cloudinary_folder: str = "property-advisor"
+
+    @property
+    def cloudinary_configured(self) -> bool:
+        return all(
+            (
+                self.cloudinary_cloud_name,
+                self.cloudinary_api_key,
+                self.cloudinary_api_secret,
+            )
+        )
+
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]

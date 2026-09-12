@@ -101,6 +101,21 @@ export type PropertyApiRecord = {
   created_at: string;
 };
 
+export type CreatePropertyPayload = {
+  title: string;
+  description: string;
+  listing_type: "sale" | "rent";
+  price: number;
+  location: string;
+  property_type: "house" | "apartment" | "land" | "commercial";
+  bedrooms: number | null;
+  bathrooms: number | null;
+  floor_area_sqft: number | null;
+  image_urls: string[];
+  image_alt: string;
+  status: "available" | "under_offer" | "sold";
+};
+
 function isChatResponse(value: unknown): value is ChatResponse {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;
@@ -279,6 +294,37 @@ export async function getFeaturedProperties(): Promise<PropertyApiRecord[]> {
   }
 
   return payload;
+}
+
+export async function uploadPropertyImages(files: File[]): Promise<string[]> {
+  const body = new FormData();
+  files.forEach((file) => body.append("files", file));
+  const response = await fetch(`${baseUrl()}/properties/images`, {
+    method: "POST",
+    body,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Image upload failed (${response.status}).`, response.status);
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload) || !payload.every((url) => typeof url === "string")) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised image response.");
+  }
+  return payload;
+}
+
+export async function createProperty(payload: CreatePropertyPayload): Promise<PropertyApiRecord> {
+  const response = await fetch(`${baseUrl()}/properties`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Property creation failed (${response.status}).`, response.status);
+  const result: unknown = await response.json();
+  if (!isPropertyApiRecord(result)) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised property response.");
+  }
+  return result;
 }
 
 /**
