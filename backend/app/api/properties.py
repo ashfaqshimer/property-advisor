@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from typing import Annotated
+from uuid import UUID
 
 import cloudinary
 import cloudinary.uploader
@@ -11,10 +12,11 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import queries
 from app.db.session import get_db
-from app.models.property import Property
-from app.schemas.property import PropertyCreate, PropertyRead
+from app.models.property import ListingType, Property, PropertyStatus, PropertyType
+from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
 
 router = APIRouter(prefix="/properties", tags=["properties"])
+admin_router = APIRouter(prefix="/admin/properties", tags=["admin-properties"])
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -58,6 +60,7 @@ def upload_property_images(files: Annotated[list[UploadFile], File()]) -> list[s
 
 
 @router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
+@admin_router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 def create_property(payload: PropertyCreate, db: DbSession) -> Property:
     property_record = Property(**payload.model_dump())
     db.add(property_record)
@@ -77,3 +80,58 @@ def get_featured_properties(
 ) -> Sequence[Property]:
     """Curated set for the homepage grid. Empty table returns [], not a 404."""
     return queries.featured_properties(db, limit=limit)
+
+
+@admin_router.get("", response_model=list[PropertyRead])
+def get_admin_properties(
+    db: DbSession,
+    search: Annotated[str | None, Query(max_length=120)] = None,
+    property_status: Annotated[PropertyStatus | None, Query(alias="status")] = None,
+    property_type: PropertyType | None = None,
+    listing_type: ListingType | None = None,
+    is_featured: bool | None = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> Sequence[Property]:
+    return queries.admin_properties(
+        db,
+        search=search,
+        status=property_status,
+        property_type=property_type,
+        listing_type=listing_type,
+        is_featured=is_featured,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@admin_router.get("/{property_id}", response_model=PropertyRead)
+def get_admin_property(property_id: UUID, db: DbSession) -> Property:
+    property_record = db.get(Property, property_id)
+    if property_record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
+    return property_record
+
+
+@admin_router.patch("/{property_id}", response_model=PropertyRead)
+def update_admin_property(
+    property_id: UUID, payload: PropertyUpdate, db: DbSession
+) -> Property:
+    property_record = db.get(Property, property_id)
+    if property_record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(property_record, field, value)
+    db.commit()
+    db.refresh(property_record)
+    return property_record
+
+
+@admin_router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_admin_property(property_id: UUID, db: DbSession) -> None:
+    property_record = db.get(Property, property_id)
+    if property_record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
+    db.delete(property_record)
+    db.commit()

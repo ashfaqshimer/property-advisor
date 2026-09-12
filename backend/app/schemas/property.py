@@ -32,6 +32,7 @@ class PropertyRead(BaseModel):
     listing_type: ListingType
     price: Decimal
     is_price_per_perch: bool
+    is_featured: bool
     # Constant, not a column — the table is single-currency. Stating it on the wire
     # documents the contract in /docs instead of burying LKR in a frontend formatter.
     currency: Literal["LKR"] = "LKR"
@@ -66,6 +67,7 @@ class PropertyCreate(BaseModel):
     listing_type: ListingType
     price: Decimal
     is_price_per_perch: bool = False
+    is_featured: bool = False
     location: str
     property_type: PropertyType
     bedrooms: int | None = None
@@ -80,3 +82,26 @@ class PropertyCreate(BaseModel):
     image_urls: list[str] = Field(default_factory=list)
     image_alt: str = ""
     status: PropertyStatus = PropertyStatus.AVAILABLE
+
+
+class PropertyUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    listing_type: ListingType | None = None
+    price: Decimal | None = None
+    is_price_per_perch: bool | None = None
+    is_featured: bool | None = None
+    location: str | None = None
+    property_type: PropertyType | None = None
+    bedrooms: int | None = None
+    bathrooms: int | None = None
+    land_size_perches: Decimal | None = None
+    floor_area_sqft: int | None = None
+    parking_spaces: int | None = None
+    build_year: int | None = None
+    road_access_ft: int | None = None
+    furnishing_status: FurnishingStatus | None = None
+    amenities: dict | None = None
+    image_urls: list[str] | None = None
+    image_alt: str | None = None
+    status: PropertyStatus | None = None

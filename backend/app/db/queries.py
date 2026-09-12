@@ -30,17 +30,15 @@ def featured_properties(
 ) -> Sequence[Property]:
     """The homepage set: the newest still-available listings.
 
-    There is no `featured` flag, deliberately. With eight listings a boolean column
-    would be true on every row and encode nothing. When there are more listings than
-    the grid holds, "featured" becomes a real editorial decision and earns a column;
-    until then "newest, still for sale" is the honest rule.
-
     `id` is the tiebreaker, not decoration: see the note on transaction clocks in
     app/db/seed.py.
     """
     stmt = (
         select(Property)
-        .where(Property.status == PropertyStatus.AVAILABLE)
+        .where(
+            Property.status == PropertyStatus.AVAILABLE,
+            Property.is_featured.is_(True),
+        )
         .order_by(Property.created_at.desc(), Property.id)
         .limit(limit)
     )
@@ -94,4 +92,34 @@ def search_properties(
         stmt = stmt.where(Property.bedrooms >= bedrooms)
 
     stmt = stmt.order_by(Property.created_at.desc(), Property.id).limit(limit)
+    return db.execute(stmt).scalars().all()
+
+
+def admin_properties(
+    db: Session,
+    *,
+    search: str | None = None,
+    status: PropertyStatus | None = None,
+    property_type: PropertyType | None = None,
+    listing_type: ListingType | None = None,
+    is_featured: bool | None = None,
+    offset: int = 0,
+    limit: int = 50,
+) -> Sequence[Property]:
+    """Return catalog rows for the management surface, including unavailable rows."""
+    stmt = select(Property)
+
+    if search:
+        term = f"%{search.strip()}%"
+        stmt = stmt.where(Property.title.ilike(term) | Property.location.ilike(term))
+    if status is not None:
+        stmt = stmt.where(Property.status == status)
+    if property_type is not None:
+        stmt = stmt.where(Property.property_type == property_type)
+    if listing_type is not None:
+        stmt = stmt.where(Property.listing_type == listing_type)
+    if is_featured is not None:
+        stmt = stmt.where(Property.is_featured == is_featured)
+
+    stmt = stmt.order_by(Property.created_at.desc(), Property.id).offset(offset).limit(limit)
     return db.execute(stmt).scalars().all()

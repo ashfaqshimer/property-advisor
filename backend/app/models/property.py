@@ -66,6 +66,10 @@ class Property(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
 
+    is_featured: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
+
     location: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     property_type: Mapped[PropertyType] = mapped_column(
         enum_column(PropertyType, "property_type"), nullable=False, index=True

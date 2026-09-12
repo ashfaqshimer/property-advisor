@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getFeaturedProperties } from "@/lib/api";
+import { getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
 import { formatPrice, mapProperty } from "@/lib/properties";
 
-const record = {
+const record: PropertyApiRecord = {
   id: "property-1",
   title: "Garden Villa",
   description: "A bright villa.",
   listing_type: "sale",
   price: 185000000,
   is_price_per_perch: false,
+  is_featured: true,
   currency: "LKR",
   location: "Colombo 7",
   property_type: "house",

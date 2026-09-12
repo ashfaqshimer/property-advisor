@@ -84,6 +84,9 @@ export type PropertyApiRecord = {
   description: string;
   price: number;
   currency: "LKR";
+  listing_type: "sale" | "rent";
+  is_price_per_perch: boolean;
+  is_featured: boolean;
   location: string;
   property_type: string;
   bedrooms: number | null;
@@ -114,6 +117,17 @@ export type CreatePropertyPayload = {
   image_urls: string[];
   image_alt: string;
   status: "available" | "under_offer" | "sold";
+  is_featured?: boolean;
+};
+
+export type AdminPropertyUpdatePayload = Partial<CreatePropertyPayload> & {
+  is_price_per_perch?: boolean;
+  land_size_perches?: number | null;
+  parking_spaces?: number | null;
+  build_year?: number | null;
+  road_access_ft?: number | null;
+  furnishing_status?: "unfurnished" | "semi_furnished" | "fully_furnished" | null;
+  amenities?: Record<string, boolean> | null;
 };
 
 function isChatResponse(value: unknown): value is ChatResponse {
@@ -133,6 +147,9 @@ function isPropertyApiRecord(value: unknown): value is PropertyApiRecord {
     typeof candidate.description === "string" &&
     typeof candidate.price === "number" &&
     candidate.currency === "LKR" &&
+    (candidate.listing_type === "sale" || candidate.listing_type === "rent") &&
+    typeof candidate.is_price_per_perch === "boolean" &&
+    typeof candidate.is_featured === "boolean" &&
     typeof candidate.location === "string" &&
     typeof candidate.property_type === "string" &&
     (typeof candidate.bedrooms === "number" || candidate.bedrooms === null) &&
@@ -313,7 +330,7 @@ export async function uploadPropertyImages(files: File[]): Promise<string[]> {
 }
 
 export async function createProperty(payload: CreatePropertyPayload): Promise<PropertyApiRecord> {
-  const response = await fetch(`${baseUrl()}/properties`, {
+  const response = await fetch(`${baseUrl()}/admin/properties`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -325,6 +342,45 @@ export async function createProperty(payload: CreatePropertyPayload): Promise<Pr
     throw new ChatError("unexpected", "The backend returned an unrecognised property response.");
   }
   return result;
+}
+
+export async function getAdminProperties(): Promise<PropertyApiRecord[]> {
+  const response = await fetch(`${baseUrl()}/admin/properties`, {
+    method: "GET",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Property list failed (${response.status}).`, response.status);
+  const result: unknown = await response.json();
+  if (!isPropertyApiResponse(result)) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised property list.");
+  }
+  return result;
+}
+
+export async function updateAdminProperty(
+  propertyId: string,
+  payload: AdminPropertyUpdatePayload,
+): Promise<PropertyApiRecord> {
+  const response = await fetch(`${baseUrl()}/admin/properties/${propertyId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Property update failed (${response.status}).`, response.status);
+  const result: unknown = await response.json();
+  if (!isPropertyApiRecord(result)) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised property response.");
+  }
+  return result;
+}
+
+export async function deleteAdminProperty(propertyId: string): Promise<void> {
+  const response = await fetch(`${baseUrl()}/admin/properties/${propertyId}`, {
+    method: "DELETE",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Property deletion failed (${response.status}).`, response.status);
 }
 
 /**

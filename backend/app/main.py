@@ -21,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(properties.router)
+app.include_router(properties.admin_router)
 app.include_router(chat.router)
 
 
