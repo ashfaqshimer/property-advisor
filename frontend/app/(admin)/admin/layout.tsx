@@ -1,18 +1,21 @@
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navigation = [
-  { label: "Properties", href: "/admin", active: true },
-  { label: "Leads", href: "#", disabled: true },
+  { label: "Properties", href: "/admin" },
+  { label: "Leads", href: "/admin/leads" },
   { label: "Settings", href: "#", disabled: true },
 ];
 
 export default function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const pathname = usePathname();
+
   return (
     <div className="min-h-screen bg-[#f4f6f4] text-[#1a2923]">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-[#dce4df] bg-[#19352b] text-white lg:flex lg:flex-col">
         <div className="border-b border-white/10 px-7 py-7"><Link href="/admin" className="text-xl font-semibold tracking-tight">Property Advisor</Link><p className="mt-1 text-xs uppercase tracking-[0.18em] text-[#a8c0b4]">Admin workspace</p></div>
         <nav aria-label="Admin navigation" className="space-y-1 px-4 py-7">
-          {navigation.map((item) => item.disabled ? <span key={item.label} aria-disabled="true" className="block cursor-not-allowed rounded-lg px-4 py-3 text-sm font-medium text-white/35">{item.label}<span className="ml-2 text-[10px] uppercase tracking-wide">Disabled</span></span> : <Link key={item.label} href={item.href} className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${item.active ? "bg-white/12 text-white" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white"}`}>{item.label}</Link>)}
+          {navigation.map((item) => item.disabled ? <span key={item.label} aria-disabled="true" className="block cursor-not-allowed rounded-lg px-4 py-3 text-sm font-medium text-white/35">{item.label}<span className="ml-2 text-[10px] uppercase tracking-wide">Disabled</span></span> : <Link key={item.label} href={item.href} className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname === item.href || (item.href === "/admin" && pathname.startsWith("/admin/properties")) ? "bg-white/12 text-white" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white"}`}>{item.label}</Link>)}
         </nav>
         <div className="mt-auto border-t border-white/10 px-7 py-6 text-xs text-[#a8c0b4]">Internal tools only</div>
       </aside>

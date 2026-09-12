@@ -130,6 +130,19 @@ export type AdminPropertyUpdatePayload = Partial<CreatePropertyPayload> & {
   amenities?: Record<string, boolean> | null;
 };
 
+export type AdminLead = {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  intent: "buy" | "rent" | "sell" | null;
+  preferences: string | null;
+  conversation_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
 function isChatResponse(value: unknown): value is ChatResponse {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;
@@ -381,6 +394,36 @@ export async function deleteAdminProperty(propertyId: string): Promise<void> {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Property deletion failed (${response.status}).`, response.status);
+}
+
+function isAdminLead(value: unknown): value is AdminLead {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === "string" &&
+    (typeof candidate.name === "string" || candidate.name === null) &&
+    (typeof candidate.phone === "string" || candidate.phone === null) &&
+    (typeof candidate.budget_min === "number" || candidate.budget_min === null) &&
+    (typeof candidate.budget_max === "number" || candidate.budget_max === null) &&
+    (candidate.intent === "buy" || candidate.intent === "rent" || candidate.intent === "sell" || candidate.intent === null) &&
+    (typeof candidate.preferences === "string" || candidate.preferences === null) &&
+    typeof candidate.conversation_id === "string" &&
+    typeof candidate.created_at === "string" &&
+    typeof candidate.updated_at === "string"
+  );
+}
+
+export async function getAdminLeads(): Promise<AdminLead[]> {
+  const response = await fetch(`${baseUrl()}/admin/leads`, {
+    method: "GET",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Lead list failed (${response.status}).`, response.status);
+  const result: unknown = await response.json();
+  if (!Array.isArray(result) || !result.every(isAdminLead)) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised lead list.");
+  }
+  return result;
 }
 
 /**

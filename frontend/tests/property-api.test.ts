@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
+import { getAdminLeads, getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
 import { formatPrice, mapProperty } from "@/lib/properties";
 
 const record: PropertyApiRecord = {
@@ -62,6 +62,32 @@ describe("featured property API", () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(200, [{ ...record, price: "185000000" }])));
 
     await expect(getFeaturedProperties()).rejects.toThrow("unrecognised body");
+  });
+});
+
+describe("admin lead API", () => {
+  it("requests and validates the admin lead route", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const lead = {
+      id: "lead-1",
+      name: "Maya",
+      phone: "0712345678",
+      budget_min: 10000000,
+      budget_max: 50000000,
+      intent: "buy",
+      preferences: "Colombo apartment",
+      conversation_id: "conversation-1",
+      created_at: "2026-09-12T00:00:00Z",
+      updated_at: "2026-09-12T00:00:00Z",
+    };
+    const fetchSpy = vi.fn(async () => jsonResponse(200, [lead]));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(getAdminLeads()).resolves.toEqual([lead]);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/admin/leads",
+      expect.objectContaining({ method: "GET" }),
+    );
   });
 });
 
