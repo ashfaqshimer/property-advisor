@@ -46,7 +46,7 @@ export function mapProperty(record: PropertyApiRecord): Property {
     description: record.description,
     beds: record.bedrooms,
     baths: record.bathrooms,
-    sqft: record.sqft,
+    sqft: record.floor_area_sqft,
     imageUrl: record.image_urls[0] ?? null,
     imageAlt: record.image_alt,
   };

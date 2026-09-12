@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.seed_data import SEED_PROPERTIES, seed_id
 from app.db.session import SessionLocal
-from app.models.property import Property, PropertyStatus
+from app.models.property import ListingType, Property, PropertyStatus
 
 
 def seed_into(session: Session) -> int:
@@ -23,6 +23,8 @@ def seed_into(session: Session) -> int:
     for position, row in enumerate(SEED_PROPERTIES):
         data = dict(row)
         slug = data.pop("slug")
+        data["listing_type"] = data.pop("listing_type", ListingType.SALE)
+        data["floor_area_sqft"] = data.pop("sqft", None)
         # merge() is a PK-keyed upsert: SELECT, then INSERT or UPDATE. Portable (works
         # on the SQLite test database too) and safe to re-run — note it overwrites, so
         # hand edits made directly in the database are reset by the next run.

@@ -11,19 +11,27 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models.property import Property, PropertyStatus, PropertyType
+from app.models.property import ListingType, Property, PropertyStatus, PropertyType
 
 EXPECTED_KEYS = {
     "id",
     "title",
     "description",
+    "listing_type",
     "price",
+    "is_price_per_perch",
     "currency",
     "location",
     "property_type",
     "bedrooms",
     "bathrooms",
-    "sqft",
+    "land_size_perches",
+    "floor_area_sqft",
+    "parking_spaces",
+    "build_year",
+    "road_access_ft",
+    "furnishing_status",
+    "amenities",
     "image_urls",
     "image_alt",
     "status",
@@ -78,13 +86,13 @@ def test_nullable_dimensions_are_present_even_when_set(client: TestClient) -> No
 
     assert item["bedrooms"] == 5
     assert item["bathrooms"] == 4
-    assert item["sqft"] == 4200
+    assert item["floor_area_sqft"] == 4200
 
 
 def test_nullable_dimensions_serialize_as_null(
     client: TestClient, seeded: Session
 ) -> None:
-    """Land and commercial listings have no beds/baths/sqft.
+    """Land and commercial listings have no beds/baths/floor area.
 
     The keys must still be present with a null value — the frontend will branch on
     them, and a missing key is a different failure mode from an empty one.
@@ -93,11 +101,13 @@ def test_nullable_dimensions_serialize_as_null(
         title="Bare Land in Homagama",
         description="A cleared residential plot with road frontage.",
         price=Decimal("18000000"),
+        listing_type=ListingType.SALE,
+        is_price_per_perch=False,
         location="Homagama",
         property_type=PropertyType.LAND,
         bedrooms=None,
         bathrooms=None,
-        sqft=None,
+            floor_area_sqft=None,
         image_urls=["https://images.unsplash.com/photo-0000000000000-000000000000"],
         image_alt="Cleared flat plot bounded by a low wall and palm trees",
         status=PropertyStatus.AVAILABLE,
@@ -113,6 +123,6 @@ def test_nullable_dimensions_serialize_as_null(
     assert item["property_type"] == "land"
     assert item["bedrooms"] is None
     assert item["bathrooms"] is None
-    assert item["sqft"] is None
+    assert item["floor_area_sqft"] is None
     # Present-but-null, not absent.
-    assert {"bedrooms", "bathrooms", "sqft"} <= item.keys()
+    assert {"bedrooms", "bathrooms", "floor_area_sqft"} <= item.keys()

@@ -38,7 +38,7 @@ from sqlalchemy.orm import Session
 
 from app.db import queries
 from app.models.lead import Lead, LeadIntent
-from app.models.property import Property, PropertyType
+from app.models.property import ListingType, Property, PropertyType
 
 SEARCH_PROPERTIES = "search_properties"
 CAPTURE_LEAD = "capture_lead"
@@ -183,6 +183,19 @@ def _as_property_type(value: Any) -> PropertyType | None:
         ) from exc
 
 
+def _as_listing_type(value: Any) -> ListingType | None:
+    if value is None or value == "":
+        return None
+    text = str(value).strip().lower()
+    aliases = {"buy": "sale", "buying": "sale", "rental": "rent", "renting": "rent"}
+    try:
+        return ListingType(aliases.get(text, text))
+    except ValueError as exc:
+        raise ToolArgumentError(
+            f"listing_type must be one of: sale, rent. Got {value!r}."
+        ) from exc
+
+
 def _as_intent(value: Any) -> LeadIntent | None:
     """Lenient on purpose — an unreadable intent tag must not cost us the lead."""
     if value is None or value == "":
@@ -233,11 +246,19 @@ def _serialize(prop: Property) -> dict[str, Any]:
         "id": str(prop.id),
         "title": prop.title,
         "location": prop.location,
+        "listing_type": prop.listing_type.value,
         "price_lkr": int(prop.price),
+        "is_price_per_perch": prop.is_price_per_perch,
         "property_type": prop.property_type.value,
         "bedrooms": prop.bedrooms,
         "bathrooms": prop.bathrooms,
-        "sqft": prop.sqft,
+        "land_size_perches": float(prop.land_size_perches) if prop.land_size_perches is not None else None,
+        "floor_area_sqft": prop.floor_area_sqft,
+        "parking_spaces": prop.parking_spaces,
+        "build_year": prop.build_year,
+        "road_access_ft": prop.road_access_ft,
+        "furnishing_status": prop.furnishing_status.value if prop.furnishing_status else None,
+        "amenities": prop.amenities,
         "description": prop.description,
     }
 
@@ -261,6 +282,7 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
         location=_clean_text(args.get("location"), 120),
         budget_min=budget_min,
         budget_max=budget_max,
+        listing_type=_as_listing_type(args.get("listing_type")),
         property_type=_as_property_type(args.get("property_type")),
         bedrooms=_as_int(args.get("bedrooms"), "bedrooms"),
     )
@@ -417,6 +439,11 @@ _SEARCH_DECLARATION = types.FunctionDeclaration(
                 type=types.Type.STRING,
                 enum=[member.value for member in PropertyType],
                 description="One of: house, apartment, land, commercial.",
+            ),
+            "listing_type": types.Schema(
+                type=types.Type.STRING,
+                enum=["sale", "rent"],
+                description="Whether the listing is for sale or rent.",
             ),
             "bedrooms": types.Schema(
                 type=types.Type.INTEGER,

@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Numeric, String, Text, Uuid, func
+from sqlalchemy import Boolean, DateTime, Numeric, String, Text, Uuid, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
@@ -22,6 +22,17 @@ class PropertyType(str, enum.Enum):
     APARTMENT = "apartment"
     LAND = "land"
     COMMERCIAL = "commercial"
+
+
+class ListingType(str, enum.Enum):
+    SALE = "sale"
+    RENT = "rent"
+
+
+class FurnishingStatus(str, enum.Enum):
+    UNFURNISHED = "unfurnished"
+    SEMI_FURNISHED = "semi_furnished"
+    FULLY_FURNISHED = "fully_furnished"
 
 
 class PropertyStatus(str, enum.Enum):
@@ -42,10 +53,18 @@ class Property(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
+    listing_type: Mapped[ListingType] = mapped_column(
+        enum_column(ListingType, "listing_type"), nullable=False, index=True
+    )
+
     # LKR. 14,2 tops out just under a trillion rupees — three orders of magnitude
     # above the priciest listing — while keeping cents for the day a rental or a
     # per-perch land price needs them.
     price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, index=True)
+
+    is_price_per_perch: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     location: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     property_type: Mapped[PropertyType] = mapped_column(
@@ -55,7 +74,17 @@ class Property(Base):
     # Nullable: land and commercial listings have none of these.
     bedrooms: Mapped[int | None] = mapped_column(nullable=True)
     bathrooms: Mapped[int | None] = mapped_column(nullable=True)
-    sqft: Mapped[int | None] = mapped_column(nullable=True)
+    land_size_perches: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 2), nullable=True
+    )
+    floor_area_sqft: Mapped[int | None] = mapped_column(nullable=True)
+    parking_spaces: Mapped[int | None] = mapped_column(nullable=True)
+    build_year: Mapped[int | None] = mapped_column(nullable=True)
+    road_access_ft: Mapped[int | None] = mapped_column(nullable=True)
+    furnishing_status: Mapped[FurnishingStatus | None] = mapped_column(
+        enum_column(FurnishingStatus, "furnishing_status"), nullable=True
+    )
+    amenities: Mapped[dict | None] = mapped_column(JSON(), nullable=True)
 
     # A Postgres array, per spec — the honest type for a list of scalars, and it keeps
     # `= ANY(image_urls)` available. The sqlite variant exists purely so the test suite

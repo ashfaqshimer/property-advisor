@@ -7,7 +7,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_serializer
 
-from app.models.property import PropertyStatus, PropertyType
+from app.models.property import (
+    FurnishingStatus,
+    ListingType,
+    PropertyStatus,
+    PropertyType,
+)
 
 
 class PropertyRead(BaseModel):
@@ -24,7 +29,9 @@ class PropertyRead(BaseModel):
     id: UUID
     title: str
     description: str
+    listing_type: ListingType
     price: Decimal
+    is_price_per_perch: bool
     # Constant, not a column — the table is single-currency. Stating it on the wire
     # documents the contract in /docs instead of burying LKR in a frontend formatter.
     currency: Literal["LKR"] = "LKR"
@@ -32,16 +39,22 @@ class PropertyRead(BaseModel):
     property_type: PropertyType
     bedrooms: int | None
     bathrooms: int | None
-    sqft: int | None
+    land_size_perches: Decimal | None
+    floor_area_sqft: int | None
+    parking_spaces: int | None
+    build_year: int | None
+    road_access_ft: int | None
+    furnishing_status: FurnishingStatus | None
+    amenities: dict | None
     image_urls: list[str]
     image_alt: str
     status: PropertyStatus
     created_at: datetime
 
-    @field_serializer("price")
-    def _price_as_number(self, price: Decimal) -> float:
+    @field_serializer("price", "land_size_perches")
+    def _decimal_as_number(self, value: Decimal | None) -> float | None:
         """Pydantic v2 serializes Decimal to a JSON *string* ("185000000.00") by
         default. The agreed contract is a raw number. Safe: LKR listings run to ~1e8
         and JSON doubles are exact to 2^53 (~9e15).
         """
-        return float(price)
+        return float(value) if value is not None else None

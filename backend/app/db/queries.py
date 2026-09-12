@@ -13,7 +13,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.property import Property, PropertyStatus, PropertyType
+from app.models.property import ListingType, Property, PropertyStatus, PropertyType
 
 # The homepage grid renders eight cards.
 DEFAULT_FEATURED_LIMIT = 8
@@ -53,6 +53,7 @@ def search_properties(
     location: str | None = None,
     budget_min: Decimal | None = None,
     budget_max: Decimal | None = None,
+    listing_type: ListingType | None = None,
     property_type: PropertyType | None = None,
     bedrooms: int | None = None,
     limit: int = DEFAULT_SEARCH_LIMIT,
@@ -85,6 +86,8 @@ def search_properties(
         stmt = stmt.where(Property.price >= budget_min)
     if budget_max is not None:
         stmt = stmt.where(Property.price <= budget_max)
+    if listing_type is not None:
+        stmt = stmt.where(Property.listing_type == listing_type)
     if property_type is not None:
         stmt = stmt.where(Property.property_type == property_type)
     if bedrooms is not None:

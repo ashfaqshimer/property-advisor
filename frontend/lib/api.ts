@@ -88,7 +88,13 @@ export type PropertyApiRecord = {
   property_type: string;
   bedrooms: number | null;
   bathrooms: number | null;
-  sqft: number | null;
+  land_size_perches: number | null;
+  floor_area_sqft: number | null;
+  parking_spaces: number | null;
+  build_year: number | null;
+  road_access_ft: number | null;
+  furnishing_status: string | null;
+  amenities: Record<string, boolean> | null;
   image_urls: string[];
   image_alt: string;
   status: string;
@@ -116,7 +122,13 @@ function isPropertyApiRecord(value: unknown): value is PropertyApiRecord {
     typeof candidate.property_type === "string" &&
     (typeof candidate.bedrooms === "number" || candidate.bedrooms === null) &&
     (typeof candidate.bathrooms === "number" || candidate.bathrooms === null) &&
-    (typeof candidate.sqft === "number" || candidate.sqft === null) &&
+    (typeof candidate.land_size_perches === "number" || candidate.land_size_perches === null) &&
+    (typeof candidate.floor_area_sqft === "number" || candidate.floor_area_sqft === null) &&
+    (typeof candidate.parking_spaces === "number" || candidate.parking_spaces === null) &&
+    (typeof candidate.build_year === "number" || candidate.build_year === null) &&
+    (typeof candidate.road_access_ft === "number" || candidate.road_access_ft === null) &&
+    (typeof candidate.furnishing_status === "string" || candidate.furnishing_status === null) &&
+    (typeof candidate.amenities === "object" || candidate.amenities === null) &&
     Array.isArray(candidate.image_urls) &&
     candidate.image_urls.every((url) => typeof url === "string") &&
     typeof candidate.image_alt === "string" &&
