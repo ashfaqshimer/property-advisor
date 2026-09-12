@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.agent import tools
 from app.agent.tools import ToolArgumentError, ToolContext
-from app.models import Conversation, Lead, LeadIntent, PropertyType
+from app.models import Conversation, Lead, LeadIntent, Property, PropertyType, PropertyStatus
 
 
 def _context(session: Session, session_id: str = "tool-sess") -> ToolContext:
@@ -70,6 +70,39 @@ class TestSearch:
 
         result = tools.search_properties(_context(seeded), {})
         assert result["match_count"] == 0
+
+
+class TestPropertyDetails:
+    def test_returns_a_current_listing_by_id(self, seeded: Session):
+        prop = seeded.execute(select(Property)).scalars().first()
+        result = tools.get_property_details(
+            _context(seeded), {"property_id": str(prop.id)}
+        )
+
+        assert result["found"] is True
+        assert result["property"]["id"] == str(prop.id)
+        assert result["property"]["title"] == prop.title
+
+    def test_does_not_return_sold_listing_details(self, seeded: Session):
+        prop = seeded.execute(select(Property)).scalars().first()
+        prop.status = PropertyStatus.SOLD
+        seeded.flush()
+
+        result = tools.get_property_details(
+            _context(seeded), {"property_id": str(prop.id)}
+        )
+
+        assert result["found"] is False
+        assert "do not invent" in result["guidance"].lower()
+
+    def test_invalid_id_is_a_tool_error(self, db_session: Session):
+        result = tools.execute_tool(
+            tools.GET_PROPERTY_DETAILS,
+            {"property_id": "not-an-id"},
+            _context(db_session),
+        )
+
+        assert "error" in result
 
 
 class TestZeroMatches:
@@ -265,7 +298,11 @@ class TestExecuteTool:
     def test_unknown_tool_returns_an_error_the_model_can_read(self, db_session: Session):
         result = tools.execute_tool("book_a_viewing", {}, _context(db_session))
         assert "error" in result
-        assert result["available_tools"] == ["capture_lead", "search_properties"]
+        assert result["available_tools"] == [
+            "capture_lead",
+            "get_property_details",
+            "search_properties",
+        ]
 
     def test_bad_arguments_do_not_raise_out_of_the_tool_layer(self, seeded: Session):
         """The loop must be able to keep the conversation going; a 500 is a worse outcome
@@ -300,7 +337,11 @@ class TestDeclarations:
             for tool in tools.TOOL_DECLARATIONS
             for declaration in tool.function_declarations
         }
-        assert names == {"search_properties", "capture_lead"}
+        assert names == {
+            "search_properties",
+            "get_property_details",
+            "capture_lead",
+        }
 
     def test_search_declaration_warns_the_model_about_empty_results(self):
         declaration = next(

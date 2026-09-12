@@ -41,6 +41,7 @@ from app.models.lead import Lead, LeadIntent
 from app.models.property import ListingType, Property, PropertyType
 
 SEARCH_PROPERTIES = "search_properties"
+GET_PROPERTY_DETAILS = "get_property_details"
 CAPTURE_LEAD = "capture_lead"
 
 # Repeated to the model in the tool response itself, not just the system prompt. See the
@@ -220,6 +221,15 @@ def _as_intent(value: Any) -> LeadIntent | None:
         return None
 
 
+def _as_uuid(value: Any, field: str) -> uuid.UUID:
+    if isinstance(value, uuid.UUID):
+        return value
+    try:
+        return uuid.UUID(str(value).strip())
+    except (AttributeError, ValueError, TypeError) as exc:
+        raise ToolArgumentError(f"{field} must be a valid property id") from exc
+
+
 def _clean_text(value: Any, limit: int) -> str | None:
     if value is None:
         return None
@@ -296,6 +306,22 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
     return payload
 
 
+def get_property_details(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    """Return the full details for one currently available listing."""
+    property_id = _as_uuid(args.get("property_id"), "property_id")
+    prop = queries.available_property_by_id(context.db, property_id)
+    if prop is None:
+        return {
+            "found": False,
+            "guidance": (
+                "That listing is no longer available in the published catalogue. "
+                "Do not invent details; offer to have an agent confirm its status or "
+                "find similar properties."
+            ),
+        }
+    return {"found": True, "property": _serialize(prop)}
+
+
 def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     """Create or update this conversation's lead.
 
@@ -370,6 +396,7 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
 
 IMPLEMENTATIONS = {
     SEARCH_PROPERTIES: search_properties,
+    GET_PROPERTY_DETAILS: get_property_details,
     CAPTURE_LEAD: capture_lead,
 }
 
@@ -498,7 +525,32 @@ _CAPTURE_DECLARATION = types.FunctionDeclaration(
     ),
 )
 
+_DETAILS_DECLARATION = types.FunctionDeclaration(
+    name=GET_PROPERTY_DETAILS,
+    description=(
+        "Get the current full details for one published listing returned by "
+        "search_properties. Pass the listing's id exactly as returned. If it is not "
+        "found, do not invent details; offer an agent follow-up or similar listings."
+    ),
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "property_id": types.Schema(
+                type=types.Type.STRING,
+                description="The id of a listing returned by search_properties.",
+            ),
+        },
+        required=["property_id"],
+    ),
+)
+
 # One Tool holding both declarations, which is what GenerateContentConfig(tools=...) wants.
 TOOL_DECLARATIONS: list[types.Tool] = [
-    types.Tool(function_declarations=[_SEARCH_DECLARATION, _CAPTURE_DECLARATION])
+    types.Tool(
+        function_declarations=[
+            _SEARCH_DECLARATION,
+            _DETAILS_DECLARATION,
+            _CAPTURE_DECLARATION,
+        ]
+    )
 ]

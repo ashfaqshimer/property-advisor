@@ -55,7 +55,11 @@ class TestPlainReply:
         declared = {
             d.name for tool in turn.tools for d in tool.function_declarations
         }
-        assert declared == {"search_properties", "capture_lead"}
+        assert declared == {
+            "search_properties",
+            "get_property_details",
+            "capture_lead",
+        }
 
     def test_empty_user_message_spends_no_model_call(self, seeded: Session):
         client = ScriptedGemini([])

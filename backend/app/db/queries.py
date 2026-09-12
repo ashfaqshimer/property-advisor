@@ -7,6 +7,7 @@ importing from `app.agent` to answer a listings request would have the dependenc
 backwards. `app/agent/tools.py` wraps this for Gemini rather than reimplementing it.
 """
 
+import uuid
 from collections.abc import Sequence
 from decimal import Decimal
 
@@ -93,6 +94,15 @@ def search_properties(
 
     stmt = stmt.order_by(Property.created_at.desc(), Property.id).limit(limit)
     return db.execute(stmt).scalars().all()
+
+
+def available_property_by_id(db: Session, property_id: uuid.UUID) -> Property | None:
+    """Return one available listing by its stable public id."""
+    stmt = select(Property).where(
+        Property.id == property_id,
+        Property.status == PropertyStatus.AVAILABLE,
+    )
+    return db.execute(stmt).scalar_one_or_none()
 
 
 def admin_properties(
