@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.auth import CurrentStaffUser
 from app.db import queries
 from app.db.session import get_db
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
@@ -22,7 +23,9 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.post("/images", response_model=list[str])
-def upload_property_images(files: Annotated[list[UploadFile], File()]) -> list[str]:
+def upload_property_images(
+    files: Annotated[list[UploadFile], File()], _user: CurrentStaffUser
+) -> list[str]:
     """Upload listing images to Cloudinary and return their secure URLs."""
     settings = get_settings()
     if not settings.cloudinary_configured:
@@ -59,9 +62,8 @@ def upload_property_images(files: Annotated[list[UploadFile], File()]) -> list[s
     return urls
 
 
-@router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 @admin_router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
-def create_property(payload: PropertyCreate, db: DbSession) -> Property:
+def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffUser) -> Property:
     property_record = Property(**payload.model_dump())
     db.add(property_record)
     db.commit()
@@ -85,6 +87,7 @@ def get_featured_properties(
 @admin_router.get("", response_model=list[PropertyRead])
 def get_admin_properties(
     db: DbSession,
+    _user: CurrentStaffUser,
     search: Annotated[str | None, Query(max_length=120)] = None,
     property_status: Annotated[PropertyStatus | None, Query(alias="status")] = None,
     property_type: PropertyType | None = None,
@@ -106,7 +109,7 @@ def get_admin_properties(
 
 
 @admin_router.get("/{property_id}", response_model=PropertyRead)
-def get_admin_property(property_id: UUID, db: DbSession) -> Property:
+def get_admin_property(property_id: UUID, db: DbSession, _user: CurrentStaffUser) -> Property:
     property_record = db.get(Property, property_id)
     if property_record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
@@ -115,7 +118,7 @@ def get_admin_property(property_id: UUID, db: DbSession) -> Property:
 
 @admin_router.patch("/{property_id}", response_model=PropertyRead)
 def update_admin_property(
-    property_id: UUID, payload: PropertyUpdate, db: DbSession
+    property_id: UUID, payload: PropertyUpdate, db: DbSession, _user: CurrentStaffUser
 ) -> Property:
     property_record = db.get(Property, property_id)
     if property_record is None:
@@ -129,7 +132,7 @@ def update_admin_property(
 
 
 @admin_router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_admin_property(property_id: UUID, db: DbSession) -> None:
+def delete_admin_property(property_id: UUID, db: DbSession, _user: CurrentStaffUser) -> None:
     property_record = db.get(Property, property_id)
     if property_record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")

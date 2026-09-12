@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     cloudinary_api_secret: str = ""
     cloudinary_folder: str = "property-advisor"
 
+    auth_cookie_name: str = "property_advisor_session"
+    auth_session_days: int = 7
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: str = "lax"
+
     @property
     def cloudinary_configured(self) -> bool:
         return all(

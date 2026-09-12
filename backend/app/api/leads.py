@@ -8,6 +8,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.auth import CurrentStaffUser
 from app.models.lead import Lead, LeadIntent
 from app.schemas.lead import LeadRead
 
@@ -18,6 +19,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 @router.get("", response_model=list[LeadRead])
 def get_admin_leads(
     db: DbSession,
+    _user: CurrentStaffUser,
     search: Annotated[str | None, Query(max_length=120)] = None,
     intent: LeadIntent | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,

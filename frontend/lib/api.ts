@@ -143,6 +143,64 @@ export type AdminLead = {
   updated_at: string;
 };
 
+export type AuthUser = {
+  id: string;
+  email: string;
+  created_at: string;
+};
+
+export class AuthError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AuthError";
+    this.status = status;
+  }
+}
+
+async function parseAuthError(response: Response): Promise<never> {
+  let detail = "Authentication failed.";
+  try {
+    const payload = (await response.json()) as { detail?: unknown };
+    if (typeof payload.detail === "string") detail = payload.detail;
+  } catch {
+    // Keep the stable fallback for an empty or malformed error response.
+  }
+  throw new AuthError(detail, response.status);
+}
+
+export async function login(email: string, password: string): Promise<AuthUser> {
+  const response = await fetch(`${baseUrl()}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) return parseAuthError(response);
+  const payload = (await response.json()) as { user?: AuthUser };
+  if (!payload.user) throw new AuthError("The backend returned an invalid user.", response.status);
+  return payload.user;
+}
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const response = await fetch(`${baseUrl()}/auth/me`, {
+    method: "GET",
+    credentials: "include",
+  });
+  if (response.status === 401) return null;
+  if (!response.ok) return parseAuthError(response);
+  return (await response.json()) as AuthUser;
+}
+
+export async function logout(): Promise<void> {
+  const response = await fetch(`${baseUrl()}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) return parseAuthError(response);
+}
+
 function isChatResponse(value: unknown): value is ChatResponse {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;
@@ -331,6 +389,7 @@ export async function uploadPropertyImages(files: File[]): Promise<string[]> {
   files.forEach((file) => body.append("files", file));
   const response = await fetch(`${baseUrl()}/properties/images`, {
     method: "POST",
+    credentials: "include",
     body,
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
@@ -345,6 +404,7 @@ export async function uploadPropertyImages(files: File[]): Promise<string[]> {
 export async function createProperty(payload: CreatePropertyPayload): Promise<PropertyApiRecord> {
   const response = await fetch(`${baseUrl()}/admin/properties`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -360,6 +420,7 @@ export async function createProperty(payload: CreatePropertyPayload): Promise<Pr
 export async function getAdminProperties(): Promise<PropertyApiRecord[]> {
   const response = await fetch(`${baseUrl()}/admin/properties`, {
     method: "GET",
+    credentials: "include",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Property list failed (${response.status}).`, response.status);
@@ -376,6 +437,7 @@ export async function updateAdminProperty(
 ): Promise<PropertyApiRecord> {
   const response = await fetch(`${baseUrl()}/admin/properties/${propertyId}`, {
     method: "PATCH",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -391,6 +453,7 @@ export async function updateAdminProperty(
 export async function deleteAdminProperty(propertyId: string): Promise<void> {
   const response = await fetch(`${baseUrl()}/admin/properties/${propertyId}`, {
     method: "DELETE",
+    credentials: "include",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Property deletion failed (${response.status}).`, response.status);
@@ -416,6 +479,7 @@ function isAdminLead(value: unknown): value is AdminLead {
 export async function getAdminLeads(): Promise<AdminLead[]> {
   const response = await fetch(`${baseUrl()}/admin/leads`, {
     method: "GET",
+    credentials: "include",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Lead list failed (${response.status}).`, response.status);

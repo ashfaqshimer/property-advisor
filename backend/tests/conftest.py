@@ -34,6 +34,8 @@ from app.api.chat import get_agent_client  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.seed import seed_into  # noqa: E402
 from app.db.session import get_db  # noqa: E402
+from app.auth import hash_password  # noqa: E402
+from app.models.auth import StaffUser  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
 
 
@@ -86,6 +88,22 @@ def empty_client(db_session: Session):
     """Client over a migrated-but-empty table."""
     fastapi_app.dependency_overrides[get_db] = lambda: db_session
     with TestClient(fastapi_app) as test_client:
+        yield test_client
+    fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def authenticated_client(seeded: Session):
+    user = StaffUser(email="staff@example.com", password_hash=hash_password("correct horse"))
+    seeded.add(user)
+    seeded.commit()
+    fastapi_app.dependency_overrides[get_db] = lambda: seeded
+    with TestClient(fastapi_app) as test_client:
+        response = test_client.post(
+            "/auth/login",
+            json={"email": "staff@example.com", "password": "correct horse"},
+        )
+        assert response.status_code == 200
         yield test_client
     fastapi_app.dependency_overrides.clear()
 

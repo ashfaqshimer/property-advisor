@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.agent.client import GeminiNotConfigured
-from app.api import chat, leads, properties
+from app.api import auth, chat, leads, properties
 from app.config import get_settings
 
 settings = get_settings()
@@ -13,10 +13,8 @@ app = FastAPI(title="Property Advisor API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    # No cookies or auth headers cross origins here. Must stay False if the origin
-    # list ever becomes "*".
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
 
@@ -24,6 +22,7 @@ app.include_router(properties.router)
 app.include_router(properties.admin_router)
 app.include_router(leads.router)
 app.include_router(chat.router)
+app.include_router(auth.router)
 
 
 @app.exception_handler(GeminiNotConfigured)
