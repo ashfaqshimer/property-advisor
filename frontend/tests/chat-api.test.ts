@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ChatError,
   REQUEST_TIMEOUT_MS,
+  captureFallbackLead,
   sendChatMessage,
   wakeBackend,
 } from "@/lib/api";
@@ -110,6 +111,27 @@ describe("sendChatMessage request", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
     // The value itself is the measured worst case; this guards it against an idle "tidy-up".
     expect(REQUEST_TIMEOUT_MS).toBeGreaterThanOrEqual(30_000);
+  });
+});
+
+describe("captureFallbackLead request", () => {
+  it("posts callback details directly to the fallback lead endpoint", async () => {
+    const fetchSpy = stubFetch(async () => jsonResponse(200, { captured: true }));
+
+    await captureFallbackLead({
+      sessionId: "session-1",
+      name: " Nimali ",
+      phone: " 0712345678 ",
+    });
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/leads/fallback`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      session_id: "session-1",
+      name: "Nimali",
+      phone: "0712345678",
+    });
   });
 });
 

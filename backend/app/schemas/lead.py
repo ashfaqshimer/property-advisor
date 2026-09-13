@@ -4,9 +4,23 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from app.models.lead import LeadIntent
+
+
+class FallbackLeadRequest(BaseModel):
+    """The minimum contact details needed when chat cannot complete."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    session_id: str = Field(min_length=1, max_length=128)
+    phone: str = Field(min_length=5, max_length=40)
+    name: str | None = Field(default=None, max_length=120)
+
+
+class FallbackLeadResponse(BaseModel):
+    captured: bool = True
 
 
 class LeadRead(BaseModel):

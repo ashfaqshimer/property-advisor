@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Conversation, Lead, LeadIntent
@@ -64,3 +65,29 @@ def test_admin_leads_filters_by_search_and_intent(
 def test_admin_leads_limit_is_validated(authenticated_client: TestClient) -> None:
     assert authenticated_client.get("/admin/leads", params={"limit": 0}).status_code == 422
     assert authenticated_client.get("/admin/leads", params={"limit": 101}).status_code == 422
+
+
+def test_fallback_lead_capture_is_public_and_idempotent(
+    client: TestClient, seeded: Session
+) -> None:
+    payload = {"session_id": "failed-chat", "name": "Nimali", "phone": "0712345678"}
+
+    first = client.post("/leads/fallback", json=payload)
+    second = client.post("/leads/fallback", json={**payload, "name": "Nimali Perera"})
+
+    assert first.status_code == 200
+    assert first.json() == {"captured": True}
+    assert second.status_code == 200
+    leads = seeded.execute(select(Lead)).scalars().all()
+    assert len(leads) == 1
+    assert leads[0].name == "Nimali Perera"
+    assert leads[0].phone == "0712345678"
+    assert leads[0].preferences == "Requested a call because chat was unavailable."
+
+
+def test_fallback_lead_capture_requires_a_phone(client: TestClient) -> None:
+    response = client.post(
+        "/leads/fallback", json={"session_id": "failed-chat", "name": "Nimali"}
+    )
+
+    assert response.status_code == 422

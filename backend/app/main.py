@@ -20,6 +20,7 @@ app.add_middleware(
 
 app.include_router(properties.router)
 app.include_router(properties.admin_router)
+app.include_router(leads.public_router)
 app.include_router(leads.router)
 app.include_router(chat.router)
 app.include_router(auth.router)

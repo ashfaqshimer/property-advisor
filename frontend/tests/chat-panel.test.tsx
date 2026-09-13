@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatPanel from "@/components/chat/ChatPanel";
 import {
   AGENT_STATUS_LINE,
-  ERROR_COPY,
   GREETING,
   PENDING_LABEL,
   SLOW_PENDING_AFTER_MS,
@@ -370,7 +369,9 @@ describe("when a turn fails", () => {
     // the visitor should not have to retype.
     expect(turns()[1]).toHaveTextContent("Anything in Galle?");
     const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent(ERROR_COPY.upstream);
+    expect(alert).toHaveTextContent("Our agents are unavailable right now.");
+    expect(alert).not.toHaveTextContent("Sorry, I ran into an issue on my end.");
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
   });
 
   it("leaves the panel usable without restoring the chips after a failed turn", async () => {
@@ -386,29 +387,59 @@ describe("when a turn fails", () => {
     }
   });
 
-  it("offers a retry for a transient failure", async () => {
+  it("does not offer a retry for a transient failure", async () => {
     stubBackend(failWith(502));
     render(<ChatPanel />);
 
     sendText("Hello");
     await act(async () => {});
 
-    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
   });
 
-  it("says something different for a 503, and offers no retry", async () => {
+  it("captures a callback request directly when chat is unavailable", async () => {
+    fetchSpy = vi.fn(async (url: unknown, init: RequestInit = {}) => {
+      if (String(url).endsWith("/health")) return jsonResponse(200, { status: "ok" });
+      if (String(url).endsWith("/properties/featured")) return jsonResponse(200, []);
+      if (String(url).endsWith("/chat")) return jsonResponse(502, { detail: "nope" });
+      return jsonResponse(200, { captured: true });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    render(<ChatPanel />);
+
+    sendText("Anything in Galle?");
+    await act(async () => {});
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Your name" }), {
+      target: { value: "Nimali" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Your phone number" }), {
+      target: { value: "0712345678" },
+    });
+    fireEvent.submit(screen.getByRole("textbox", { name: "Your phone number" }).closest("form")!);
+    await act(async () => {});
+
+    const fallbackCall = fetchSpy.mock.calls.find(([url]) =>
+      String(url).endsWith("/leads/fallback"),
+    );
+    expect(fallbackCall).toBeDefined();
+    expect(JSON.parse((fallbackCall![1] as RequestInit).body as string)).toMatchObject({
+      name: "Nimali",
+      phone: "0712345678",
+    });
+    expect(screen.getByText("Thanks. An agent will call you back soon.")).toBeInTheDocument();
+  });
+
+  it("uses the callback path for a 503 without exposing technical details", async () => {
     stubBackend(failWith(503));
     render(<ChatPanel />);
 
     sendText("Hello");
     await act(async () => {});
 
-    // The key is missing server-side. A retry button here would be a lie.
-    expect(screen.getByRole("alert")).toHaveTextContent(ERROR_COPY.unavailable);
-    expect(
-      screen.queryByRole("button", { name: "Try again" }),
-    ).not.toBeInTheDocument();
-    expect(ERROR_COPY.unavailable).not.toBe(ERROR_COPY.upstream);
+    expect(screen.getByRole("alert")).toHaveTextContent("Our agents are unavailable right now.");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("GEMINI_API_KEY");
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
   });
 
   it("reports an unreachable backend without guessing why", async () => {
@@ -420,8 +451,7 @@ describe("when a turn fails", () => {
     sendText("Hello");
     await act(async () => {});
 
-    // A CORS rejection is indistinguishable from being offline, so the copy stays vague.
-    expect(screen.getByRole("alert")).toHaveTextContent(ERROR_COPY.network);
+    expect(screen.getByRole("alert")).toHaveTextContent("Our agents are unavailable right now.");
   });
 
   it("reports a timeout as its own thing", async () => {
@@ -433,37 +463,30 @@ describe("when a turn fails", () => {
     sendText("Hello");
     await act(async () => {});
 
-    expect(screen.getByRole("alert")).toHaveTextContent(ERROR_COPY.timeout);
+    expect(screen.getByRole("alert")).toHaveTextContent("Our agents are unavailable right now.");
   });
 
-  it("resends the same text on retry without duplicating the bubble", async () => {
+  it("does not retry the failed chat request", async () => {
     let attempt = 0;
     stubBackend(() => {
       attempt += 1;
       return attempt === 1
         ? jsonResponse(502, { detail: "nope" })
-        : reply("Found a few in Galle.");
+        : reply("This should not be requested.");
     });
     render(<ChatPanel />);
 
     sendText("Anything in Galle?");
     await act(async () => {});
 
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await act(async () => {});
-
-    expect(chatCalls()).toHaveLength(2);
-    expect(bodyOf(1).message).toBe("Anything in Galle?");
-    // Same conversation, so the backend appends rather than forking.
-    expect(bodyOf(1).session_id).toBe(bodyOf(0).session_id);
-
-    // One user bubble, one greeting, one reply — the retry must not add a second copy.
+    expect(chatCalls()).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
     const texts = turns().map((turn) => turn.textContent ?? "");
     expect(texts.filter((text) => text.includes("Anything in Galle?"))).toHaveLength(1);
-    expect(turns()).toHaveLength(3);
+    expect(screen.queryByText("This should not be requested.")).not.toBeInTheDocument();
   });
 
-  it("clears the alert once a retry succeeds", async () => {
+  it("keeps the callback alert after chat fails", async () => {
     let attempt = 0;
     stubBackend(() => {
       attempt += 1;
@@ -473,11 +496,8 @@ describe("when a turn fails", () => {
 
     sendText("Hello");
     await act(async () => {});
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await act(async () => {});
-
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByText(/All good now\./)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Our agents are unavailable right now.");
+    expect(screen.queryByText(/All good now\./)).not.toBeInTheDocument();
   });
 
   it("marks the failed bubble for screen readers, not just visually", async () => {

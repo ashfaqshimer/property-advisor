@@ -78,6 +78,12 @@ export type ChatResponse = {
   session_id: string;
 };
 
+export type FallbackLeadPayload = {
+  sessionId: string;
+  name: string;
+  phone: string;
+};
+
 export type PropertyApiRecord = {
   id: string;
   title: string;
@@ -399,6 +405,32 @@ export async function sendChatMessage({
   }
 
   return payload;
+}
+
+export async function captureFallbackLead({
+  sessionId,
+  name,
+  phone,
+}: FallbackLeadPayload): Promise<void> {
+  const response = await fetch(`${baseUrl()}/leads/fallback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, name: name.trim() || null, phone: phone.trim() }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Fallback lead capture failed (${response.status}).`, response.status);
+  }
+
+  const payload: unknown = await response.json();
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    (payload as { captured?: unknown }).captured !== true
+  ) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised lead response.");
+  }
 }
 
 export async function getFeaturedProperties(): Promise<PropertyApiRecord[]> {

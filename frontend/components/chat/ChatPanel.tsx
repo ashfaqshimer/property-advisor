@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 
 import {
   ChatError,
+  captureFallbackLead,
   getFeaturedProperties,
   MAX_MESSAGE_LENGTH,
   sendChatMessage,
@@ -12,7 +13,6 @@ import {
 } from "@/lib/api";
 import {
   AGENT_STATUS_LINE,
-  ERROR_COPY,
   FALLBACK_PROPERTY_SUGGESTIONS,
   GREETING,
   PENDING_LABEL,
@@ -109,6 +109,11 @@ export default function ChatPanel() {
   const [pending, setPending] = useState(false);
   const [slow, setSlow] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  const [fallbackName, setFallbackName] = useState("");
+  const [fallbackPhone, setFallbackPhone] = useState("");
+  const [fallbackPending, setFallbackPending] = useState(false);
+  const [fallbackSubmitted, setFallbackSubmitted] = useState(false);
+  const [fallbackError, setFallbackError] = useState(false);
 
   const sessionIdRef = useRef<string | null>(null);
   const messageCountRef = useRef(0);
@@ -162,6 +167,8 @@ export default function ChatPanel() {
     setPending(true);
     setSlow(false);
     setFailure(null);
+    setFallbackSubmitted(false);
+    setFallbackError(false);
     slowTimerRef.current = setTimeout(() => setSlow(true), SLOW_PENDING_AFTER_MS);
 
     try {
@@ -206,10 +213,24 @@ export default function ChatPanel() {
     void runTurn(trimmed, id);
   };
 
-  const retry = () => {
-    if (!failure || pending) return;
-    // No second bubble: the first one is still on screen, and the server kept nothing.
-    void runTurn(failure.text, failure.messageId);
+  const submitFallbackLead = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!failure || !fallbackPhone.trim() || fallbackPending) return;
+
+    setFallbackPending(true);
+    setFallbackError(false);
+    try {
+      await captureFallbackLead({
+        sessionId: sessionId(),
+        name: fallbackName,
+        phone: fallbackPhone,
+      });
+      setFallbackSubmitted(true);
+    } catch {
+      setFallbackError(true);
+    } finally {
+      setFallbackPending(false);
+    }
   };
 
   const canSend = draft.trim().length > 0 && !pending;
@@ -313,10 +334,6 @@ export default function ChatPanel() {
                   isUser
                     ? "rounded-br-md bg-brand text-on-brand"
                     : "rounded-bl-md bg-agent-bubble text-ink"
-                } ${
-                  /* Dimmed so the failed turn reads as unsent without removing it. The
-                     adjacent alert carries the actual explanation. */
-                  hasFailed ? "opacity-60" : ""
                 }`}
               >
                 {/*
@@ -365,16 +382,41 @@ export default function ChatPanel() {
           role="alert"
           className="shrink-0 px-4 pb-3 text-xs leading-relaxed text-muted"
         >
-          <p>{ERROR_COPY[failure.error.kind]}</p>
-          {failure.error.retryable && (
-            <button
-              type="button"
-              onClick={retry}
-              disabled={pending}
-              className="mt-1.5 rounded-full border border-neutral-200 px-3 py-1.5 font-medium text-ink hover:bg-band-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-            >
-              Try again
-            </button>
+          <p>Our agents are unavailable right now. Leave your number and we&apos;ll call you back.</p>
+          {!fallbackSubmitted ? (
+            <>
+              <form onSubmit={submitFallbackLead} className="mt-2 flex flex-col gap-2">
+                <input
+                  type="text"
+                  value={fallbackName}
+                  onChange={(event) => setFallbackName(event.target.value)}
+                  maxLength={120}
+                  aria-label="Your name"
+                  placeholder="Your name (optional)"
+                  className="rounded-md border border-neutral-200 bg-surface px-3 py-2 text-ink placeholder:text-muted focus:outline-none focus-visible:outline-2 focus-visible:outline-brand"
+                />
+                <input
+                  type="tel"
+                  value={fallbackPhone}
+                  onChange={(event) => setFallbackPhone(event.target.value)}
+                  maxLength={40}
+                  required
+                  aria-label="Your phone number"
+                  placeholder="Your phone number"
+                  className="rounded-md border border-neutral-200 bg-surface px-3 py-2 text-ink placeholder:text-muted focus:outline-none focus-visible:outline-2 focus-visible:outline-brand"
+                />
+                <button
+                  type="submit"
+                  disabled={!fallbackPhone.trim() || fallbackPending}
+                  className="self-start rounded-full bg-brand px-3 py-1.5 font-medium text-on-brand hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                >
+                  {fallbackPending ? "Sending…" : "Request a call"}
+                </button>
+                {fallbackError && <p className="text-red-700">We couldn&apos;t save that. Please try again.</p>}
+              </form>
+            </>
+          ) : (
+            <p className="mt-2 text-brand">Thanks. An agent will call you back soon.</p>
           )}
         </div>
       )}
