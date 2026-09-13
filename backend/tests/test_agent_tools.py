@@ -6,6 +6,7 @@ that makes these tools survive `flash-lite`'s loose arguments.
 """
 
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
@@ -28,6 +29,56 @@ class TestSearch:
         result = tools.search_properties(_context(seeded), {})
         assert result["match_count"] == 5, "capped at 5 even though 8 are seeded"
         assert "guidance" not in result
+
+    def test_landmark_location_uses_geocoded_radius(self, seeded: Session, monkeypatch):
+        captured = {}
+
+        class FakeGeocoder:
+            def __init__(self, _api_key):
+                pass
+
+            def geocode(self, location):
+                captured["location"] = location
+                return SimpleNamespace(latitude=6.89, longitude=79.87)
+
+        def fake_search(_db, **kwargs):
+            captured.update(kwargs)
+            return []
+
+        monkeypatch.setattr(tools, "GoogleGeocoder", FakeGeocoder)
+        monkeypatch.setattr(
+            tools,
+            "get_settings",
+            lambda: SimpleNamespace(google_maps_api_key="test-key", location_search_radius_km=5),
+        )
+        monkeypatch.setattr(tools.queries, "search_properties", fake_search)
+
+        result = tools.search_properties(_context(seeded), {"location": "Havelock City"})
+
+        assert result["match_count"] == 0
+        assert captured["location"] == "Havelock City"
+        assert captured["latitude"] == 6.89
+        assert captured["longitude"] == 79.87
+        assert captured["radius_km"] == 5
+
+    def test_geocoding_failure_falls_back_to_text_search(self, seeded: Session, monkeypatch):
+        class FakeGeocoder:
+            def __init__(self, _api_key):
+                pass
+
+            def geocode(self, _location):
+                raise tools.GeocodingError("offline")
+
+        monkeypatch.setattr(tools, "GoogleGeocoder", FakeGeocoder)
+        monkeypatch.setattr(
+            tools,
+            "get_settings",
+            lambda: SimpleNamespace(google_maps_api_key="test-key", location_search_radius_km=5),
+        )
+
+        result = tools.search_properties(_context(seeded), {"location": "Colombo"})
+
+        assert result["match_count"] > 1
 
     def test_location_is_case_insensitive_substring(self, seeded: Session):
         result = tools.search_properties(_context(seeded), {"location": "colombo"})

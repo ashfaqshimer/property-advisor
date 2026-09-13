@@ -1,8 +1,11 @@
 from uuid import UUID
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app.db.seed_data import seed_id
+from app.geocoding import Coordinates
+from app.models import Property
 
 
 def test_admin_properties_require_authentication(client: TestClient) -> None:
@@ -36,6 +39,44 @@ def test_admin_patch_updates_featured_and_status(authenticated_client: TestClien
     assert response.status_code == 200
     assert response.json()["is_featured"] is False
     assert response.json()["status"] == "under_offer"
+
+
+def test_admin_location_update_persists_geocoded_coordinates(
+    authenticated_client: TestClient, seeded: Session, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        "app.api.properties._geocode_location",
+        lambda _location: Coordinates(latitude=6.89, longitude=79.87),
+    )
+
+    response = authenticated_client.patch(
+        f"/admin/properties/{seed_id('garden-villa-ward-place')}",
+        json={"location": "Havelock City"},
+    )
+
+    assert response.status_code == 200
+    property_record = seeded.get(Property, seed_id("garden-villa-ward-place"))
+    assert property_record.location == "Havelock City"
+    assert property_record.latitude == 6.89
+    assert property_record.longitude == 79.87
+
+
+def test_admin_location_update_rejects_unresolved_location(
+    authenticated_client: TestClient, monkeypatch
+) -> None:
+    from fastapi import HTTPException
+
+    def reject(_location):
+        raise HTTPException(status_code=422, detail="The property location could not be resolved.")
+
+    monkeypatch.setattr("app.api.properties._geocode_location", reject)
+
+    response = authenticated_client.patch(
+        f"/admin/properties/{seed_id('garden-villa-ward-place')}",
+        json={"location": "Not A Real Place"},
+    )
+
+    assert response.status_code == 422
 
 
 def test_admin_delete_removes_a_property(authenticated_client: TestClient) -> None:

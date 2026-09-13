@@ -26,6 +26,7 @@ transaction pooling breaks psycopg3's named prepared statements).
 ```bash
 uv run alembic upgrade head        # create/update tables
 uv run python -m app.db.seed       # 8 sample listings; safe to re-run
+uv run python -m app.db.backfill_locations  # populate missing listing coordinates
 uv run fastapi dev app/main.py     # http://127.0.0.1:8000 — /docs for Swagger
 uv run pytest
 ```
@@ -207,12 +208,20 @@ survived the deploy. All three are verified in production.
 The `pip install uv` prefix is load-bearing: Render's native Python runtime doesn't
 ship uv, and the build dies on `uv: command not found` without it.
 
-Env vars are `DATABASE_URL`, `ALLOWED_ORIGINS`, and `PYTHON_VERSION=3.11` — set that
+Env vars are `DATABASE_URL`, `ALLOWED_ORIGINS`, `GOOGLE_MAPS_API_KEY`, and
+`PYTHON_VERSION=3.11` — set that
 last one explicitly rather than trusting Render to find `.python-version` inside the
 `backend/` root directory. Add `MIGRATION_DATABASE_URL` only if `DATABASE_URL` points
 at the `-pooler` endpoint (see Setup above). **`GEMINI_API_KEY` is now required** — `POST
 /chat` reads it, and a blank key means every chat request answers 503 while `/health` and
 `/properties/featured` keep working, so the service looks healthy while the agent is dead.
+
+Location search geocodes user-provided neighborhoods and landmarks, then searches within
+the configured `LOCATION_SEARCH_RADIUS_KM` (5 km by default) using PostGIS. Apply the
+geolocation migration and run `uv run python -m app.db.backfill_locations` before
+deploying the ingestion enforcement. New or edited admin listings must resolve through
+Google before they are saved; user searches fall back to text matching if geocoding is
+unavailable.
 
 **Migrations and seeding run from a laptop, not from Render.** The free tier has no
 SSH shell and Pre-Deploy Command is a paid feature, so `uv run alembic upgrade head`

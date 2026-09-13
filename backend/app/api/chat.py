@@ -5,6 +5,7 @@ and the iteration cap; everything here is validation, dependency wiring, and giv
 failures an HTTP shape.
 """
 
+import logging
 from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,6 +19,7 @@ from app.db.session import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
 
 router = APIRouter(tags=["chat"])
+logger = logging.getLogger(__name__)
 
 
 def get_agent_client() -> SupportsGenerate:
@@ -49,6 +51,10 @@ def post_chat(
         # purpose (see loop.py's docstring) — this only gives the failure a status code.
         # Note a *safety* block doesn't land here: it comes back as a candidate-less
         # response, which the loop turns into FALLBACK_REPLY and a 200.
+        logger.exception(
+            "Gemini request failed while processing chat session %s",
+            payload.session_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The assistant is unavailable right now. Please try again.",
@@ -93,5 +99,9 @@ def _run_turn_handling_session_race(
     try:
         return runner(db, payload.session_id, payload.message, client=client)
     except IntegrityError:
+        logger.warning(
+            "Conversation creation raced for chat session %s; retrying turn",
+            payload.session_id,
+        )
         db.rollback()
         return runner(db, payload.session_id, payload.message, client=client)

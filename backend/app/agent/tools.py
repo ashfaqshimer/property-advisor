@@ -36,7 +36,9 @@ from google.genai import types
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db import queries
+from app.geocoding import GeocodingError, GoogleGeocoder
 from app.models.lead import Lead, LeadIntent
 from app.models.property import ListingType, Property, PropertyType
 
@@ -287,14 +289,27 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
     if budget_min is not None and budget_max is not None and budget_min > budget_max:
         budget_min, budget_max = budget_max, budget_min
 
+    location = _clean_text(args.get("location"), 120)
+    coordinates = None
+    if location:
+        settings = get_settings()
+        if settings.google_maps_api_key:
+            try:
+                coordinates = GoogleGeocoder(settings.google_maps_api_key).geocode(location)
+            except GeocodingError:
+                coordinates = None
+
     matches = queries.search_properties(
         context.db,
-        location=_clean_text(args.get("location"), 120),
+        location=location,
         budget_min=budget_min,
         budget_max=budget_max,
         listing_type=_as_listing_type(args.get("listing_type")),
         property_type=_as_property_type(args.get("property_type")),
         bedrooms=_as_int(args.get("bedrooms"), "bedrooms"),
+        latitude=coordinates.latitude if coordinates else None,
+        longitude=coordinates.longitude if coordinates else None,
+        radius_km=get_settings().location_search_radius_km if coordinates else None,
     )
 
     payload: dict[str, Any] = {
@@ -450,8 +465,8 @@ _SEARCH_DECLARATION = types.FunctionDeclaration(
             "location": types.Schema(
                 type=types.Type.STRING,
                 description=(
-                    "Area or city, matched as a substring: 'Colombo 5', 'Rajagiriya', "
-                    "'Galle'. Use 'Colombo' to cover every Colombo suburb."
+                    "Area, neighborhood, landmark, or city. Nearby listings are included: "
+                    "'Havelock City', 'Bambalapitiya', 'Colombo 5', 'Rajagiriya', or 'Galle'."
                 ),
             ),
             "budget_min": types.Schema(

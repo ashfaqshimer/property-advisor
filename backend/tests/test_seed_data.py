@@ -36,6 +36,10 @@ def test_every_listing_has_a_positive_price() -> None:
     assert all(row["price"] > 0 for row in SEED_PROPERTIES)
 
 
+def test_every_listing_has_coordinates() -> None:
+    assert all(row["latitude"] is not None and row["longitude"] is not None for row in SEED_PROPERTIES)
+
+
 def test_every_listing_has_alt_text_that_is_not_the_title() -> None:
     # The reason image_alt exists as a column at all: alt describes the photo, and
     # frontend/tests/property-grid.test.tsx asserts it differs from the title.

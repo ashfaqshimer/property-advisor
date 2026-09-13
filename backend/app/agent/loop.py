@@ -40,6 +40,7 @@ hide exactly the flakiness worth measuring first.
 from __future__ import annotations
 
 import uuid
+import logging
 from typing import Any
 
 from google.genai import types
@@ -55,6 +56,7 @@ from app.models.message import Message, MessageRole
 # Five model calls per user turn. PROJECT_OVERVIEW §5 suggests ~5; the real constraint is
 # that this number bounds the cost of one misbehaving conversation.
 MAX_TOOL_ITERATIONS = 5
+logger = logging.getLogger(__name__)
 
 
 def get_or_create_conversation(db: Session, session_id: str) -> Conversation:
@@ -214,6 +216,11 @@ def run_turn(
             # Plain text — the loop's exit. An empty or candidate-less response falls back
             # rather than returning "" to the user.
             reply = "".join(part.text for part in parts if part.text).strip()
+            if not reply:
+                logger.warning(
+                    "Gemini returned no usable text for chat session %s",
+                    session_id,
+                )
             return finish(reply or FALLBACK_REPLY)
 
         # The model's own turn goes back verbatim, so its function_call parts are echoed
@@ -248,4 +255,8 @@ def run_turn(
         contents.append(types.Content(role="user", parts=response_parts))
 
     # Cap reached with the model still calling tools. Answer in prose rather than looping.
+    logger.warning(
+        "Gemini tool-call iteration cap reached for chat session %s",
+        session_id,
+    )
     return finish(FALLBACK_REPLY)

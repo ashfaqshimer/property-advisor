@@ -11,7 +11,8 @@ import uuid
 from collections.abc import Sequence
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import cast, func, select
+from sqlalchemy.types import UserDefinedType
 from sqlalchemy.orm import Session
 
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
@@ -24,6 +25,15 @@ MAX_FEATURED_LIMIT = 24
 # row goes back into the prompt as tokens, and a model handed twenty listings summarises
 # instead of recommending.
 DEFAULT_SEARCH_LIMIT = 5
+
+
+class Geography(UserDefinedType):
+    """PostGIS geography type used only in PostgreSQL query expressions."""
+
+    cache_ok = True
+
+    def get_col_spec(self, **_):
+        return "geography"
 
 
 def featured_properties(
@@ -55,6 +65,9 @@ def search_properties(
     listing_type: ListingType | None = None,
     property_type: PropertyType | None = None,
     bedrooms: int | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    radius_km: float | None = None,
     limit: int = DEFAULT_SEARCH_LIMIT,
 ) -> Sequence[Property]:
     """Listings matching whatever criteria were supplied.
@@ -79,7 +92,20 @@ def search_properties(
     """
     stmt = select(Property).where(Property.status == PropertyStatus.AVAILABLE)
 
-    if location:
+    if latitude is not None and longitude is not None and radius_km is not None:
+        property_point = cast(
+            func.ST_SetSRID(
+                func.ST_MakePoint(Property.longitude, Property.latitude), 4326
+            ),
+            Geography(),
+        )
+        search_point = cast(
+            func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326), Geography()
+        )
+        stmt = stmt.where(
+            func.ST_DWithin(property_point, search_point, radius_km * 1000)
+        )
+    elif location:
         stmt = stmt.where(Property.location.ilike(f"%{location.strip()}%"))
     if budget_min is not None:
         stmt = stmt.where(Property.price >= budget_min)

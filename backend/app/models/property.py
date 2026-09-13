@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Numeric, String, Text, Uuid, func
+from sqlalchemy import Boolean, DateTime, Float, Numeric, String, Text, Uuid, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
@@ -71,6 +71,8 @@ class Property(Base):
     )
 
     location: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     property_type: Mapped[PropertyType] = mapped_column(
         enum_column(PropertyType, "property_type"), nullable=False, index=True
     )

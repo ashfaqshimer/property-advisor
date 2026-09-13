@@ -13,6 +13,7 @@ from app.config import get_settings
 from app.auth import CurrentStaffUser
 from app.db import queries
 from app.db.session import get_db
+from app.geocoding import Coordinates, GeocodingError, GoogleGeocoder
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
 from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
 
@@ -20,6 +21,23 @@ router = APIRouter(prefix="/properties", tags=["properties"])
 admin_router = APIRouter(prefix="/admin/properties", tags=["admin-properties"])
 
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+def _geocode_location(location: str) -> Coordinates:
+    settings = get_settings()
+    try:
+        coordinates = GoogleGeocoder(settings.google_maps_api_key).geocode(location)
+    except GeocodingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Location geocoding is temporarily unavailable.",
+        ) from exc
+    if coordinates is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The property location could not be resolved.",
+        )
+    return coordinates
 
 
 @router.post("/images", response_model=list[str])
@@ -64,7 +82,13 @@ def upload_property_images(
 
 @admin_router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffUser) -> Property:
-    property_record = Property(**payload.model_dump())
+    property_data = payload.model_dump()
+    coordinates = _geocode_location(property_data["location"])
+    property_record = Property(
+        **property_data,
+        latitude=coordinates.latitude,
+        longitude=coordinates.longitude,
+    )
     db.add(property_record)
     db.commit()
     db.refresh(property_record)
@@ -124,7 +148,13 @@ def update_admin_property(
     if property_record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    if "location" in changes:
+        coordinates = _geocode_location(changes["location"])
+        changes["latitude"] = coordinates.latitude
+        changes["longitude"] = coordinates.longitude
+
+    for field, value in changes.items():
         setattr(property_record, field, value)
     db.commit()
     db.refresh(property_record)
