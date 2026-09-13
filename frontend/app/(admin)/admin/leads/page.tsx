@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { createAdminLead, getAdminLeads, type AdminLead } from "@/lib/api";
+import { createAdminLead, getAdminLeads, type AdminLead, type LeadInterest } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
 
 const intentStyles = {
@@ -16,7 +16,19 @@ const sourceLabels = {
   fallback: "Fallback",
 } as const;
 
-function formatBudget(value: number | null): string {
+const interestLabels: Record<LeadInterest, string> = {
+  apartment_sale: "Apartment for sale",
+  apartment_rent: "Apartment to rent",
+  house_sale: "House for sale",
+  house_rent: "House to rent",
+  land: "Land",
+  selling: "Selling property",
+  other: "Other",
+};
+
+function formatBudget(min: number | null, max: number | null): string {
+  if (min !== null && max !== null) return `LKR ${min.toLocaleString()} - ${max.toLocaleString()}`;
+  const value = max ?? min;
   return value === null ? "Not specified" : `LKR ${value.toLocaleString()}`;
 }
 
@@ -27,7 +39,11 @@ export default function AdminLeadsPage() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [budgetMin, setBudgetMin] = useState("");
+  const [budgetMax, setBudgetMax] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [requirements, setRequirements] = useState("");
+  const [interest, setInterest] = useState<LeadInterest | "">("");
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
@@ -42,11 +58,23 @@ export default function AdminLeadsPage() {
     setFormError("");
     setCreating(true);
     try {
-      const lead = await createAdminLead({ name: name || undefined, phone, remarks: remarks || undefined });
+      const lead = await createAdminLead({
+        name: name || undefined,
+        phone,
+        budget_min: budgetMin ? Number(budgetMin) : undefined,
+        budget_max: budgetMax ? Number(budgetMax) : undefined,
+        requirements: requirements || undefined,
+        interest: interest || undefined,
+        remarks: remarks || undefined,
+      });
       setLeads((current) => [lead, ...current]);
       setName("");
       setPhone("");
+      setBudgetMin("");
+      setBudgetMax("");
       setRemarks("");
+      setRequirements("");
+      setInterest("");
     } catch (reason) {
       setFormError(reason instanceof Error ? reason.message : "Could not create lead.");
     } finally {
@@ -64,8 +92,12 @@ export default function AdminLeadsPage() {
       <form onSubmit={handleCreate} className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-[#dce4df] bg-white p-5 shadow-[0_8px_24px_rgba(25,53,43,0.04)]">
         <label className="min-w-48 flex-1 text-sm font-medium text-[#526158]">Name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
         <label className="min-w-48 flex-1 text-sm font-medium text-[#526158]">Phone<input required value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <label className="min-w-56 flex-1 text-sm font-medium text-[#526158]">Looking for<select value={interest} onChange={(event) => setInterest(event.target.value as LeadInterest | "")} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]"><option value="">Not specified</option>{Object.entries(interestLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="min-w-40 flex-1 text-sm font-medium text-[#526158]">Budget min<input type="number" min="0" value={budgetMin} onChange={(event) => setBudgetMin(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <label className="min-w-40 flex-1 text-sm font-medium text-[#526158]">Budget max<input type="number" min="0" value={budgetMax} onChange={(event) => setBudgetMax(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <label className="min-w-64 flex-[2] text-sm font-medium text-[#526158]">Requirements<input value={requirements} onChange={(event) => setRequirements(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
         <label className="min-w-64 flex-[2] text-sm font-medium text-[#526158]">Remarks<input value={remarks} onChange={(event) => setRemarks(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
-        <button type="submit" disabled={creating} className="rounded-lg bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{creating ? "Adding..." : "Add manual lead"}</button>
+        <button type="submit" disabled={creating} className="rounded-lg bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{creating ? "Adding..." : "Add new lead"}</button>
         {formError && <p className="basis-full text-sm text-[#a34d4d]">{formError}</p>}
       </form>
       {error && <p className="mb-3 text-right text-sm text-[#a34d4d]">{error}</p>}
@@ -84,15 +116,16 @@ export default function AdminLeadsPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-[#f8faf8] text-xs uppercase tracking-[0.12em] text-[#7a8780]">
-                <tr><th className="px-5 py-4 font-semibold">Contact</th><th className="px-4 py-4 font-semibold">Source</th><th className="px-4 py-4 font-semibold">Intent</th><th className="px-4 py-4 font-semibold">Budget</th><th className="px-4 py-4 font-semibold">Preferences</th><th className="px-4 py-4 font-semibold">Remarks</th><th className="px-5 py-4 text-right font-semibold">Captured</th></tr>
+                <tr><th className="px-5 py-4 font-semibold">Contact</th><th className="px-4 py-4 font-semibold">Source</th><th className="px-4 py-4 font-semibold">Looking for</th><th className="px-4 py-4 font-semibold">Intent</th><th className="px-4 py-4 font-semibold">Budget</th><th className="px-4 py-4 font-semibold">Requirements</th><th className="px-4 py-4 font-semibold">Remarks</th><th className="px-5 py-4 text-right font-semibold">Captured</th></tr>
               </thead>
               <tbody className="divide-y divide-[#edf0ee]">
                 {leads.map((lead) => <tr key={lead.id} className="transition hover:bg-[#fbfcfb]">
                   <td className="px-5 py-4"><p className="font-semibold text-[#253a30]">{lead.name ?? "Unnamed lead"}</p><p className="mt-1 text-[#65736b]">{lead.phone ?? "No phone captured"}</p></td>
                   <td className="px-4 py-4 text-[#65736b]">{lead.source ? sourceLabels[lead.source] : "Unknown"}</td>
+                  <td className="px-4 py-4 text-[#65736b]">{lead.interest ? interestLabels[lead.interest] : "Not specified"}</td>
                   <td className="px-4 py-4">{lead.intent ? <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${intentStyles[lead.intent]}`}>{lead.intent}</span> : <span className="text-[#8a968f]">Not specified</span>}</td>
-                  <td className="px-4 py-4 text-[#65736b]">{formatBudget(lead.budget_max ?? lead.budget_min)}</td>
-                  <td className="max-w-sm px-4 py-4 text-[#65736b]">{lead.preferences ?? "No preferences captured"}</td>
+                  <td className="px-4 py-4 text-[#65736b]">{formatBudget(lead.budget_min, lead.budget_max)}</td>
+                  <td className="max-w-sm px-4 py-4 text-[#65736b]">{lead.requirements ?? "No requirements captured"}</td>
                   <td className="max-w-sm px-4 py-4 text-[#65736b]">{lead.remarks ?? "No remarks"}</td>
                   <td className="px-5 py-4 text-right text-[#65736b]">{new Date(lead.created_at).toLocaleDateString()}</td>
                 </tr>)}

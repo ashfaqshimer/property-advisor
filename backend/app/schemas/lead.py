@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-from app.models.lead import LeadIntent, LeadSource
+from app.models.lead import LeadIntent, LeadInterest, LeadSource
 
 
 class FallbackLeadRequest(BaseModel):
@@ -33,7 +33,8 @@ class ManualLeadCreate(BaseModel):
     budget_min: Decimal | None = Field(default=None, ge=0)
     budget_max: Decimal | None = Field(default=None, ge=0)
     intent: LeadIntent | None = None
-    preferences: str | None = Field(default=None, max_length=4000)
+    requirements: str | None = Field(default=None, max_length=4000)
+    interest: LeadInterest | None = None
     remarks: str | None = Field(default=None, max_length=4000)
     conversation_id: UUID | None = None
 
@@ -47,7 +48,8 @@ class LeadRead(BaseModel):
     budget_min: Decimal | None
     budget_max: Decimal | None
     intent: LeadIntent | None
-    preferences: str | None
+    requirements: str | None
+    interest: LeadInterest | None
     remarks: str | None
     source: LeadSource | None
     conversation_id: UUID | None

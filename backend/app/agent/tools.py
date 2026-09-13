@@ -39,7 +39,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import queries
 from app.geocoding import GeocodingError, GoogleGeocoder
-from app.models.lead import Lead, LeadIntent, LeadSource
+from app.models.lead import Lead, LeadIntent, LeadInterest, LeadSource
 from app.models.property import ListingType, Property, PropertyType
 
 SEARCH_PROPERTIES = "search_properties"
@@ -223,6 +223,25 @@ def _as_intent(value: Any) -> LeadIntent | None:
         return None
 
 
+def _as_interest(value: Any) -> LeadInterest | None:
+    """Leniently normalize the model's structured lead category."""
+    if value is None or value == "":
+        return None
+    text = str(value).strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "apartment_for_sale": "apartment_sale",
+        "apartment_for_rent": "apartment_rent",
+        "house_for_sale": "house_sale",
+        "house_for_rent": "house_rent",
+        "sell": "selling",
+        "selling_property": "selling",
+    }
+    try:
+        return LeadInterest(aliases.get(text, text))
+    except ValueError:
+        return None
+
+
 def _as_uuid(value: Any, field: str) -> uuid.UUID:
     if isinstance(value, uuid.UUID):
         return value
@@ -347,9 +366,12 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     """
     name = _clean_text(args.get("name"), 120)
     phone = _clean_text(args.get("phone"), 40)
-    preferences = _clean_text(args.get("preferences"), 4000)
+    requirements = _clean_text(
+        args.get("requirements") or args.get("preferences"), 4000
+    )
     remarks = _clean_text(args.get("remarks"), 4000)
     intent = _as_intent(args.get("intent"))
+    interest = _as_interest(args.get("interest"))
     budget_min = _as_decimal(args.get("budget_min"), "budget_min")
     budget_max = _as_decimal(args.get("budget_max"), "budget_max")
     if budget_min is not None and budget_max is not None and budget_min > budget_max:
@@ -357,10 +379,10 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
 
     # Nothing worth keeping. Writing an all-NULL row would leave a lead nobody can follow
     # up, indistinguishable from a real one that lost its details.
-    if not any([name, phone, preferences, remarks, intent, budget_min, budget_max]):
+    if not any([name, phone, requirements, remarks, intent, interest, budget_min, budget_max]):
         return {
             "saved": False,
-            "reason": "Nothing to save yet — no name, phone, preferences, remarks, or intent.",
+            "reason": "Nothing to save yet — no name, phone, requirements, remarks, or intent.",
             "guidance": (
                 "Keep helping and ask for a name and phone number once you've given them "
                 "something useful. Don't call this tool again until you have one of them."
@@ -383,12 +405,14 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         lead.name = name
     if phone:
         lead.phone = phone
-    if preferences:
-        lead.preferences = preferences
+    if requirements:
+        lead.requirements = requirements
     if remarks:
         lead.remarks = remarks
     if intent is not None:
         lead.intent = intent
+    if interest is not None:
+        lead.interest = interest
     if budget_min is not None:
         lead.budget_min = budget_min
     if budget_max is not None:
@@ -408,6 +432,7 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
             "name": lead.name,
             "phone": lead.phone,
             "intent": lead.intent.value if lead.intent else None,
+            "interest": lead.interest.value if lead.interest else None,
             "budget_min": int(lead.budget_min) if lead.budget_min else None,
             "budget_max": int(lead.budget_max) if lead.budget_max else None,
             "remarks": lead.remarks,
@@ -537,12 +562,20 @@ _CAPTURE_DECLARATION = types.FunctionDeclaration(
                 type=types.Type.NUMBER,
                 description="Top of their budget in LKR, if mentioned.",
             ),
-            "preferences": types.Schema(
+            "requirements": types.Schema(
                 type=types.Type.STRING,
                 description=(
                     "Short free-text summary an agent can act on: areas, property type, "
                     "timing, and — for a seller — the property's location, type, and "
                     "rough size."
+                ),
+            ),
+            "interest": types.Schema(
+                type=types.Type.STRING,
+                enum=[member.value for member in LeadInterest],
+                description=(
+                    "The closest structured category: apartment_sale, apartment_rent, "
+                    "house_sale, house_rent, land, selling, or other."
                 ),
             ),
             "remarks": types.Schema(

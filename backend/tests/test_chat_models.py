@@ -18,7 +18,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Conversation, Lead, LeadIntent, Message, MessageRole
+from app.models import Conversation, Lead, LeadIntent, LeadInterest, Message, MessageRole
 
 
 def _conversation(session: Session, session_id: str = "sess-1") -> Conversation:
@@ -134,7 +134,7 @@ class TestMessageRole:
 
 class TestLeadIntent:
     """`leads.intent` — added with the agent's seller lane, so "show me every seller lead"
-    isn't a substring search over the free-text `preferences` blob."""
+    isn't a substring search over the structured lead fields or free-text requirements."""
 
     def test_persists_lowercase_value_not_member_name(self, db_session: Session):
         conversation = _conversation(db_session)
@@ -207,7 +207,7 @@ class TestLead:
         """The agent works toward a name and phone over several turns, so a row with
         neither is a legitimate intermediate state."""
         conversation = _conversation(db_session)
-        db_session.add(Lead(conversation_id=conversation.id, preferences="wants a garden"))
+        db_session.add(Lead(conversation_id=conversation.id, requirements="wants a garden"))
         db_session.commit()
 
         lead = db_session.scalar(select(Lead))

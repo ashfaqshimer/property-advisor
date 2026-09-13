@@ -18,6 +18,7 @@ from app.models import (
     Conversation,
     Lead,
     LeadIntent,
+    LeadInterest,
     LeadSource,
     Property,
     PropertyType,
@@ -304,12 +305,12 @@ class TestCaptureLead:
     def test_later_call_does_not_blank_an_earlier_field(self, db_session: Session):
         context = _context(db_session)
         tools.capture_lead(context, {"name": "Nimal Perera", "phone": "0771234567"})
-        tools.capture_lead(context, {"preferences": "Wants Colombo 5, 3 beds"})
+        tools.capture_lead(context, {"requirements": "Wants Colombo 5, 3 beds"})
 
         lead = db_session.execute(select(Lead)).scalar_one()
-        assert lead.name == "Nimal Perera", "the name must survive a preferences-only call"
+        assert lead.name == "Nimal Perera", "the name must survive a requirements-only call"
         assert lead.phone == "0771234567"
-        assert lead.preferences == "Wants Colombo 5, 3 beds"
+        assert lead.requirements == "Wants Colombo 5, 3 beds"
 
     def test_nothing_useful_writes_no_row(self, db_session: Session):
         """An all-NULL lead is indistinguishable from a real one that lost its details."""
@@ -328,7 +329,7 @@ class TestCaptureLead:
                 "name": "Ayesha",
                 "phone": "0712223334",
                 "intent": "selling",
-                "preferences": "12 perch house in Battaramulla",
+                "requirements": "12 perch house in Battaramulla",
             },
         )
         lead = db_session.execute(

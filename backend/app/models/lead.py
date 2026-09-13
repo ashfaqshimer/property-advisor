@@ -29,6 +29,18 @@ class LeadIntent(str, enum.Enum):
     SELL = "sell"
 
 
+class LeadInterest(str, enum.Enum):
+    """What the lead wants to buy, rent, or sell."""
+
+    APARTMENT_SALE = "apartment_sale"
+    APARTMENT_RENT = "apartment_rent"
+    HOUSE_SALE = "house_sale"
+    HOUSE_RENT = "house_rent"
+    LAND = "land"
+    SELLING = "selling"
+    OTHER = "other"
+
+
 class LeadSource(str, enum.Enum):
     """How a lead first entered the system."""
 
@@ -66,8 +78,12 @@ class Lead(Base):
         enum_column(LeadSource, "lead_source"), nullable=True, index=True
     )
 
-    # Free-form notes the agent distils from the conversation, not a structured filter.
-    preferences: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Free-form requirements the agent distils from the conversation, not a structured filter.
+    requirements: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    interest: Mapped[LeadInterest | None] = mapped_column(
+        enum_column(LeadInterest, "lead_interest"), nullable=True, index=True
+    )
 
     # Operational notes for important context that should not be treated as a search filter.
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)

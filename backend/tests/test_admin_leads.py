@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Conversation, Lead, LeadIntent, LeadSource
+from app.models import Conversation, Lead, LeadIntent, LeadInterest, LeadSource
 
 
 def test_admin_leads_requires_authentication(client: TestClient) -> None:
@@ -19,7 +19,8 @@ def _add_lead(db: Session, *, name: str, intent: LeadIntent) -> Lead:
         budget_min=Decimal("10000000"),
         budget_max=Decimal("50000000"),
         intent=intent,
-        preferences="Colombo apartment",
+        requirements="Colombo apartment",
+        interest=LeadInterest.APARTMENT_SALE,
         conversation=conversation,
     )
     db.add(lead)
@@ -43,7 +44,8 @@ def test_admin_leads_returns_serialized_leads(authenticated_client: TestClient, 
             "budget_max": 50000000.0,
             "intent": "buy",
             "source": None,
-            "preferences": "Colombo apartment",
+            "requirements": "Colombo apartment",
+            "interest": "apartment_sale",
             "remarks": None,
             "conversation_id": str(lead.conversation_id),
             "created_at": lead.created_at.isoformat().replace("+00:00", "Z"),
@@ -84,7 +86,7 @@ def test_fallback_lead_capture_is_public_and_idempotent(
     assert len(leads) == 1
     assert leads[0].name == "Nimali Perera"
     assert leads[0].phone == "0712345678"
-    assert leads[0].preferences == "Requested a call because chat was unavailable."
+    assert leads[0].requirements == "Requested a call because chat was unavailable."
     assert leads[0].source is LeadSource.FALLBACK
     assert leads[0].remarks == "Chat was unavailable when this callback request was submitted."
 
@@ -115,7 +117,8 @@ def test_manual_lead_creation_allows_no_conversation(
             "name": "Maya",
             "intent": "buy",
             "budget_max": "50000000",
-            "preferences": "Colombo apartment",
+            "requirements": "Colombo apartment",
+            "interest": "apartment_sale",
             "remarks": "Call after 6pm",
         },
     )

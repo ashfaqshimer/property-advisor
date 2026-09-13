@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.auth import CurrentStaffUser
 from app.agent.loop import get_or_create_conversation
 from app.models.conversation import Conversation
-from app.models.lead import Lead, LeadIntent, LeadSource
+from app.models.lead import Lead, LeadIntent, LeadInterest, LeadSource
 from app.schemas.lead import (
     FallbackLeadRequest,
     FallbackLeadResponse,
@@ -38,7 +38,7 @@ def _capture_fallback_lead(
 
     lead.name = payload.name
     lead.phone = payload.phone
-    lead.preferences = "Requested a call because chat was unavailable."
+    lead.requirements = "Requested a call because chat was unavailable."
     if not lead.remarks:
         lead.remarks = "Chat was unavailable when this callback request was submitted."
     db.commit()
@@ -64,6 +64,7 @@ def get_admin_leads(
     _user: CurrentStaffUser,
     search: Annotated[str | None, Query(max_length=120)] = None,
     intent: LeadIntent | None = None,
+    interest: LeadInterest | None = None,
     source: LeadSource | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -75,12 +76,14 @@ def get_admin_leads(
             or_(
                 Lead.name.ilike(term),
                 Lead.phone.ilike(term),
-                Lead.preferences.ilike(term),
+                Lead.requirements.ilike(term),
                 Lead.remarks.ilike(term),
             )
         )
     if intent is not None:
         stmt = stmt.where(Lead.intent == intent)
+    if interest is not None:
+        stmt = stmt.where(Lead.interest == interest)
     if source is not None:
         stmt = stmt.where(Lead.source == source)
     stmt = stmt.order_by(Lead.created_at.desc(), Lead.id).offset(offset).limit(limit)

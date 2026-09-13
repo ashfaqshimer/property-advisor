@@ -144,6 +144,14 @@ export type AdminPropertyUpdatePayload = Partial<CreatePropertyPayload> & {
 };
 
 export type LeadSource = "ai_agent" | "manual" | "fallback";
+export type LeadInterest =
+  | "apartment_sale"
+  | "apartment_rent"
+  | "house_sale"
+  | "house_rent"
+  | "land"
+  | "selling"
+  | "other";
 
 export type ManualLeadPayload = {
   name?: string;
@@ -151,7 +159,8 @@ export type ManualLeadPayload = {
   budget_min?: number;
   budget_max?: number;
   intent?: "buy" | "rent" | "sell";
-  preferences?: string;
+  requirements?: string;
+  interest?: LeadInterest;
   remarks?: string;
   conversation_id?: string;
 };
@@ -164,7 +173,8 @@ export type AdminLead = {
   budget_max: number | null;
   intent: "buy" | "rent" | "sell" | null;
   source: LeadSource | null;
-  preferences: string | null;
+  requirements: string | null;
+  interest: LeadInterest | null;
   remarks: string | null;
   conversation_id: string | null;
   created_at: string;
@@ -563,7 +573,8 @@ function isAdminLead(value: unknown): value is AdminLead {
     (typeof candidate.budget_max === "number" || candidate.budget_max === null) &&
     (candidate.intent === "buy" || candidate.intent === "rent" || candidate.intent === "sell" || candidate.intent === null) &&
     (candidate.source === "ai_agent" || candidate.source === "manual" || candidate.source === "fallback" || candidate.source === null) &&
-    (typeof candidate.preferences === "string" || candidate.preferences === null) &&
+    (typeof candidate.requirements === "string" || candidate.requirements === null) &&
+    (candidate.interest === "apartment_sale" || candidate.interest === "apartment_rent" || candidate.interest === "house_sale" || candidate.interest === "house_rent" || candidate.interest === "land" || candidate.interest === "selling" || candidate.interest === "other" || candidate.interest === null) &&
     (typeof candidate.remarks === "string" || candidate.remarks === null) &&
     (typeof candidate.conversation_id === "string" || candidate.conversation_id === null) &&
     typeof candidate.created_at === "string" &&
