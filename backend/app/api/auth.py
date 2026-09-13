@@ -1,22 +1,34 @@
 """Staff login and session endpoints."""
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.auth import (
     CurrentStaffUser,
     DbSession,
+    RootStaffUser,
     _hash_session_token,
     create_session,
+    hash_password,
     verify_password,
 )
 from app.config import get_settings
 from app.models.auth import StaffSession, StaffUser
-from app.schemas.auth import LoginRequest, LoginResponse, StaffUserRead
+from app.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    StaffRole,
+    StaffUserCreate,
+    StaffUserRead,
+    StaffUserUpdate,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+admin_router = APIRouter(prefix="/admin/users", tags=["admin-users"])
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -61,3 +73,48 @@ def logout(
             session.revoked_at = datetime.now(UTC)
             db.commit()
     response.delete_cookie(get_settings().auth_cookie_name)
+
+
+@admin_router.get("", response_model=list[StaffUserRead])
+def get_staff_users(db: DbSession, _user: RootStaffUser) -> list[StaffUser]:
+    return list(db.scalars(select(StaffUser).order_by(StaffUser.created_at, StaffUser.email)).all())
+
+
+@admin_router.post("", response_model=StaffUserRead, status_code=status.HTTP_201_CREATED)
+def create_agent(payload: StaffUserCreate, db: DbSession, _user: RootStaffUser) -> StaffUser:
+    agent = StaffUser(
+        email=payload.email.lower(),
+        password_hash=hash_password(payload.password),
+        role=StaffRole.AGENT,
+    )
+    db.add(agent)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already in use.") from exc
+    db.refresh(agent)
+    return agent
+
+
+@admin_router.patch("/{user_id}", response_model=StaffUserRead)
+def update_agent(
+    user_id: UUID, payload: StaffUserUpdate, db: DbSession, _user: RootStaffUser
+) -> StaffUser:
+    agent = db.get(StaffUser, user_id)
+    if agent is None or agent.role != StaffRole.AGENT:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
+    changes = payload.model_dump(exclude_unset=True)
+    if "email" in changes:
+        agent.email = changes["email"].lower()
+    if "password" in changes and changes["password"] is not None:
+        agent.password_hash = hash_password(changes["password"])
+    if "is_active" in changes and changes["is_active"] is not None:
+        agent.is_active = changes["is_active"]
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already in use.") from exc
+    db.refresh(agent)
+    return agent

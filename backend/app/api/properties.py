@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.auth import CurrentStaffUser
+from app.auth import CurrentStaffUser, RootStaffUser
 from app.db import queries
 from app.db.session import get_db
 from app.geocoding import Coordinates, GeocodingError, GoogleGeocoder
@@ -162,7 +162,7 @@ def update_admin_property(
 
 
 @admin_router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_admin_property(property_id: UUID, db: DbSession, _user: CurrentStaffUser) -> None:
+def delete_admin_property(property_id: UUID, db: DbSession, _user: RootStaffUser) -> None:
     property_record = db.get(Property, property_id)
     if property_record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")

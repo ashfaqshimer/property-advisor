@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db.session import get_db
 from app.models.auth import StaffSession, StaffUser
+from app.schemas.auth import StaffRole
 
 password_hasher = PasswordHasher()
 DbSession = Annotated[Session, Depends(get_db)]
@@ -72,3 +73,12 @@ def get_current_user(request: Request, db: DbSession) -> StaffUser:
 
 
 CurrentStaffUser = Annotated[StaffUser, Depends(get_current_user)]
+
+
+def require_root(user: CurrentStaffUser) -> StaffUser:
+    if user.role != StaffRole.ROOT:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Root access required.")
+    return user
+
+
+RootStaffUser = Annotated[StaffUser, Depends(require_root)]

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
+	getCurrentUser,
 	updateAdminProperty,
 } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
@@ -31,7 +32,9 @@ export default function AdminPropertiesPage() {
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(true);
 	const [busyProperty, setBusyProperty] = useState<string | null>(null);
+	const [canDelete, setCanDelete] = useState(false);
 	useEffect(() => {
+		getCurrentUser().then((user) => setCanDelete(user?.role === 'root')).catch(() => {});
 		getAdminProperties()
 			.then((records) =>
 				setProperties(
@@ -190,14 +193,14 @@ export default function AdminPropertiesPage() {
 										</button>
 									</td>
 									<td className='px-5 py-4 text-right'>
-										<button
+										{canDelete && <button
 											type='button'
 											disabled={busyProperty === property.id}
 											onClick={() => console.log('Edit property', property)}
 											className='mr-4 text-xs font-semibold text-[#35664f] hover:underline'
 										>
 											Edit
-										</button>
+										</button>}
 										<button
 											type='button'
 											onClick={() => deleteProperty(property.id)}

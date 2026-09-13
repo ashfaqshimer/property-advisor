@@ -6,6 +6,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
+class StaffRole:
+    ROOT = "root"
+    AGENT = "agent"
+
+
 class LoginRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -18,7 +23,24 @@ class StaffUserRead(BaseModel):
 
     id: UUID
     email: EmailStr
+    role: str
+    is_active: bool
     created_at: datetime
+
+
+class StaffUserCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class StaffUserUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    is_active: bool | None = None
 
 
 class LoginResponse(BaseModel):

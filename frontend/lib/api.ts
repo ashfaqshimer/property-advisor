@@ -109,11 +109,18 @@ export type CreatePropertyPayload = {
   description: string;
   listing_type: "sale" | "rent";
   price: number;
+  is_price_per_perch?: boolean;
   location: string;
   property_type: "house" | "apartment" | "land" | "commercial";
   bedrooms: number | null;
   bathrooms: number | null;
+  land_size_perches?: number | null;
   floor_area_sqft: number | null;
+  parking_spaces?: number | null;
+  build_year?: number | null;
+  road_access_ft?: number | null;
+  furnishing_status?: string | null;
+  amenities?: Record<string, boolean> | null;
   image_urls: string[];
   image_alt: string;
   status: "available" | "under_offer" | "sold";
@@ -146,8 +153,11 @@ export type AdminLead = {
 export type AuthUser = {
   id: string;
   email: string;
+  role: "root" | "agent";
   created_at: string;
 };
+
+export type StaffUser = AuthUser & { is_active: boolean };
 
 export class AuthError extends Error {
   readonly status: number;
@@ -191,6 +201,42 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (response.status === 401) return null;
   if (!response.ok) return parseAuthError(response);
   return (await response.json()) as AuthUser;
+}
+
+export async function getStaffUsers(): Promise<StaffUser[]> {
+  const response = await fetch(`${baseUrl()}/admin/users`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `User list failed (${response.status}).`, response.status);
+  const result: unknown = await response.json();
+  if (!Array.isArray(result)) throw new ChatError("unexpected", "The backend returned an unrecognised user list.");
+  return result as StaffUser[];
+}
+
+export async function createAgent(email: string, password: string): Promise<StaffUser> {
+  const response = await fetch(`${baseUrl()}/admin/users`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Agent creation failed (${response.status}).`, response.status);
+  return (await response.json()) as StaffUser;
+}
+
+export async function updateAgent(userId: string, payload: { email?: string; password?: string; is_active?: boolean }): Promise<StaffUser> {
+  const response = await fetch(`${baseUrl()}/admin/users/${userId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Agent update failed (${response.status}).`, response.status);
+  return (await response.json()) as StaffUser;
 }
 
 export async function logout(): Promise<void> {

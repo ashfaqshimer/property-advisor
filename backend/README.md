@@ -27,9 +27,16 @@ transaction pooling breaks psycopg3's named prepared statements).
 uv run alembic upgrade head        # create/update tables
 uv run python -m app.db.seed       # 8 sample listings; safe to re-run
 uv run python -m app.db.backfill_locations  # populate missing listing coordinates
+uv run python -m scripts.create_admin # one-time root account bootstrap
 uv run fastapi dev app/main.py     # http://127.0.0.1:8000 — /docs for Swagger
 uv run pytest
 ```
+
+Before running `scripts.create_admin`, set `BOOTSTRAP_ADMIN_SECRET` in your local
+environment. The command refuses to run without it and refuses to create a second root
+account. Keep the secret out of the repository; after the first root account is created,
+remove or rotate it. Future agent accounts must be created from the root-only admin
+workspace.
 
 ## Talking to the agent
 

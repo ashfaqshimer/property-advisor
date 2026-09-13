@@ -34,6 +34,16 @@ def test_gemini_model_comes_from_configuration() -> None:
     assert settings.gemini_model == "gemini-3.1-flash"
 
 
+def test_bootstrap_secret_comes_from_configuration() -> None:
+    settings = _settings(
+        database_url="postgresql://u:p@host/db",
+        gemini_model="gemini-test",
+        bootstrap_admin_secret="one-time-secret",
+    )
+
+    assert settings.bootstrap_admin_secret == "one-time-secret"
+
+
 def test_neon_url_is_rewritten_to_psycopg3() -> None:
     # SQLAlchemy resolves a bare postgresql:// to psycopg2, which isn't installed.
     settings = _settings(

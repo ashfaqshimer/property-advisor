@@ -23,6 +23,7 @@ app.include_router(properties.admin_router)
 app.include_router(leads.router)
 app.include_router(chat.router)
 app.include_router(auth.router)
+app.include_router(auth.admin_router)
 
 
 @app.exception_handler(GeminiNotConfigured)

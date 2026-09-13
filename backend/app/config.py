@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     auth_cookie_secure: bool = False
     auth_cookie_samesite: str = "lax"
 
+    # Used only by the one-time local bootstrap command.
+    bootstrap_admin_secret: str = ""
+
     @property
     def cloudinary_configured(self) -> bool:
         return all(
