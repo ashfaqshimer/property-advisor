@@ -1,15 +1,3 @@
-/**
- * Types and copy for the chat panel.
- *
- * The seeded conversation that used to live here is gone: the panel talks to `POST /chat`
- * now, so the only message it invents is Amaya's greeting. Everything else arrives from the
- * backend, which is also the single source of truth for the transcript — `messages` rows in
- * Postgres, replayed to the model every turn.
- *
- * Wording lives here rather than inline in the panel so that changing what Amaya says never
- * means reading JSX, and so the error copy can be asserted against `ChatErrorKind` directly.
- */
-
 import type { ChatErrorKind } from "@/lib/api";
 
 export type ChatMessage = {
@@ -29,13 +17,22 @@ export type ChatMessage = {
  * verbatim and reads *this* file to do it — change both, or that test fails.
  */
 export const GREETING =
-  "Hi, I'm Amaya, an advisor at Property Advisor. Whether you're after land, a house, or an apartment — buying, renting, or selling — tell me what you have in mind and I'll take it from there.";
+  "Hi, I'm Amaya with Property Advisor. Just let me know what kind of place you're looking to buy, rent, or sell, and we can go from there.";
 
-/** Clicking one sends it as a message, so each has to read as something a visitor would type. */
+/** The first chip is always available, even while featured listings are loading. */
+export const SELLING_SUGGESTION = "I want to sell my apartment";
+
+/** Used until featured listings arrive, or when the featured-listings request fails. */
+export const FALLBACK_PROPERTY_SUGGESTIONS: string[] = [
+  "Tell me about the 3-bedroom apartment in Colombo",
+  "Show me properties in Galle",
+  "What's available in Rajagiriya?",
+];
+
+/** Stable fallback retained for tests and other consumers of the chat constants. */
 export const SUGGESTION_CHIPS: string[] = [
-  "3-bedroom homes in Colombo under LKR 50M",
-  "Beachside properties in Galle",
-  "What's trending in Rajagiriya?",
+  SELLING_SUGGESTION,
+  ...FALLBACK_PROPERTY_SUGGESTIONS,
 ];
 
 /** How each speaker is announced to a screen reader, since colour and side
@@ -50,7 +47,7 @@ export const SPEAKER_LABELS: Record<ChatMessage["role"], string> = {
  * true the moment this talked to a real service: the free tier cold-starts in ~22s. Promising
  * speed we can't deliver is worse than not mentioning it.
  */
-export const AGENT_STATUS_LINE = "Online · answers take a moment";
+export const AGENT_STATUS_LINE = "Online · replies might take a few seconds";
 
 /** Announced while a request is in flight; real text, because animated dots say nothing. */
 export const PENDING_LABEL = "Amaya is typing…";
@@ -65,7 +62,7 @@ export const PENDING_LABEL = "Amaya is typing…";
  * than one that stays vague.
  */
 export const SLOW_PENDING_LABEL =
-  "Still waking up — this can take a little longer after a quiet spell.";
+  "Sorry for the wait, just taking a bit longer to pull this up.";
 
 /** Spec calls for roughly 8–10s: long enough that a warm turn (4–11s) usually never shows it. */
 export const SLOW_PENDING_AFTER_MS = 9_000;
@@ -79,11 +76,11 @@ export const SLOW_PENDING_AFTER_MS = 9_000;
  * because it is the one case where pressing retry cannot possibly help.
  */
 export const ERROR_COPY: Record<ChatErrorKind, string> = {
-  config: "Chat isn't configured on this site yet — that's on us, not you.",
-  timeout: "That took longer than I could wait for. Worth another try.",
-  network: "I couldn't get through to our server just then. Try again in a moment.",
-  upstream: "Something went wrong on my side answering that. Try again?",
+  config: "Looks like chat isn't quite set up on our end yet. Sorry about that!",
+  timeout: "Sorry, that took too long to load. Want to try asking again?",
+  network: "Looks like we lost connection for a second. Could you try sending that again?",
+  upstream: "Sorry, I ran into an issue on my end. Can we try that again?",
   unavailable:
-    "I'm offline at the moment — this one's on us, and trying again won't help. Do come back a little later.",
-  unexpected: "Something unexpected came back from our server. Try again?",
+    "I'm actually offline right now. Check back a bit later!",
+  unexpected: "Sorry, I ran into a weird glitch just now. Mind trying again?",
 };

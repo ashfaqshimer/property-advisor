@@ -52,6 +52,7 @@ let fetchSpy: ReturnType<typeof vi.fn>;
 function stubBackend(onChat: ChatHandler = () => reply("Of course.")) {
   fetchSpy = vi.fn(async (url: unknown, init: RequestInit = {}) => {
     if (String(url).endsWith("/health")) return jsonResponse(200, { status: "ok" });
+    if (String(url).endsWith("/properties/featured")) return jsonResponse(200, []);
     return onChat(init);
   });
   vi.stubGlobal("fetch", fetchSpy);

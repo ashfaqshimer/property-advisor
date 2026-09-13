@@ -19,11 +19,13 @@ export default function Home() {
             column at its content height — without it the chat column stretches
             to match the grid and `sticky` has nothing to slide against.
           */}
-          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3 lg:gap-10">
-            <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-5 lg:gap-10">
+            <div className="lg:col-span-3">
               <PropertyGrid />
             </div>
-            <ChatPanel />
+            <div className="lg:col-span-2">
+              <ChatPanel />
+            </div>
           </div>
         </Container>
       </main>

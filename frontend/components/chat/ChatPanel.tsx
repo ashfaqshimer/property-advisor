@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 import {
   ChatError,
+  getFeaturedProperties,
   MAX_MESSAGE_LENGTH,
   sendChatMessage,
   wakeBackend,
@@ -11,30 +13,16 @@ import {
 import {
   AGENT_STATUS_LINE,
   ERROR_COPY,
+  FALLBACK_PROPERTY_SUGGESTIONS,
   GREETING,
   PENDING_LABEL,
   SLOW_PENDING_AFTER_MS,
   SLOW_PENDING_LABEL,
   SPEAKER_LABELS,
-  SUGGESTION_CHIPS,
+  SELLING_SUGGESTION,
   type ChatMessage,
 } from "@/lib/chat";
-
-/**
- * Decorative avatar mark. `aria-hidden` because the agent's name sits right
- * beside it — announcing the glyph too would only duplicate that.
- */
-const SparkleIcon = () => (
-  <svg
-    aria-hidden="true"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    className="size-4"
-  >
-    <path d="M13 2.5 14.6 7 19 8.6 14.6 10.2 13 14.7 11.4 10.2 7 8.6 11.4 7Z" />
-    <path d="M6.5 13.5 7.4 16l2.6.9-2.6.9L6.5 20.4 5.6 17.8 3 16.9l2.6-.9Z" />
-  </svg>
-);
+import { mapProperty, type Property } from "@/lib/properties";
 
 /** Decorative: the button's `aria-label` carries the meaning. */
 const SendIcon = () => (
@@ -113,6 +101,7 @@ type Failure = {
  * to the viewport edge and then nudged down a beat later.
  */
 export default function ChatPanel() {
+  const [featuredProperties, setFeaturedProperties] = useState<Property[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: "greeting", role: "agent", text: GREETING },
   ]);
@@ -145,6 +134,12 @@ export default function ChatPanel() {
       abortRef.current?.abort();
       if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    getFeaturedProperties()
+      .then((records) => setFeaturedProperties(records.slice(0, 3).map(mapProperty)))
+      .catch(() => setFeaturedProperties([]));
   }, []);
 
   useEffect(() => {
@@ -218,6 +213,14 @@ export default function ChatPanel() {
   };
 
   const canSend = draft.trim().length > 0 && !pending;
+  const propertySuggestions = featuredProperties.map(
+    (property) => `Tell me more about ${property.title} in ${property.location}`,
+  );
+  const suggestionChips = [
+    SELLING_SUGGESTION,
+    ...propertySuggestions,
+    ...FALLBACK_PROPERTY_SUGGESTIONS.slice(0, 3 - propertySuggestions.length),
+  ];
 
   return (
     <section
@@ -243,17 +246,20 @@ export default function ChatPanel() {
         reports a second `banner` alongside the site header. Same reasoning as
         the mobile menu using a plain <ul> rather than a nested <nav>.
       */}
-      <div className="flex shrink-0 items-center gap-3 bg-band-strong px-4 py-3">
-        <span
+      <div className="flex shrink-0 items-center gap-3 bg-band-strong px-5 py-4">
+        <Image
+          src="/images/amaya_avatar_compressed.png"
+          alt=""
+          width={48}
+          height={48}
           aria-hidden="true"
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-brand text-on-brand"
+          className="size-12 shrink-0 rounded-full object-cover"
         >
-          <SparkleIcon />
-        </span>
+        </Image>
         {/* `min-w-0` so a narrow panel wraps the name instead of overflowing. */}
         <div className="min-w-0">
           <p className="font-display text-[0.9375rem] leading-tight text-ink">
-            Amaya — AI Advisor
+            Amaya Perera
           </p>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
             {/* Status colour is decorative; the word "Online" carries it. */}
@@ -284,7 +290,7 @@ export default function ChatPanel() {
       <ul
         aria-label="Conversation with Amaya"
         aria-live="polite"
-        className="flex min-h-72 flex-col gap-3 px-4 py-4 lg:min-h-64 lg:flex-1 lg:overflow-y-auto"
+        className="flex min-h-72 flex-col gap-3 px-4 py-4 lg:min-h-72 lg:flex-1 lg:overflow-y-auto"
       >
         {messages.map((message) => {
           const isUser = message.role === "user";
@@ -375,7 +381,7 @@ export default function ChatPanel() {
       {/* `items-start` shrink-wraps each pill to its label, as in the mockup;
           `max-w-full` keeps the longest one inside the panel at 375px. */}
       <div className="flex shrink-0 flex-col items-start gap-2 px-4 pb-4">
-        {SUGGESTION_CHIPS.map((chip) => (
+        {suggestionChips.map((chip) => (
           <button
             key={chip}
             type="button"
