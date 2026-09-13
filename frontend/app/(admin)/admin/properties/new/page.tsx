@@ -7,11 +7,19 @@ import { createProperty, uploadPropertyImages } from '@/lib/api';
 type FormValues = {
 	title: string;
 	propertyType: string;
+	listingType: 'sale' | 'rent';
 	price: string;
+	pricePerPerch: boolean;
 	location: string;
 	bedrooms: string;
 	bathrooms: string;
+	landSizePerches: string;
 	sqft: string;
+	parkingSpaces: string;
+	buildYear: string;
+	roadAccessFt: string;
+	furnishingStatus: string;
+	amenities: string;
 	description: string;
 	status: string;
 	isFeatured: boolean;
@@ -20,11 +28,19 @@ type ImagePreview = { file: File; url: string };
 const emptyForm: FormValues = {
 	title: '',
 	propertyType: 'house',
+	listingType: 'sale',
 	price: '',
+	pricePerPerch: false,
 	location: '',
 	bedrooms: '',
 	bathrooms: '',
+	landSizePerches: '',
 	sqft: '',
+	parkingSpaces: '',
+	buildYear: '',
+	roadAccessFt: '',
+	furnishingStatus: '',
+	amenities: '',
 	description: '',
 	status: 'available',
 	isFeatured: false,
@@ -89,11 +105,16 @@ export default function NewPropertyPage() {
 			const imageUrls = images.length
 				? await uploadPropertyImages(images.map((image) => image.file))
 				: [];
+			const amenityNames = form.amenities
+				.split(',')
+				.map((amenity) => amenity.trim())
+				.filter(Boolean);
 			await createProperty({
 				title: form.title.trim(),
 				description: form.description.trim(),
-				listing_type: 'sale',
+				listing_type: form.listingType,
 				price: Number(form.price),
+				is_price_per_perch: form.pricePerPerch,
 				location: form.location.trim(),
 				property_type: form.propertyType as
 					| 'house'
@@ -102,7 +123,17 @@ export default function NewPropertyPage() {
 					| 'commercial',
 				bedrooms: form.bedrooms ? Number(form.bedrooms) : null,
 				bathrooms: form.bathrooms ? Number(form.bathrooms) : null,
+				land_size_perches: form.landSizePerches
+					? Number(form.landSizePerches)
+					: null,
 				floor_area_sqft: form.sqft ? Number(form.sqft) : null,
+				parking_spaces: form.parkingSpaces ? Number(form.parkingSpaces) : null,
+				build_year: form.buildYear ? Number(form.buildYear) : null,
+				road_access_ft: form.roadAccessFt ? Number(form.roadAccessFt) : null,
+				furnishing_status: form.furnishingStatus || null,
+				amenities: amenityNames.length
+					? Object.fromEntries(amenityNames.map((amenity) => [amenity, true]))
+					: null,
 				image_urls: imageUrls,
 				image_alt: form.title.trim(),
 				is_featured: form.isFeatured,
@@ -175,6 +206,17 @@ export default function NewPropertyPage() {
 							{errorText('title')}
 						</label>
 						<label className='text-sm font-medium'>
+							Listing type
+							<select
+								className={fieldClass}
+								value={form.listingType}
+								onChange={(e) => updateField('listingType', e.target.value)}
+							>
+								<option value='sale'>For sale</option>
+								<option value='rent'>For rent</option>
+							</select>
+						</label>
+						<label className='text-sm font-medium'>
 							Property type
 							<select
 								className={fieldClass}
@@ -197,6 +239,16 @@ export default function NewPropertyPage() {
 								onChange={(e) => updateField('price', e.target.value)}
 								placeholder='50000000'
 							/>
+							<label className='mt-2 flex items-center gap-2 text-xs font-normal text-[#65736b]'>
+								<input
+									type='checkbox'
+									checked={form.pricePerPerch}
+									onChange={(e) =>
+										updateField('pricePerPerch', e.target.checked)
+									}
+								/>
+								Price per perch
+							</label>
 							{errorText('price')}
 						</label>
 						<label className='text-sm font-medium sm:col-span-2'>
@@ -239,6 +291,18 @@ export default function NewPropertyPage() {
 							/>
 						</label>
 						<label className='text-sm font-medium'>
+							Land size (perches)
+							<input
+								className={fieldClass}
+								type='number'
+								min='0'
+								step='0.01'
+								value={form.landSizePerches}
+								onChange={(e) => updateField('landSizePerches', e.target.value)}
+								placeholder='10.5'
+							/>
+						</label>
+						<label className='text-sm font-medium'>
 							Sqft
 							<input
 								className={fieldClass}
@@ -247,6 +311,40 @@ export default function NewPropertyPage() {
 								value={form.sqft}
 								onChange={(e) => updateField('sqft', e.target.value)}
 								placeholder='1800'
+							/>
+						</label>
+						<label className='text-sm font-medium'>
+							Parking spaces
+							<input
+								className={fieldClass}
+								type='number'
+								min='0'
+								value={form.parkingSpaces}
+								onChange={(e) => updateField('parkingSpaces', e.target.value)}
+								placeholder='2'
+							/>
+						</label>
+						<label className='text-sm font-medium'>
+							Build year
+							<input
+								className={fieldClass}
+								type='number'
+								min='1800'
+								max={new Date().getFullYear() + 1}
+								value={form.buildYear}
+								onChange={(e) => updateField('buildYear', e.target.value)}
+								placeholder='2020'
+							/>
+						</label>
+						<label className='text-sm font-medium'>
+							Road access (ft)
+							<input
+								className={fieldClass}
+								type='number'
+								min='0'
+								value={form.roadAccessFt}
+								onChange={(e) => updateField('roadAccessFt', e.target.value)}
+								placeholder='20'
 							/>
 						</label>
 					</div>
@@ -265,6 +363,18 @@ export default function NewPropertyPage() {
 						placeholder='Describe the property, its surroundings, and notable features.'
 					/>
 					{errorText('description')}
+					<label className='mt-5 block text-sm font-medium'>
+						Amenities
+						<input
+							className={fieldClass}
+							value={form.amenities}
+							onChange={(e) => updateField('amenities', e.target.value)}
+							placeholder='Pool, Garden, Generator'
+						/>
+						<span className='mt-1 block text-xs font-normal text-[#829088]'>
+							Separate amenities with commas.
+						</span>
+					</label>
 				</div>
 				<div className='rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Status & visibility</h3>
@@ -280,6 +390,29 @@ export default function NewPropertyPage() {
 								<option value='under_offer'>Under offer</option>
 								<option value='sold'>Sold</option>
 							</select>
+						</label>
+						<label className='text-sm font-medium sm:w-64'>
+							Furnishing
+							<select
+								className={fieldClass}
+								value={form.furnishingStatus}
+								onChange={(e) =>
+									updateField('furnishingStatus', e.target.value)
+								}
+							>
+								<option value=''>Not specified</option>
+								<option value='unfurnished'>Unfurnished</option>
+								<option value='semi_furnished'>Semi-furnished</option>
+								<option value='fully_furnished'>Fully furnished</option>
+							</select>
+						</label>
+						<label className='flex items-center gap-2 pb-3 text-sm font-medium'>
+							<input
+								type='checkbox'
+								checked={form.isFeatured}
+								onChange={(e) => updateField('isFeatured', e.target.checked)}
+							/>
+							Featured property
 						</label>
 					</div>
 				</div>
