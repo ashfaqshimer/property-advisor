@@ -302,8 +302,8 @@ export default function ChatPanel() {
         appear without any focus change, so nothing else would announce them. Polite rather
         than assertive — an answer is worth hearing at the next pause, not mid-sentence.
 
-        `min-h-72` gives the region a usable floor before it has grown into its
-        content. At `lg` that floor drops to `min-h-64` and `flex-1` takes over:
+        `min-h-96` gives the region a more generous floor before it has grown
+        into its content. At `lg`, `flex-1` takes over:
         the panel grows with the conversation until it hits `max-h-panel-max`,
         after which the list is the part that shrinks and scrolls. The floor has
         to stay under the space left by the header, chips, and input at a short
@@ -312,7 +312,7 @@ export default function ChatPanel() {
       <ul
         aria-label="Conversation with Amaya"
         aria-live="polite"
-        className="flex min-h-72 flex-col gap-3 px-4 py-4 lg:min-h-72 lg:flex-1 lg:overflow-y-auto"
+        className="flex min-h-96 flex-col gap-3 px-4 py-4 lg:flex-1 lg:overflow-y-auto"
       >
         {messages.map((message) => {
           const isUser = message.role === "user";
