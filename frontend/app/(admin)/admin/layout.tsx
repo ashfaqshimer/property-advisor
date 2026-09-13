@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AuthUser, getCurrentUser, logout } from "../../../lib/api";
+import { Spinner } from "../../../components/ui/spinner";
 
 const navigation = [
   { label: "Properties", href: "/admin" },
@@ -17,6 +18,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     getCurrentUser()
@@ -29,12 +31,13 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
   }, [router]);
 
   async function handleLogout() {
+    setSigningOut(true);
     await logout();
     router.replace("/login");
   }
 
   if (checkingAuth || !user) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#f4f6f4] text-sm text-[#64736b]">Checking access...</main>;
+    return <main className="flex min-h-screen items-center justify-center bg-[#f4f6f4] text-sm text-[#64736b]"><Spinner className="mr-2 h-4 w-4" />Checking access...</main>;
   }
 
   return (
@@ -47,7 +50,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
         <div className="mt-auto border-t border-white/10 px-7 py-6 text-xs text-[#a8c0b4]">Internal tools only</div>
       </aside>
       <div className="lg:pl-64">
-        <header className="flex h-20 items-center justify-between border-b border-[#dce4df] bg-white px-5 sm:px-8"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#718078]">Property Advisor</p><h1 className="mt-1 text-lg font-semibold">Admin workspace</h1></div><div className="flex items-center gap-4 text-sm text-[#64736b]"><span className="hidden sm:inline">{user.email}</span><button type="button" onClick={handleLogout} className="font-medium text-[#28513f] hover:underline">Sign out</button></div></header>
+        <header className="flex h-20 items-center justify-between border-b border-[#dce4df] bg-white px-5 sm:px-8"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#718078]">Property Advisor</p><h1 className="mt-1 text-lg font-semibold">Admin workspace</h1></div><div className="flex items-center gap-4 text-sm text-[#64736b]"><span className="hidden sm:inline">{user.email}</span><button type="button" onClick={handleLogout} disabled={signingOut} className="inline-flex items-center font-medium text-[#28513f] hover:underline disabled:cursor-wait disabled:opacity-60">{signingOut && <Spinner className="mr-2 h-3.5 w-3.5" />}Sign out</button></div></header>
         <main className="px-5 py-8 sm:px-8">{children}</main>
       </div>
     </div>

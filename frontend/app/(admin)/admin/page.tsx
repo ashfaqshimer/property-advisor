@@ -7,6 +7,7 @@ import {
 	getAdminProperties,
 	updateAdminProperty,
 } from '@/lib/api';
+import { Spinner } from '@/components/ui/spinner';
 
 type PropertyStatus = 'available' | 'under_offer' | 'sold';
 type Property = {
@@ -28,6 +29,8 @@ const statusStyles: Record<PropertyStatus, string> = {
 export default function AdminPropertiesPage() {
 	const [properties, setProperties] = useState<Property[]>([]);
 	const [error, setError] = useState('');
+	const [loading, setLoading] = useState(true);
+	const [busyProperty, setBusyProperty] = useState<string | null>(null);
 	useEffect(() => {
 		getAdminProperties()
 			.then((records) =>
@@ -49,9 +52,11 @@ export default function AdminPropertiesPage() {
 						? reason.message
 						: 'Could not load properties.',
 				),
-			);
+			)
+			.finally(() => setLoading(false));
 	}, []);
 	async function toggleFeatured(id: string, featured: boolean) {
+		setBusyProperty(id);
 		try {
 			const updated = await updateAdminProperty(id, { is_featured: !featured });
 			setProperties((current) =>
@@ -67,9 +72,12 @@ export default function AdminPropertiesPage() {
 					? reason.message
 					: 'Could not update the property.',
 			);
+		} finally {
+			setBusyProperty(null);
 		}
 	}
 	async function deleteProperty(id: string) {
+		setBusyProperty(id);
 		try {
 			await deleteAdminProperty(id);
 			setProperties((current) =>
@@ -81,6 +89,8 @@ export default function AdminPropertiesPage() {
 					? reason.message
 					: 'Could not delete the property.',
 			);
+		} finally {
+			setBusyProperty(null);
 		}
 	}
 	return (
@@ -137,7 +147,14 @@ export default function AdminPropertiesPage() {
 							</tr>
 						</thead>
 						<tbody className='divide-y divide-[#edf0ee]'>
-							{properties.map((property) => (
+							{loading ? (
+								<tr>
+									<td className='px-5 py-12 text-center' colSpan={7}>
+										<Spinner className='mx-auto h-5 w-5 text-[#28513f]' />
+										<span className='sr-only'>Loading properties</span>
+									</td>
+								</tr>
+							) : properties.map((property) => (
 								<tr key={property.id} className='transition hover:bg-[#fbfcfb]'>
 									<td className='px-5 py-4'>
 										<span className='font-semibold text-[#253a30]'>
@@ -161,6 +178,7 @@ export default function AdminPropertiesPage() {
 									<td className='px-4 py-4'>
 										<button
 											type='button'
+											disabled={busyProperty === property.id}
 											aria-label={`${property.featured ? 'Remove from' : 'Add to'} featured properties`}
 											aria-pressed={property.featured}
 											onClick={() =>
@@ -168,12 +186,13 @@ export default function AdminPropertiesPage() {
 											}
 											className={`text-2xl leading-none transition ${property.featured ? 'text-[#d99b2b]' : 'text-[#c8d0ca] hover:text-[#d99b2b]'}`}
 										>
-											★
+											{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
 										</button>
 									</td>
 									<td className='px-5 py-4 text-right'>
 										<button
 											type='button'
+											disabled={busyProperty === property.id}
 											onClick={() => console.log('Edit property', property)}
 											className='mr-4 text-xs font-semibold text-[#35664f] hover:underline'
 										>
@@ -184,7 +203,7 @@ export default function AdminPropertiesPage() {
 											onClick={() => deleteProperty(property.id)}
 											className='text-xs font-semibold text-[#a34d4d] hover:underline'
 										>
-											Delete
+											{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : 'Delete'}
 										</button>
 									</td>
 								</tr>

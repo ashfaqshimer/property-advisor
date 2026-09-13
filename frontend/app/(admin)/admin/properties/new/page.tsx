@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { createProperty, uploadPropertyImages } from '@/lib/api';
+import { Spinner } from '@/components/ui/spinner';
 
 type FormValues = {
 	title: string;
@@ -473,7 +474,14 @@ export default function NewPropertyPage() {
 						disabled={saving}
 						className='rounded-lg bg-[#28513f] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1e4031] disabled:cursor-wait disabled:opacity-60'
 					>
-						{saving ? 'Uploading and saving...' : 'Save property'}
+						{saving ? (
+							<>
+								<Spinner className='mr-2 h-4 w-4' />
+								Uploading and saving...
+							</>
+						) : (
+							'Save property'
+						)}
 					</button>
 				</div>
 			</form>

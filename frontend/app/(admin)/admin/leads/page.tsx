@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAdminLeads, type AdminLead } from "@/lib/api";
+import { Spinner } from "@/components/ui/spinner";
 
 const intentStyles = {
   buy: "bg-[#e0f1e7] text-[#28704b]",
@@ -16,11 +17,13 @@ function formatBudget(value: number | null): string {
 export default function AdminLeadsPage() {
   const [leads, setLeads] = useState<AdminLead[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getAdminLeads()
       .then(setLeads)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : "Could not load leads."));
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "Could not load leads."))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -36,7 +39,11 @@ export default function AdminLeadsPage() {
           <p className="text-sm font-semibold">All leads <span className="ml-1 font-normal text-[#8a968f]">({leads.length})</span></p>
           <span className="text-xs text-[#8a968f]">Live data</span>
         </div>
-        {leads.length === 0 && !error ? (
+        {loading ? (
+          <div className="flex min-h-32 items-center justify-center">
+            <Spinner className="h-5 w-5 text-[#28513f]" />
+          </div>
+        ) : leads.length === 0 && !error ? (
           <p className="px-5 py-12 text-center text-sm text-[#75847c]">No leads have been captured yet.</p>
         ) : (
           <div className="overflow-x-auto">
