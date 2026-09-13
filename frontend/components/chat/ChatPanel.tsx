@@ -213,6 +213,7 @@ export default function ChatPanel() {
   };
 
   const canSend = draft.trim().length > 0 && !pending;
+  const hasStartedChat = messages.some((message) => message.role === "user");
   const propertySuggestions = featuredProperties.map(
     (property) => `Tell me more about ${property.title} in ${property.location}`,
   );
@@ -378,21 +379,23 @@ export default function ChatPanel() {
         </div>
       )}
 
-      {/* `items-start` shrink-wraps each pill to its label, as in the mockup;
-          `max-w-full` keeps the longest one inside the panel at 375px. */}
-      <div className="flex shrink-0 flex-col items-start gap-2 px-4 pb-4">
-        {suggestionChips.map((chip) => (
-          <button
-            key={chip}
-            type="button"
-            onClick={() => submit(chip)}
-            disabled={pending}
-            className="max-w-full rounded-full border border-neutral-200 px-3.5 py-2 text-left text-xs text-muted hover:bg-band-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-          >
-            {chip}
-          </button>
-        ))}
-      </div>
+      {!hasStartedChat && (
+        /* `items-start` shrink-wraps each pill to its label, as in the mockup;
+            `max-w-full` keeps the longest one inside the panel at 375px. */
+        <div className="flex shrink-0 flex-col items-start gap-2 px-4 pb-4">
+          {suggestionChips.map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => submit(chip)}
+              disabled={pending}
+              className="max-w-full rounded-full border border-neutral-200 px-3.5 py-2 text-left text-xs text-muted hover:bg-band-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="shrink-0 border-t border-neutral-200 px-4 py-3">
         {/*

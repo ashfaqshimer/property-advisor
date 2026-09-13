@@ -104,7 +104,7 @@ describe("chat panel header", () => {
 
     // Amaya is the advisor; Property Advisor is the brokerage. The header names
     // her, not the brand — the brand belongs to the navbar and footer.
-    expect(screen.getByText("Amaya — AI Advisor")).toBeInTheDocument();
+    expect(screen.getByText("Amaya Perera")).toBeInTheDocument();
     expect(screen.getByText(AGENT_STATUS_LINE)).toBeInTheDocument();
   });
 
@@ -280,10 +280,23 @@ describe("suggestion chips", () => {
     expect(bodyOf(0).message).toBe(SUGGESTION_CHIPS[0]);
     expect(turns()[1]).toHaveTextContent(SUGGESTION_CHIPS[0]);
   });
+
+  it("hides the chips once the first message has been sent", () => {
+    stubBackend();
+    render(<ChatPanel />);
+
+    expect(screen.getByRole("button", { name: SUGGESTION_CHIPS[0] })).toBeInTheDocument();
+
+    sendText("Hello");
+
+    expect(screen.queryByRole("button", { name: SUGGESTION_CHIPS[0] })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: SUGGESTION_CHIPS[1] })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: SUGGESTION_CHIPS[2] })).not.toBeInTheDocument();
+  });
 });
 
 describe("while a request is in flight", () => {
-  it("disables the input, send, and every chip", () => {
+  it("disables the input and send while hiding the chips once chat has started", () => {
     stubBackend(() => deferred().promise);
     render(<ChatPanel />);
 
@@ -292,7 +305,7 @@ describe("while a request is in flight", () => {
     expect(input()).toBeDisabled();
     expect(sendButton()).toBeDisabled();
     for (const chip of SUGGESTION_CHIPS) {
-      expect(screen.getByRole("button", { name: chip })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: chip })).not.toBeInTheDocument();
     }
   });
 
@@ -360,7 +373,7 @@ describe("when a turn fails", () => {
     expect(alert).toHaveTextContent(ERROR_COPY.upstream);
   });
 
-  it("leaves the panel usable", async () => {
+  it("leaves the panel usable without restoring the chips after a failed turn", async () => {
     stubBackend(failWith(502));
     render(<ChatPanel />);
 
@@ -369,7 +382,7 @@ describe("when a turn fails", () => {
 
     expect(input()).toBeEnabled();
     for (const chip of SUGGESTION_CHIPS) {
-      expect(screen.getByRole("button", { name: chip })).toBeEnabled();
+      expect(screen.queryByRole("button", { name: chip })).not.toBeInTheDocument();
     }
   });
 
