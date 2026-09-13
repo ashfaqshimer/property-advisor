@@ -44,6 +44,7 @@ def test_admin_leads_returns_serialized_leads(authenticated_client: TestClient, 
             "budget_max": 50000000.0,
             "intent": "buy",
             "source": None,
+            "edited_by": None,
             "requirements": "Colombo apartment",
             "interest": "apartment_sale",
             "remarks": None,
@@ -105,6 +106,29 @@ def test_manual_lead_creation_is_staff_only(client: TestClient) -> None:
     )
 
     assert response.status_code == 401
+
+
+def test_admin_can_edit_lead_and_records_editor_without_changing_source(
+    authenticated_client: TestClient, seeded: Session
+) -> None:
+    lead = _add_lead(seeded, name="Maya", intent=LeadIntent.BUY)
+    lead.source = LeadSource.AI_AGENT
+    seeded.commit()
+
+    response = authenticated_client.patch(
+        f"/admin/leads/{lead.id}",
+        json={"name": "Maya Perera", "remarks": "Call tomorrow", "source": "manual"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Maya Perera"
+    assert body["remarks"] == "Call tomorrow"
+    assert body["source"] == "ai_agent"
+    assert body["edited_by"]["name"] == "root"
+    seeded.refresh(lead)
+    assert lead.source is LeadSource.AI_AGENT
+    assert lead.edited_by is not None
 
 
 def test_manual_lead_creation_allows_no_conversation(

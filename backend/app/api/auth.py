@@ -83,6 +83,7 @@ def get_staff_users(db: DbSession, _user: RootStaffUser) -> list[StaffUser]:
 @admin_router.post("", response_model=StaffUserRead, status_code=status.HTTP_201_CREATED)
 def create_agent(payload: StaffUserCreate, db: DbSession, _user: RootStaffUser) -> StaffUser:
     agent = StaffUser(
+        name=payload.name,
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
         role=StaffRole.AGENT,

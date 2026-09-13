@@ -78,6 +78,13 @@ class Lead(Base):
         enum_column(LeadSource, "lead_source"), nullable=True, index=True
     )
 
+    edited_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("staff_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Free-form requirements the agent distils from the conversation, not a structured filter.
     requirements: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -115,6 +122,7 @@ class Lead(Base):
     conversation: Mapped["Conversation"] = relationship(  # noqa: F821
         back_populates="lead"
     )
+    edited_by: Mapped["StaffUser | None"] = relationship()  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<Lead {self.name!r} {self.phone!r}>"

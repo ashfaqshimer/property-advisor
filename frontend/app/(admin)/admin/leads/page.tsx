@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { createAdminLead, getAdminLeads, type AdminLead, type LeadInterest } from "@/lib/api";
+import { createAdminLead, getAdminLeads, updateAdminLead, type AdminLead, type LeadInterest } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
 
 const intentStyles = {
@@ -45,6 +45,16 @@ export default function AdminLeadsPage() {
   const [requirements, setRequirements] = useState("");
   const [interest, setInterest] = useState<LeadInterest | "">("");
   const [formError, setFormError] = useState("");
+  const [editingLead, setEditingLead] = useState<AdminLead | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editBudgetMin, setEditBudgetMin] = useState("");
+  const [editBudgetMax, setEditBudgetMax] = useState("");
+  const [editIntent, setEditIntent] = useState<"buy" | "rent" | "sell" | "">("");
+  const [editRemarks, setEditRemarks] = useState("");
+  const [editRequirements, setEditRequirements] = useState("");
+  const [editInterest, setEditInterest] = useState<LeadInterest | "">("");
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     getAdminLeads()
@@ -82,6 +92,44 @@ export default function AdminLeadsPage() {
     }
   }
 
+  function startEditing(lead: AdminLead) {
+    setEditingLead(lead);
+    setEditName(lead.name ?? "");
+    setEditPhone(lead.phone ?? "");
+    setEditBudgetMin(lead.budget_min?.toString() ?? "");
+    setEditBudgetMax(lead.budget_max?.toString() ?? "");
+    setEditIntent(lead.intent ?? "");
+    setEditRemarks(lead.remarks ?? "");
+    setEditRequirements(lead.requirements ?? "");
+    setEditInterest(lead.interest ?? "");
+    setFormError("");
+  }
+
+  async function handleUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingLead) return;
+    setUpdating(true);
+    setFormError("");
+    try {
+      const updated = await updateAdminLead(editingLead.id, {
+        name: editName || null,
+        phone: editPhone || null,
+        budget_min: editBudgetMin ? Number(editBudgetMin) : null,
+        budget_max: editBudgetMax ? Number(editBudgetMax) : null,
+        intent: editIntent || null,
+        requirements: editRequirements || null,
+        interest: editInterest || null,
+        remarks: editRemarks || null,
+      });
+      setLeads((current) => current.map((lead) => lead.id === updated.id ? updated : lead));
+      setEditingLead(null);
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : "Could not update lead.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
   return (
     <section className="mx-auto max-w-[1380px]">
       <div className="mb-8">
@@ -100,6 +148,18 @@ export default function AdminLeadsPage() {
         <button type="submit" disabled={creating} className="rounded-lg bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{creating ? "Adding..." : "Add new lead"}</button>
         {formError && <p className="basis-full text-sm text-[#a34d4d]">{formError}</p>}
       </form>
+      {editingLead && <form onSubmit={handleUpdate} className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-[#cbded2] bg-[#f5faf6] p-5">
+        <div className="basis-full flex items-center justify-between"><p className="text-sm font-semibold text-[#28513f]">Edit lead</p><button type="button" onClick={() => setEditingLead(null)} className="text-sm text-[#65736b] hover:underline">Cancel</button></div>
+        <label className="min-w-48 flex-1 text-sm font-medium text-[#526158]">Name<input value={editName} onChange={(event) => setEditName(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <label className="min-w-48 flex-1 text-sm font-medium text-[#526158]">Phone<input value={editPhone} onChange={(event) => setEditPhone(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <label className="min-w-36 flex-1 text-sm font-medium text-[#526158]">Budget min<input type="number" min="0" value={editBudgetMin} onChange={(event) => setEditBudgetMin(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <label className="min-w-36 flex-1 text-sm font-medium text-[#526158]">Budget max<input type="number" min="0" value={editBudgetMax} onChange={(event) => setEditBudgetMax(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <label className="min-w-32 flex-1 text-sm font-medium text-[#526158]">Intent<select value={editIntent} onChange={(event) => setEditIntent(event.target.value as "buy" | "rent" | "sell" | "")} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]"><option value="">Not specified</option><option value="buy">Buy</option><option value="rent">Rent</option><option value="sell">Sell</option></select></label>
+        <label className="min-w-56 flex-1 text-sm font-medium text-[#526158]">Looking for<select value={editInterest} onChange={(event) => setEditInterest(event.target.value as LeadInterest | "")} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]"><option value="">Not specified</option>{Object.entries(interestLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="min-w-64 flex-[2] text-sm font-medium text-[#526158]">Requirements<input value={editRequirements} onChange={(event) => setEditRequirements(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <label className="min-w-64 flex-[2] text-sm font-medium text-[#526158]">Remarks<input value={editRemarks} onChange={(event) => setEditRemarks(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] bg-white px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
+        <button type="submit" disabled={updating} className="rounded-lg bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{updating ? "Saving..." : "Save changes"}</button>
+      </form>}
       {error && <p className="mb-3 text-right text-sm text-[#a34d4d]">{error}</p>}
       <div className="overflow-hidden rounded-xl border border-[#dce4df] bg-white shadow-[0_8px_24px_rgba(25,53,43,0.04)]">
         <div className="flex items-center justify-between border-b border-[#e6ebe8] px-5 py-4">
@@ -116,7 +176,7 @@ export default function AdminLeadsPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-[#f8faf8] text-xs uppercase tracking-[0.12em] text-[#7a8780]">
-                <tr><th className="px-5 py-4 font-semibold">Contact</th><th className="px-4 py-4 font-semibold">Source</th><th className="px-4 py-4 font-semibold">Looking for</th><th className="px-4 py-4 font-semibold">Intent</th><th className="px-4 py-4 font-semibold">Budget</th><th className="px-4 py-4 font-semibold">Requirements</th><th className="px-4 py-4 font-semibold">Remarks</th><th className="px-5 py-4 text-right font-semibold">Captured</th></tr>
+                <tr><th className="px-5 py-4 font-semibold">Contact</th><th className="px-4 py-4 font-semibold">Source</th><th className="px-4 py-4 font-semibold">Looking for</th><th className="px-4 py-4 font-semibold">Intent</th><th className="px-4 py-4 font-semibold">Budget</th><th className="px-4 py-4 font-semibold">Requirements</th><th className="px-4 py-4 font-semibold">Remarks</th><th className="px-4 py-4 font-semibold">Edited by</th><th className="px-5 py-4 text-right font-semibold">Captured</th><th className="px-5 py-4 text-right font-semibold">Action</th></tr>
               </thead>
               <tbody className="divide-y divide-[#edf0ee]">
                 {leads.map((lead) => <tr key={lead.id} className="transition hover:bg-[#fbfcfb]">
@@ -127,7 +187,9 @@ export default function AdminLeadsPage() {
                   <td className="px-4 py-4 text-[#65736b]">{formatBudget(lead.budget_min, lead.budget_max)}</td>
                   <td className="max-w-sm px-4 py-4 text-[#65736b]">{lead.requirements ?? "No requirements captured"}</td>
                   <td className="max-w-sm px-4 py-4 text-[#65736b]">{lead.remarks ?? "No remarks"}</td>
+                  <td className="px-4 py-4 text-[#65736b]">{lead.edited_by ? lead.edited_by.name : "Not edited"}</td>
                   <td className="px-5 py-4 text-right text-[#65736b]">{new Date(lead.created_at).toLocaleDateString()}</td>
+                  <td className="px-5 py-4 text-right"><button type="button" onClick={() => startEditing(lead)} className="text-xs font-semibold text-[#35664f] hover:underline">Edit</button></td>
                 </tr>)}
               </tbody>
             </table>

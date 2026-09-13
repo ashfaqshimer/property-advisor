@@ -22,6 +22,7 @@ class StaffUserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    name: str
     email: EmailStr
     role: str
     is_active: bool
@@ -31,6 +32,7 @@ class StaffUserRead(BaseModel):
 class StaffUserCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    name: str = Field(min_length=1, max_length=120)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
 

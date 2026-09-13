@@ -173,6 +173,7 @@ export type AdminLead = {
   budget_max: number | null;
   intent: "buy" | "rent" | "sell" | null;
   source: LeadSource | null;
+  edited_by: { id: string; name: string; email: string } | null;
   requirements: string | null;
   interest: LeadInterest | null;
   remarks: string | null;
@@ -183,6 +184,7 @@ export type AdminLead = {
 
 export type AuthUser = {
   id: string;
+  name: string;
   email: string;
   role: "root" | "agent";
   created_at: string;
@@ -246,12 +248,12 @@ export async function getStaffUsers(): Promise<StaffUser[]> {
   return result as StaffUser[];
 }
 
-export async function createAgent(email: string, password: string): Promise<StaffUser> {
+export async function createAgent(name: string, email: string, password: string): Promise<StaffUser> {
   const response = await fetch(`${baseUrl()}/admin/users`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ name, email, password }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Agent creation failed (${response.status}).`, response.status);
@@ -268,6 +270,29 @@ export async function updateAgent(userId: string, payload: { email?: string; pas
   });
   if (!response.ok) throw new ChatError("unexpected", `Agent update failed (${response.status}).`, response.status);
   return (await response.json()) as StaffUser;
+}
+
+export type AdminLeadUpdatePayload = Partial<{
+  name: string | null;
+  phone: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  intent: "buy" | "rent" | "sell" | null;
+  requirements: string | null;
+  interest: LeadInterest | null;
+  remarks: string | null;
+}>;
+
+export async function updateAdminLead(leadId: string, payload: AdminLeadUpdatePayload): Promise<AdminLead> {
+  const response = await fetch(`${baseUrl()}/admin/leads/${leadId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Lead update failed (${response.status}).`, response.status);
+  return (await response.json()) as AdminLead;
 }
 
 export async function logout(): Promise<void> {

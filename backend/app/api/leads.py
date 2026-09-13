@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
@@ -18,6 +19,7 @@ from app.schemas.lead import (
     FallbackLeadResponse,
     LeadRead,
     ManualLeadCreate,
+    LeadUpdate,
 )
 
 router = APIRouter(prefix="/admin/leads", tags=["admin-leads"])
@@ -115,6 +117,22 @@ def create_manual_lead(
         source=LeadSource.MANUAL,
     )
     db.add(lead)
+    db.commit()
+    db.refresh(lead)
+    return lead
+
+
+@router.patch("/{lead_id}", response_model=LeadRead)
+def update_lead(
+    lead_id: UUID, payload: LeadUpdate, db: DbSession, user: CurrentStaffUser
+) -> Lead:
+    lead = db.get(Lead, lead_id)
+    if lead is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found.")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(lead, field, value)
+    lead.edited_by_id = user.id
     db.commit()
     db.refresh(lead)
     return lead

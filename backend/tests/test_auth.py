@@ -21,6 +21,7 @@ def test_login_me_and_logout(client, seeded):
 
     assert login.status_code == 200
     assert login.json()["user"]["email"] == "staff@example.com"
+    assert login.json()["user"]["name"] == "root"
     assert client.get("/auth/me").json()["email"] == "staff@example.com"
 
     assert client.post("/auth/logout").status_code == 204

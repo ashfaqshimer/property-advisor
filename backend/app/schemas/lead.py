@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
 
 from app.models.lead import LeadIntent, LeadInterest, LeadSource
 
@@ -39,6 +39,29 @@ class ManualLeadCreate(BaseModel):
     conversation_id: UUID | None = None
 
 
+class LeadUpdate(BaseModel):
+    """Lead fields staff may correct; provenance fields are intentionally absent."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, min_length=5, max_length=40)
+    budget_min: Decimal | None = Field(default=None, ge=0)
+    budget_max: Decimal | None = Field(default=None, ge=0)
+    intent: LeadIntent | None = None
+    requirements: str | None = Field(default=None, max_length=4000)
+    interest: LeadInterest | None = None
+    remarks: str | None = Field(default=None, max_length=4000)
+
+
+class LeadEditorRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    email: EmailStr
+
+
 class LeadRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,6 +75,7 @@ class LeadRead(BaseModel):
     interest: LeadInterest | None
     remarks: str | None
     source: LeadSource | None
+    edited_by: LeadEditorRead | None
     conversation_id: UUID | None
     created_at: datetime
     updated_at: datetime
