@@ -14,7 +14,15 @@ from sqlalchemy.orm import Session
 
 from app.agent import tools
 from app.agent.tools import ToolArgumentError, ToolContext
-from app.models import Conversation, Lead, LeadIntent, Property, PropertyType, PropertyStatus
+from app.models import (
+    Conversation,
+    Lead,
+    LeadIntent,
+    LeadSource,
+    Property,
+    PropertyType,
+    PropertyStatus,
+)
 
 
 def _context(session: Session, session_id: str = "tool-sess") -> ToolContext:
@@ -265,6 +273,23 @@ class TestCaptureLead:
         lead = db_session.execute(select(Lead)).scalar_one()
         assert lead.name == "Nimal Perera"
         assert lead.intent is LeadIntent.BUY
+        assert lead.source is LeadSource.AI_AGENT
+
+    def test_captures_and_updates_remarks(self, db_session: Session):
+        context = _context(db_session)
+        tools.capture_lead(context, {"phone": "0771234567", "remarks": "Prefers WhatsApp"})
+        tools.capture_lead(context, {"remarks": "Prefers WhatsApp after 6pm"})
+
+        lead = db_session.execute(select(Lead)).scalar_one()
+        assert lead.remarks == "Prefers WhatsApp after 6pm"
+
+    def test_later_capture_preserves_agent_source(self, db_session: Session):
+        context = _context(db_session)
+        tools.capture_lead(context, {"name": "Nimal Perera"})
+        tools.capture_lead(context, {"phone": "0771234567"})
+
+        lead = db_session.execute(select(Lead)).scalar_one()
+        assert lead.source is LeadSource.AI_AGENT
 
     def test_second_call_updates_rather_than_duplicating(self, db_session: Session):
         """`leads.conversation_id` is UNIQUE, so a second insert would raise. The model

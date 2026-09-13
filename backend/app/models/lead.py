@@ -29,6 +29,14 @@ class LeadIntent(str, enum.Enum):
     SELL = "sell"
 
 
+class LeadSource(str, enum.Enum):
+    """How a lead first entered the system."""
+
+    AI_AGENT = "ai_agent"
+    MANUAL = "manual"
+    FALLBACK = "fallback"
+
+
 class Lead(Base):
     __tablename__ = "leads"
 
@@ -54,16 +62,23 @@ class Lead(Base):
         enum_column(LeadIntent, "lead_intent"), nullable=True, index=True
     )
 
+    source: Mapped[LeadSource | None] = mapped_column(
+        enum_column(LeadSource, "lead_source"), nullable=True, index=True
+    )
+
     # Free-form notes the agent distils from the conversation, not a structured filter.
     preferences: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Operational notes for important context that should not be treated as a search filter.
+    remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # UNIQUE: one lead per conversation. This is what makes a second `capture_lead` call an
     # update rather than a duplicate row — enforced here rather than by trusting the model
     # to call the tool exactly once.
-    conversation_id: Mapped[uuid.UUID] = mapped_column(
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("conversations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         unique=True,
     )
 

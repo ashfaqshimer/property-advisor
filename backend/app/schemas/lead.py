@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-from app.models.lead import LeadIntent
+from app.models.lead import LeadIntent, LeadSource
 
 
 class FallbackLeadRequest(BaseModel):
@@ -23,6 +23,21 @@ class FallbackLeadResponse(BaseModel):
     captured: bool = True
 
 
+class ManualLeadCreate(BaseModel):
+    """Fields staff can enter when a lead did not arrive through chat."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, max_length=120)
+    phone: str = Field(min_length=5, max_length=40)
+    budget_min: Decimal | None = Field(default=None, ge=0)
+    budget_max: Decimal | None = Field(default=None, ge=0)
+    intent: LeadIntent | None = None
+    preferences: str | None = Field(default=None, max_length=4000)
+    remarks: str | None = Field(default=None, max_length=4000)
+    conversation_id: UUID | None = None
+
+
 class LeadRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -33,7 +48,9 @@ class LeadRead(BaseModel):
     budget_max: Decimal | None
     intent: LeadIntent | None
     preferences: str | None
-    conversation_id: UUID
+    remarks: str | None
+    source: LeadSource | None
+    conversation_id: UUID | None
     created_at: datetime
     updated_at: datetime
 

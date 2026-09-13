@@ -39,7 +39,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import queries
 from app.geocoding import GeocodingError, GoogleGeocoder
-from app.models.lead import Lead, LeadIntent
+from app.models.lead import Lead, LeadIntent, LeadSource
 from app.models.property import ListingType, Property, PropertyType
 
 SEARCH_PROPERTIES = "search_properties"
@@ -348,6 +348,7 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     name = _clean_text(args.get("name"), 120)
     phone = _clean_text(args.get("phone"), 40)
     preferences = _clean_text(args.get("preferences"), 4000)
+    remarks = _clean_text(args.get("remarks"), 4000)
     intent = _as_intent(args.get("intent"))
     budget_min = _as_decimal(args.get("budget_min"), "budget_min")
     budget_max = _as_decimal(args.get("budget_max"), "budget_max")
@@ -356,10 +357,10 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
 
     # Nothing worth keeping. Writing an all-NULL row would leave a lead nobody can follow
     # up, indistinguishable from a real one that lost its details.
-    if not any([name, phone, preferences, intent, budget_min, budget_max]):
+    if not any([name, phone, preferences, remarks, intent, budget_min, budget_max]):
         return {
             "saved": False,
-            "reason": "Nothing to save yet — no name, phone, preferences, or intent.",
+            "reason": "Nothing to save yet — no name, phone, preferences, remarks, or intent.",
             "guidance": (
                 "Keep helping and ask for a name and phone number once you've given them "
                 "something useful. Don't call this tool again until you have one of them."
@@ -372,7 +373,10 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
 
     created = lead is None
     if lead is None:
-        lead = Lead(conversation_id=context.conversation_id)
+        lead = Lead(
+            conversation_id=context.conversation_id,
+            source=LeadSource.AI_AGENT,
+        )
         context.db.add(lead)
 
     if name:
@@ -381,6 +385,8 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         lead.phone = phone
     if preferences:
         lead.preferences = preferences
+    if remarks:
+        lead.remarks = remarks
     if intent is not None:
         lead.intent = intent
     if budget_min is not None:
@@ -404,6 +410,7 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
             "intent": lead.intent.value if lead.intent else None,
             "budget_min": int(lead.budget_min) if lead.budget_min else None,
             "budget_max": int(lead.budget_max) if lead.budget_max else None,
+            "remarks": lead.remarks,
         },
         "still_missing": still_missing,
     }
@@ -501,8 +508,10 @@ _CAPTURE_DECLARATION = types.FunctionDeclaration(
         "Save this person's contact details and what they're looking for, so an agent can "
         "follow up. Call it as soon as you have a name or a phone number — a partial "
         "record is useful and you can call again to add more; later calls update the same "
-        "record instead of creating a second one. Never invent a detail to fill a field: "
-        "omit what you weren't told."
+        "record instead of creating a second one. Add a concise remarks note when the "
+        "conversation contains useful follow-up context, such as urgency, contact timing, "
+        "a concern, or a promised action. Never invent a detail to fill a field: omit "
+        "what you weren't told."
     ),
     parameters=types.Schema(
         type=types.Type.OBJECT,
@@ -534,6 +543,14 @@ _CAPTURE_DECLARATION = types.FunctionDeclaration(
                     "Short free-text summary an agent can act on: areas, property type, "
                     "timing, and — for a seller — the property's location, type, and "
                     "rough size."
+                ),
+            ),
+            "remarks": types.Schema(
+                type=types.Type.STRING,
+                description=(
+                    "Important operational note for the follow-up agent, such as a "
+                    "specific concern, urgency, or promised action. Only include facts "
+                    "the person stated or that are clear from the conversation."
                 ),
             ),
         },

@@ -143,6 +143,19 @@ export type AdminPropertyUpdatePayload = Partial<CreatePropertyPayload> & {
   amenities?: Record<string, boolean> | null;
 };
 
+export type LeadSource = "ai_agent" | "manual" | "fallback";
+
+export type ManualLeadPayload = {
+  name?: string;
+  phone: string;
+  budget_min?: number;
+  budget_max?: number;
+  intent?: "buy" | "rent" | "sell";
+  preferences?: string;
+  remarks?: string;
+  conversation_id?: string;
+};
+
 export type AdminLead = {
   id: string;
   name: string | null;
@@ -150,8 +163,10 @@ export type AdminLead = {
   budget_min: number | null;
   budget_max: number | null;
   intent: "buy" | "rent" | "sell" | null;
+  source: LeadSource | null;
   preferences: string | null;
-  conversation_id: string;
+  remarks: string | null;
+  conversation_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -547,8 +562,10 @@ function isAdminLead(value: unknown): value is AdminLead {
     (typeof candidate.budget_min === "number" || candidate.budget_min === null) &&
     (typeof candidate.budget_max === "number" || candidate.budget_max === null) &&
     (candidate.intent === "buy" || candidate.intent === "rent" || candidate.intent === "sell" || candidate.intent === null) &&
+    (candidate.source === "ai_agent" || candidate.source === "manual" || candidate.source === "fallback" || candidate.source === null) &&
     (typeof candidate.preferences === "string" || candidate.preferences === null) &&
-    typeof candidate.conversation_id === "string" &&
+    (typeof candidate.remarks === "string" || candidate.remarks === null) &&
+    (typeof candidate.conversation_id === "string" || candidate.conversation_id === null) &&
     typeof candidate.created_at === "string" &&
     typeof candidate.updated_at === "string"
   );
@@ -564,6 +581,22 @@ export async function getAdminLeads(): Promise<AdminLead[]> {
   const result: unknown = await response.json();
   if (!Array.isArray(result) || !result.every(isAdminLead)) {
     throw new ChatError("unexpected", "The backend returned an unrecognised lead list.");
+  }
+  return result;
+}
+
+export async function createAdminLead(payload: ManualLeadPayload): Promise<AdminLead> {
+  const response = await fetch(`${baseUrl()}/admin/leads`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Lead creation failed (${response.status}).`, response.status);
+  const result: unknown = await response.json();
+  if (!isAdminLead(result)) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised lead.");
   }
   return result;
 }

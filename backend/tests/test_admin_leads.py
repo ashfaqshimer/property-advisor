@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Conversation, Lead, LeadIntent
+from app.models import Conversation, Lead, LeadIntent, LeadSource
 
 
 def test_admin_leads_requires_authentication(client: TestClient) -> None:
@@ -42,7 +42,9 @@ def test_admin_leads_returns_serialized_leads(authenticated_client: TestClient, 
             "budget_min": 10000000.0,
             "budget_max": 50000000.0,
             "intent": "buy",
+            "source": None,
             "preferences": "Colombo apartment",
+            "remarks": None,
             "conversation_id": str(lead.conversation_id),
             "created_at": lead.created_at.isoformat().replace("+00:00", "Z"),
             "updated_at": lead.updated_at.isoformat().replace("+00:00", "Z"),
@@ -83,6 +85,8 @@ def test_fallback_lead_capture_is_public_and_idempotent(
     assert leads[0].name == "Nimali Perera"
     assert leads[0].phone == "0712345678"
     assert leads[0].preferences == "Requested a call because chat was unavailable."
+    assert leads[0].source is LeadSource.FALLBACK
+    assert leads[0].remarks == "Chat was unavailable when this callback request was submitted."
 
 
 def test_fallback_lead_capture_requires_a_phone(client: TestClient) -> None:
@@ -91,3 +95,49 @@ def test_fallback_lead_capture_requires_a_phone(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_manual_lead_creation_is_staff_only(client: TestClient) -> None:
+    response = client.post(
+        "/admin/leads", json={"phone": "0712345678", "name": "Maya"}
+    )
+
+    assert response.status_code == 401
+
+
+def test_manual_lead_creation_allows_no_conversation(
+    authenticated_client: TestClient, seeded: Session
+) -> None:
+    response = authenticated_client.post(
+        "/admin/leads",
+        json={
+            "phone": "0712345678",
+            "name": "Maya",
+            "intent": "buy",
+            "budget_max": "50000000",
+            "preferences": "Colombo apartment",
+            "remarks": "Call after 6pm",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source"] == "manual"
+    assert body["conversation_id"] is None
+    assert body["remarks"] == "Call after 6pm"
+    lead = seeded.scalar(select(Lead))
+    assert lead is not None
+    assert lead.source is LeadSource.MANUAL
+
+
+def test_admin_leads_can_filter_by_source(
+    authenticated_client: TestClient, seeded: Session
+) -> None:
+    _add_lead(seeded, name="Maya", intent=LeadIntent.BUY)
+    seeded.add(Lead(name="Ravi", phone="0712345678", source=LeadSource.MANUAL))
+    seeded.commit()
+
+    response = authenticated_client.get("/admin/leads", params={"source": "manual"})
+
+    assert response.status_code == 200
+    assert [item["name"] for item in response.json()] == ["Ravi"]

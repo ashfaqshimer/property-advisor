@@ -56,6 +56,10 @@ class TestPersona:
     def test_settled_rule_is_still_present(self, rule: str):
         assert rule in SYSTEM_PROMPT
 
+    def test_lead_notes_are_recorded_when_useful(self):
+        assert "add a brief `remarks` note" in SYSTEM_PROMPT
+        assert "Do not invent, infer" in SYSTEM_PROMPT
+
     def test_fallback_obeys_the_same_rules_as_the_prompt(self):
         lowered = FALLBACK_REPLY.lower()
         assert "agent" in lowered

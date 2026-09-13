@@ -75,7 +75,9 @@ describe("admin lead API", () => {
       budget_min: 10000000,
       budget_max: 50000000,
       intent: "buy",
+      source: "ai_agent",
       preferences: "Colombo apartment",
+      remarks: "Prefers WhatsApp",
       conversation_id: "conversation-1",
       created_at: "2026-09-12T00:00:00Z",
       updated_at: "2026-09-12T00:00:00Z",
@@ -88,6 +90,30 @@ describe("admin lead API", () => {
       "http://127.0.0.1:8000/admin/leads",
       expect.objectContaining({ method: "GET" }),
     );
+  });
+
+  it("rejects an unknown lead source", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse(200, [{
+          id: "lead-1",
+          name: null,
+          phone: "0712345678",
+          budget_min: null,
+          budget_max: null,
+          intent: null,
+          source: "imported",
+          preferences: null,
+          conversation_id: null,
+          created_at: "2026-09-12T00:00:00Z",
+          updated_at: "2026-09-12T00:00:00Z",
+        }]),
+      ),
+    );
+
+    await expect(getAdminLeads()).rejects.toThrow("unrecognised lead list");
   });
 });
 
