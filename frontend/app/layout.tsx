@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Property Advisor — Property in Colombo and across Sri Lanka",
   description:
-    "AI-guided property search across Sri Lanka's top locations. Tell us what you're looking for and we'll find the right address.",
+    "Your expert real estate partner in Sri Lanka. Buy, sell, rent, or get professional property advice — we are here to help.",
 };
 
 export default function RootLayout({

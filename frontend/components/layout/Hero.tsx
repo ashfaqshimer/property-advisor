@@ -27,9 +27,8 @@ export default function Hero() {
           </h1>
 
           <p className="mt-6 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
-            AI-guided property search across Sri Lanka&apos;s top locations.
-            Tell us what you&apos;re looking for, and we&apos;ll find the right
-            address.
+            Your expert real estate partner across Sri Lanka. Whether you want to 
+            buy, sell, rent, or just need advice, we are here to help.
           </p>
 
           <ChatCta className="mt-9" />
