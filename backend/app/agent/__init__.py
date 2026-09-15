@@ -9,6 +9,6 @@ module scope (unlike `app.db.session`'s engine, which cannot connect by accident
 """
 
 from app.agent.loop import MAX_TOOL_ITERATIONS, run_turn
-from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.prompt_builder import build_system_prompt
 
-__all__ = ["MAX_TOOL_ITERATIONS", "SYSTEM_PROMPT", "run_turn"]
+__all__ = ["MAX_TOOL_ITERATIONS", "build_system_prompt", "run_turn"]

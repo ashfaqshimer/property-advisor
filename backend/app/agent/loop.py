@@ -49,7 +49,8 @@ from sqlalchemy.orm import Session
 
 from app.agent import tools
 from app.agent.client import SupportsGenerate, get_gemini_client
-from app.agent.prompts import FALLBACK_REPLY, GREETING, SYSTEM_PROMPT
+from app.agent.persona import FALLBACK_REPLY, GREETING
+from app.agent.prompt_builder import build_system_prompt
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
 
@@ -207,7 +208,7 @@ def run_turn(
         response = gemini.generate(
             contents=contents,
             tools=tools.TOOL_DECLARATIONS,
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=build_system_prompt(),
         )
         parts = _parts_of(response)
         calls = [part.function_call for part in parts if part.function_call]

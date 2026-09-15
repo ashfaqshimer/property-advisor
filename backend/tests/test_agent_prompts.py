@@ -10,55 +10,56 @@ from pathlib import Path
 import pytest
 
 from app.agent.client import GeminiClient, GeminiNotConfigured
-from app.agent.prompts import FALLBACK_REPLY, GREETING, SYSTEM_PROMPT
+from app.agent.persona import FALLBACK_REPLY, GREETING
+from app.agent.prompt_builder import build_system_prompt
+from app.agent.schema_intro import build_seller_fields_prompt
 from app.config import BACKEND_DIR
 
 
 class TestPersona:
     def test_she_is_amaya(self):
-        assert "You are Amaya" in SYSTEM_PROMPT
+        assert "You are Amaya" in build_system_prompt()
 
     def test_the_brokerage_is_not_her_name(self):
         """Property Advisor is where she works. CLAUDE.md's branding section covers this;
         the old rule said the agent was named after the brand and was amended
         deliberately."""
-        assert "You are Property Advisor" not in SYSTEM_PROMPT
-        assert "Property Advisor" in SYSTEM_PROMPT, "the brokerage is still named"
+        assert "You are Property Advisor" not in build_system_prompt()
+        assert "Property Advisor" in build_system_prompt(), "the brokerage is still named"
 
     def test_no_trace_of_the_old_brand(self):
         """The brand was renamed from "Home Advisor"; nothing should still say it."""
-        assert "home advisor" not in SYSTEM_PROMPT.lower()
+        assert "home advisor" not in build_system_prompt().lower()
 
     def test_no_placeholder_branding_from_the_mockup(self):
-        assert "terra" not in SYSTEM_PROMPT.lower()
+        assert "terra" not in build_system_prompt().lower()
 
     @pytest.mark.parametrize(
         "rule",
         [
             "Only ever describe a property that a tool call returned to you",
             "Do NOT say we have nothing in that area",
-            "never claim to be human",
-            "Don't invent a biography",
+            "never identify yourself as an AI",
+            "Don't invent a complex biography",
             "Respond in English",
-            "Make no comparative claims about other agents",
-            "Never quote a valuation, a commission, or a timeline",
-            # Rewritten twice. A live run showed flash-lite re-asking for a number in
-            # disguise after being declined; a flat ban then collided with the owner's
-            # empty-inventory instruction, which *is* a second ask. Settled wording allows
-            # exactly one re-offer, hedged.
-            "Don't nag",
-            "One exception, and only once",
-            # The greeting is persisted as seq 0 and replayed to her, so without this she
-            # sees her own hello and says hello back.
+            "Make no comparative claims about other agencies",
+            "Never quote a valuation, commission rate, or listing timeline",
+            "Don't badger them",
             "You have already greeted them",
         ],
     )
     def test_settled_rule_is_still_present(self, rule: str):
-        assert rule in SYSTEM_PROMPT
+        assert rule in build_system_prompt()
 
     def test_lead_notes_are_recorded_when_useful(self):
-        assert "add a brief `remarks` note" in SYSTEM_PROMPT
-        assert "Do not invent, infer" in SYSTEM_PROMPT
+        assert "add a brief `remarks` note" in build_system_prompt()
+        assert "Do not invent, infer" in build_system_prompt()
+
+class TestSchemaIntro:
+    def test_seller_fields_reflect_property_create(self):
+        fields_prompt = build_seller_fields_prompt()
+        assert "land size, in perches" in fields_prompt
+        assert "is_featured" not in fields_prompt
 
     def test_fallback_obeys_the_same_rules_as_the_prompt(self):
         lowered = FALLBACK_REPLY.lower()

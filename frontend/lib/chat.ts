@@ -17,7 +17,7 @@ export type ChatMessage = {
  * verbatim and reads *this* file to do it — change both, or that test fails.
  */
 export const GREETING =
-  "Hi, I'm Amaya with Property Advisor. Just let me know what kind of place you're looking to buy, rent, or sell, and we can go from there.";
+  "Hi, I'm Amaya with Property Advisor. Whether you're after land, a house, or an apartment, tell me what you have in mind and I'll take it from there.";
 
 /** The first chip is always available, even while featured listings are loading. */
 export const SELLING_SUGGESTION = "I want to sell my apartment";
