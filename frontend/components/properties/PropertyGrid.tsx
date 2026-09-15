@@ -106,7 +106,7 @@ export default function PropertyGrid() {
 
   useEffect(() => {
     getFeaturedProperties()
-      .then((records) => setProperties(records.map(mapProperty)))
+      .then((records) => setProperties(records.map(mapProperty).slice(0, 6)))
       .catch(() => setHasError(true));
   }, []);
 

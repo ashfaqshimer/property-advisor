@@ -7,11 +7,11 @@ from app.db.seed_data import SEED_PROPERTIES, seed_id
 from app.models.property import Property, PropertyStatus
 
 
-def test_returns_all_eight_by_default(client: TestClient) -> None:
+def test_returns_up_to_six_by_default(client: TestClient) -> None:
     response = client.get("/properties/featured")
 
     assert response.status_code == 200
-    assert len(response.json()) == 8
+    assert len(response.json()) == 6
 
 
 def test_limit_narrows_the_result(client: TestClient) -> None:
@@ -26,11 +26,7 @@ def test_limit_out_of_bounds_is_rejected(client: TestClient) -> None:
     assert client.get("/properties/featured", params={"limit": 99}).status_code == 422
 
 
-def test_limit_beyond_the_row_count_returns_what_exists(client: TestClient) -> None:
-    response = client.get("/properties/featured", params={"limit": 24})
 
-    assert response.status_code == 200
-    assert len(response.json()) == 8
 
 
 def test_empty_table_returns_an_empty_list_not_a_404(empty_client: TestClient) -> None:
@@ -43,7 +39,7 @@ def test_empty_table_returns_an_empty_list_not_a_404(empty_client: TestClient) -
 def test_order_matches_the_homepage_grid(client: TestClient) -> None:
     titles = [item["title"] for item in client.get("/properties/featured").json()]
 
-    assert titles == [row["title"] for row in SEED_PROPERTIES]
+    assert titles == [row["title"] for row in SEED_PROPERTIES][:6]
 
 
 def test_sold_and_under_offer_listings_are_excluded(

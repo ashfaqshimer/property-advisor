@@ -50,13 +50,12 @@ describe("PropertyGrid", () => {
 });
 
 describe("PropertyCard", () => {
-  it("renders the title, price, and description from its property", () => {
+  it("renders the title and description from its property", () => {
     render(<PropertyCard property={sample} />);
 
     expect(
       screen.getByRole("heading", { level: 3, name: sample.title }),
     ).toBeInTheDocument();
-    expect(screen.getByText(sample.priceLkr)).toBeInTheDocument();
     expect(screen.getByText(sample.description)).toBeInTheDocument();
     expect(screen.getByText(sample.location)).toBeInTheDocument();
   });

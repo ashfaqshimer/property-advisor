@@ -105,9 +105,6 @@ export default function PropertyCard({ property }: { property: Property }) {
           <h3 className="font-display text-base leading-snug text-ink">
             {property.title}
           </h3>
-          <p className="shrink-0 text-sm font-semibold whitespace-nowrap text-brand">
-            {property.priceLkr}
-          </p>
         </div>
 
         {/* `mb-4` rather than a margin on the divider: `mt-auto` below collapses

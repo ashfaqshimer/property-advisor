@@ -18,8 +18,8 @@ from sqlalchemy.orm import Session
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
 
 # The homepage grid renders eight cards.
-DEFAULT_FEATURED_LIMIT = 8
-MAX_FEATURED_LIMIT = 24
+DEFAULT_FEATURED_LIMIT = 6
+MAX_FEATURED_LIMIT = 6
 
 # What one tool response shows the model, per PROJECT_OVERVIEW §5. Small on purpose: every
 # row goes back into the prompt as tokens, and a model handed twenty listings summarises
