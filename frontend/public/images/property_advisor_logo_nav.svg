@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="210 130 780 835">
+<g id="logo" stroke-linecap="round" stroke-linejoin="round">
+  <!-- House outline -->
+  <path d="M350 500 L350 330 L600 150 L850 330 L850 380"
+        fill="none" stroke="#789866" stroke-width="28"/>
+  <!-- Advisor silhouette -->
+  <path d="M425 570 C425 480 470 425 530 410
+           C565 402 610 420 635 455
+           C650 475 655 505 650 535
+           L690 575 L690 635 L425 635 Z"
+        fill="#164f3b"/>
+  <path d="M525 330 C575 300 635 315 655 350
+           C668 374 655 407 625 425
+           L575 430 L550 405 L520 385 Z"
+        fill="#164f3b"/>
+  <!-- Face cutout -->
+  <path d="M615 350 L635 365 L632 405 L620 430 L590 438 L590 400 L605 388 Z"
+        fill="#ffffff"/>
+  <!-- Tie -->
+  <path d="M565 465 L585 490 L605 465 L595 555 L575 555 Z" fill="#ffffff"/>
+  <!-- Magnifying glass -->
+  <circle cx="810" cy="430" r="90" fill="#ffffff" stroke="#164f3b" stroke-width="22"/>
+  <path d="M875 495 L925 545" fill="none" stroke="#164f3b" stroke-width="24"/>
+  <!-- Minimal building inside magnifier -->
+  <path d="M770 485 L770 425 L790 425 L790 390 L815 390 L815 485"
+        fill="#789866"/>
+  <path d="M820 485 L820 410 L845 410 L845 485" fill="#789866"/>
+  <path d="M778 445 L785 445 M778 465 L785 465 M825 430 L832 430 M825 450 L832 450"
+        stroke="#ffffff" stroke-width="6"/>
+  <!-- Straight outlined key -->
+  <circle cx="410" cy="665" r="72" fill="none" stroke="#789866" stroke-width="18"/>
+  <circle cx="410" cy="665" r="22" fill="none" stroke="#789866" stroke-width="14"/>
+  <path d="M482 665 H875 L845 695 H805 V720 H775 V695 H735 V720 H705 V695 H482"
+        fill="none" stroke="#789866" stroke-width="18"/>
+</g>
+
+<!-- Wordmark (no tagline) -->
+<g text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+  <text x="600" y="850" font-size="125" font-weight="700" fill="#164f3b">Property</text>
+  <line x1="225" y1="915" x2="355" y2="915" stroke="#789866" stroke-width="6"/>
+  <text x="600" y="940" font-size="78" letter-spacing="7" fill="#789866">Advisor</text>
+  <line x1="845" y1="915" x2="975" y2="915" stroke="#789866" stroke-width="6"/>
+</g>
+</svg>

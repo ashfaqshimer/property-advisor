@@ -9,8 +9,17 @@ export default function Hero() {
     >
       <Container className="py-16 sm:py-24">
         <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+          {/* Full brand lockup — prominent at the top of the hero */}
+          <img
+            src="/images/property_advisor_logo.svg"
+            alt="Property Advisor"
+            width={280}
+            height={280}
+            className="mb-4 sm:w-[340px]"
+          />
+
           <p className="rounded-full bg-band-strong px-3.5 py-1.5 text-xs text-muted">
-            Colombo-based · island-wide reach
+            Colombo-based 🌴 island-wide reach
           </p>
 
           {/*

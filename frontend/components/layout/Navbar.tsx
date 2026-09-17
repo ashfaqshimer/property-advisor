@@ -18,7 +18,7 @@ export default function Navbar() {
   return (
     <header className="relative border-b border-neutral-200 bg-neutral-100/50">
       <Container>
-        <nav aria-label="Main" className="flex h-16 items-center gap-4">
+        <nav aria-label="Main" className="flex h-24 items-center gap-4">
           {/* Shared with the footer — Logo owns the mark, wordmark, and their
               accessible naming; the header only makes it a link. */}
           <Link
