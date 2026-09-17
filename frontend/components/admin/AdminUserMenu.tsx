@@ -63,7 +63,7 @@ export default function AdminUserMenu({
         >
           {initial}
         </div>
-        <div className="flex flex-col text-left">
+        <div className="hidden flex-col text-left sm:flex">
           <span className="text-xs text-[#718078]">
             Welcome, <strong className="font-semibold text-[#1a2923]">{displayName}</strong>
           </span>
