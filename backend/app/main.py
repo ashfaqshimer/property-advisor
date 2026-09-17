@@ -1,3 +1,5 @@
+import time
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -6,9 +8,34 @@ from app.agent.client import GeminiNotConfigured
 from app.api import auth, chat, leads, properties
 from app.config import get_settings
 
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.dict_tracebacks,
+        structlog.processors.JSONRenderer(),
+    ],
+)
+logger = structlog.get_logger()
+
 settings = get_settings()
 
 app = FastAPI(title="Property Advisor API")
+
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    duration_ms = (time.time() - start_time) * 1000
+    
+    logger.info(
+        "http_request",
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+        duration_ms=round(duration_ms, 2),
+    )
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,

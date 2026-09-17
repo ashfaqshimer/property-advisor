@@ -40,7 +40,7 @@ hide exactly the flakiness worth measuring first.
 from __future__ import annotations
 
 import uuid
-import logging
+import structlog
 from typing import Any
 
 from google.genai import types
@@ -57,7 +57,7 @@ from app.models.message import Message, MessageRole
 # Five model calls per user turn. PROJECT_OVERVIEW §5 suggests ~5; the real constraint is
 # that this number bounds the cost of one misbehaving conversation.
 MAX_TOOL_ITERATIONS = 5
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 def get_or_create_conversation(db: Session, session_id: str) -> Conversation:
@@ -204,11 +204,20 @@ def run_turn(
         db.commit()
         return reply
 
-    for _ in range(MAX_TOOL_ITERATIONS):
+    for i in range(MAX_TOOL_ITERATIONS):
         response = gemini.generate(
             contents=contents,
             tools=tools.TOOL_DECLARATIONS,
             system_instruction=build_system_prompt(),
+        )
+        usage = response.usage_metadata
+        logger.info(
+            "gemini_generate",
+            session_id=session_id,
+            iteration=i,
+            prompt_tokens=usage.prompt_token_count if usage else None,
+            candidates_tokens=usage.candidates_token_count if usage else None,
+            total_tokens=usage.total_token_count if usage else None,
         )
         parts = _parts_of(response)
         calls = [part.function_call for part in parts if part.function_call]
@@ -245,6 +254,7 @@ def run_turn(
         for call in calls:
             name = call.name or ""
             args = dict(call.args or {})
+            logger.info("tool_execution", tool=name, session_id=session_id)
             result = tools.execute_tool(name, args, context)
             record(
                 MessageRole.TOOL,
