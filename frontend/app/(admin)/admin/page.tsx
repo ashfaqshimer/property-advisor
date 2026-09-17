@@ -136,7 +136,7 @@ export default function AdminPropertiesPage() {
 					</p>
 					<span className='text-xs text-[#8a968f]'>Live data</span>
 				</div>
-				<div className='overflow-x-auto'>
+				<div className='hidden sm:block overflow-x-auto'>
 					<table className='w-full min-w-[900px] text-left text-sm'>
 						<thead className='bg-[#f8faf8] text-xs uppercase tracking-[0.12em] text-[#7a8780]'>
 							<tr>
@@ -213,6 +213,60 @@ export default function AdminPropertiesPage() {
 							))}
 						</tbody>
 					</table>
+				</div>
+				<div className='flex flex-col divide-y divide-[#edf0ee] sm:hidden'>
+					{loading ? (
+						<div className='flex justify-center py-12'>
+							<Spinner className='h-5 w-5 text-[#28513f]' />
+						</div>
+					) : properties.map((property) => (
+						<div key={property.id} className='flex flex-col gap-3 p-5'>
+							<div className='flex items-start justify-between gap-4'>
+								<span className='font-semibold text-[#253a30] leading-tight'>
+									{property.title}
+								</span>
+								<span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wide font-semibold ${statusStyles[property.status]}`}>
+									{property.status.replace('_', ' ')}
+								</span>
+							</div>
+							<div className='flex items-center justify-between text-sm text-[#65736b]'>
+								<span>{property.type}</span>
+								<span className='font-semibold text-[#344b3f]'>{property.price}</span>
+							</div>
+							<div className='text-sm text-[#65736b]'>
+								📍 {property.location}
+							</div>
+							<div className='mt-2 flex items-center justify-between border-t border-[#edf0ee] pt-4'>
+								<button
+									type='button'
+									disabled={busyProperty === property.id}
+									onClick={() => toggleFeatured(property.id, property.featured)}
+									className={`text-2xl leading-none transition ${property.featured ? 'text-[#d99b2b]' : 'text-[#c8d0ca] hover:text-[#d99b2b]'}`}
+								>
+									{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
+								</button>
+								<div className='flex gap-5'>
+									{canDelete && (
+										<button
+											type='button'
+											disabled={busyProperty === property.id}
+											onClick={() => console.log('Edit property', property)}
+											className='text-xs font-semibold text-[#35664f] hover:underline'
+										>
+											Edit
+										</button>
+									)}
+									<button
+										type='button'
+										onClick={() => deleteProperty(property.id)}
+										className='text-xs font-semibold text-[#a34d4d] hover:underline'
+									>
+										{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : 'Delete'}
+									</button>
+								</div>
+							</div>
+						</div>
+					))}
 				</div>
 			</div>
 		</section>
