@@ -16,6 +16,7 @@
 
 ## Frontend (Next.js 16 + Tailwind v4)
 
+* **Mobile-First Design:** This is a mobile-first application. When developing UI, the primary focus must be the mobile view. Ensure everything is presented properly on mobile before scaling up to larger screens.
 * **Stack:** Next.js 16.2.12 (App Router), React 19.2.4, Tailwind v4, TypeScript, `pnpm` (run commands from `frontend/`).
 * **Next.js 16:** Respect breaking changes in Next 16 App Router. Do not use Next 14/15 patterns from memory if they have been deprecated.
 * **Tailwind v4:** Configured exclusively through `@theme` in `frontend/app/globals.css`. **Do not create or look for a `tailwind.config.ts`.**

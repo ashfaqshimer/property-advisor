@@ -7,6 +7,7 @@ A real estate brokerage website centered on an AI agent that chats with prospect
 **Primary goals:**
 - A real, usable tool for early-stage brokerage work (lead capture + property matching)
 - Demonstrates strong agentic AI engineering: a manually built tool-calling loop (no LangChain/LangGraph in v1), clean separation of concerns, and a real database-backed agent rather than a scripted demo
+- Mobile-first approach: The application must be a mobile-first application. When developing UI, the primary focus should be the mobile view, ensuring everything is presented properly before scaling up to larger screens.
 
 ---
 
