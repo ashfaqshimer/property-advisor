@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.agent import loop
 from app.agent.loop import MAX_TOOL_ITERATIONS, run_turn
-from app.agent.prompts import GREETING
+from app.agent.persona import GREETING
 from app.models import Conversation, Lead, Message, MessageRole
 from tests.agent_fakes import (
     ScriptedGemini,

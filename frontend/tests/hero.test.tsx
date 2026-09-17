@@ -27,7 +27,7 @@ describe("hero content", () => {
 
     expect(
       screen.getByText(
-        "AI-guided property search across Sri Lanka's top locations. Tell us what you're looking for, and we'll find the right address.",
+        "Your expert real estate partner across Sri Lanka. Whether you want to buy, sell, rent, or just need advice, we are here to help.",
       ),
     ).toBeInTheDocument();
   });

@@ -18,7 +18,7 @@ from google.genai import errors as genai_errors
 import app.api.chat as chat_module
 from app.agent.client import GeminiNotConfigured
 from app.agent.loop import run_turn
-from app.agent.prompts import FALLBACK_REPLY
+from app.agent.persona import FALLBACK_REPLY
 from app.api.chat import get_agent_client
 from app.main import app as fastapi_app
 from app.models import Conversation, Message, MessageRole
