@@ -30,34 +30,47 @@ A real estate brokerage website centered on an AI agent that chats with prospect
 ## 3. Repository Structure
 
 ```
-real-estate-agent/
+property-advisor/
 ├── frontend/                 # Next.js app
 │   ├── app/
 │   │   ├── page.tsx           # Homepage (hero, featured properties, chat panel)
 │   │   ├── layout.tsx
-│   │   └── api/               # Next.js route handlers (thin proxy to FastAPI, if needed)
+│   │   ├── login/             # /login page (session-based staff auth)
+│   │   └── (admin)/admin/     # Admin dashboard (route group, auth-guarded)
+│   │       ├── layout.tsx     # Shared sidebar + header, getCurrentUser guard
+│   │       ├── page.tsx       # Properties table
+│   │       ├── leads/         # Leads table
+│   │       ├── properties/    # Property detail/edit
+│   │       └── users/         # User management (root role only)
 │   ├── components/
+│   │   ├── admin/             # AdminUserMenu, data table layouts
 │   │   ├── chat/              # ChatPanel, MessageBubble, PromptChips, ChatInput
 │   │   ├── properties/        # PropertyCard, PropertyGrid
-│   │   └── layout/            # Navbar, Footer, Hero
-│   ├── lib/                    # API client, types
-│   └── ...
+│   │   ├── layout/            # Navbar, Footer, Hero
+│   │   └── ui/                # Shared primitives (Spinner, ChatCta, …)
+│   └── lib/                   # API client (api.ts), types, chat.ts, properties.ts
 ├── backend/                   # FastAPI app
 │   ├── app/
-│   │   ├── main.py             # FastAPI entrypoint
+│   │   ├── main.py            # FastAPI entrypoint, structlog middleware, CORS
 │   │   ├── api/
-│   │   │   ├── chat.py         # POST /chat endpoint
-│   │   │   └── properties.py   # GET /properties (for the featured grid, optional)
+│   │   │   ├── auth.py        # POST /auth/login, POST /auth/logout, GET /auth/me
+│   │   │   ├── chat.py        # POST /chat endpoint
+│   │   │   ├── leads.py       # GET /leads (public + auth-protected admin)
+│   │   │   └── properties.py  # GET /properties/featured + admin CRUD
 │   │   ├── agent/
-│   │   │   ├── loop.py         # Manual tool-calling loop
-│   │   │   ├── tools.py        # Tool definitions + implementations
-│   │   │   ├── prompts.py      # System prompt(s)
-│   │   │   └── client.py       # Gemini API wrapper
-│   │   ├── models/             # SQLAlchemy models
-│   │   ├── db/                 # Session, engine, Alembic config
-│   │   └── schemas/            # Pydantic request/response models
+│   │   │   ├── loop.py        # Manual tool-calling loop (run_turn)
+│   │   │   ├── tools.py       # Tool definitions + implementations
+│   │   │   ├── persona.py     # Amaya's voice, objectives, seller/buyer lanes
+│   │   │   ├── guardrails.py  # Inventory rules, never-do list
+│   │   │   ├── schema_intro.py # Runtime seller fields from PropertyCreate schema
+│   │   │   ├── prompt_builder.py # Assembles system prompt from the three modules
+│   │   │   ├── prompts.py     # Legacy shim — do not add new prompt logic here
+│   │   │   └── client.py      # Gemini API wrapper
+│   │   ├── models/            # SQLAlchemy models (property, conversation, message, lead, auth)
+│   │   ├── db/                # Session, engine, Alembic config, queries, seed
+│   │   └── schemas/           # Pydantic request/response models
 │   ├── alembic/
-│   └── requirements.txt
+│   └── pyproject.toml         # uv-managed; no requirements.txt
 └── README.md
 ```
 
@@ -69,15 +82,26 @@ real-estate-agent/
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| title | string | |
+| title | string(200) | |
 | description | text | |
-| price | numeric | LKR |
-| location | string | e.g. "Colombo 5", "Galle" |
+| listing_type | enum | sale, rent |
+| price | numeric(14,2) | LKR |
+| is_price_per_perch | bool | For land listings priced per perch |
+| is_featured | bool | Replaces the "newest-available" heuristic; indexed |
+| location | string(120) | e.g. "Colombo 5", "Galle" |
+| latitude / longitude | float | nullable; geolocation for future map features |
 | property_type | enum | house, apartment, land, commercial |
 | bedrooms | int | nullable |
 | bathrooms | int | nullable |
-| sqft | int | nullable |
-| image_urls | array[string] | |
+| land_size_perches | numeric(8,2) | nullable |
+| floor_area_sqft | int | nullable |
+| parking_spaces | int | nullable |
+| build_year | int | nullable |
+| road_access_ft | int | nullable |
+| furnishing_status | enum | unfurnished, semi_furnished, fully_furnished; nullable |
+| amenities | JSON | nullable; free-form extra features |
+| image_urls | array[string] | Postgres ARRAY, SQLite JSON variant for tests |
+| image_alt | string | Alt text for image_urls[0]; describes the photo, not the listing |
 | status | enum | available, under_offer, sold |
 | created_at | timestamp | |
 
@@ -87,16 +111,22 @@ real-estate-agent/
 | id | UUID (PK) | |
 | name | string | nullable until captured |
 | phone | string | nullable until captured |
-| budget_min / budget_max | numeric | nullable |
-| preferences | text | free-form notes from conversation |
-| conversation_id | FK → conversations.id | |
+| budget_min / budget_max | numeric(14,2) | nullable |
+| intent | enum | buy, rent, sell; nullable; indexed |
+| interest | enum | apartment_sale, apartment_rent, house_sale, house_rent, land, selling, other; nullable |
+| source | enum | ai_agent, manual, fallback; nullable |
+| requirements | text | free-form needs from the conversation (replaces `preferences`) |
+| remarks | text | nullable; brief operational notes for follow-up context |
+| edited_by_id | FK → staff_users.id | nullable; SET NULL on staff delete |
+| conversation_id | FK → conversations.id | UNIQUE; makes repeat `capture_lead` an update, not a duplicate |
 | created_at | timestamp | |
+| updated_at | timestamp | Tracks when the last `capture_lead` enrichment happened |
 
 ### `conversations`
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| session_id | string | client-generated, ties to a browser session |
+| session_id | string | client-generated, UNIQUE |
 | created_at | timestamp | |
 
 ### `messages`
@@ -106,6 +136,29 @@ real-estate-agent/
 | conversation_id | FK → conversations.id | |
 | role | enum | user, assistant, tool |
 | content | text | |
+| tool_payload | JSON | nullable; stores function_call / function_response parts for replay |
+| seq | int | ordering within a conversation (created_at is insufficient — Postgres `now()` is transaction-start time) |
+| created_at | timestamp | |
+
+### `staff_users`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| name | string(120) | |
+| email | string(320) | UNIQUE, indexed |
+| password_hash | string(512) | bcrypt |
+| role | string(20) | e.g. "root", "agent" |
+| is_active | bool | |
+| created_at | timestamp | |
+
+### `staff_sessions`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | FK → staff_users.id | CASCADE delete |
+| token_hash | string(64) | UNIQUE, indexed; SHA-256 of the bearer token |
+| expires_at | timestamp | indexed |
+| revoked_at | timestamp | nullable; set on logout |
 | created_at | timestamp | |
 
 ---
@@ -147,12 +200,16 @@ real-estate-agent/
 
 ## 6. API Endpoints (FastAPI)
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/chat` | Send a user message + session_id, get back the agent's reply (runs the full tool loop) |
-| GET | `/properties/featured` | Returns a curated set of properties for the homepage grid |
-| GET | `/properties` | Full listing with optional query params (for a future listings page) |
-| GET | `/leads` | (Auth-protected, for your own use) view captured leads |
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/health` | — | Smoke-test |
+| POST | `/chat` | — | Send a user message + session_id, get back Amaya's reply |
+| GET | `/properties/featured` | — | Curated featured set for the homepage grid |
+| GET | `/properties` | Staff session | Full listing (admin) with optional query params |
+| GET | `/leads` | Staff session | View captured leads |
+| POST | `/auth/login` | — | Authenticate staff, return session token |
+| POST | `/auth/logout` | Staff session | Revoke current session |
+| GET | `/auth/me` | Staff session | Return the current authenticated staff user |
 
 ---
 

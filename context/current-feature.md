@@ -31,15 +31,39 @@
 
 ## 🔨 Active Feature
 
-<!--
-  Fill this in fresh for whatever you're currently building.
-  Keep it honest and current — if something below is wrong, fix it don't
-  just append a correction under it.
--->
-
 ---
 
 ## 📜 Feature History
+
+### Admin dashboard (mobile-first) — 2026-09-17
+- **What:** Internal staff dashboard at `/admin` (Next.js route group `app/(admin)/admin/`). Pages: Properties, Leads, Users (root-only). Shared layout with a responsive collapsible sidebar and session-based auth guard (`getCurrentUser` \u2192 redirect to `/login` if no valid session). Data tables adapted to a card-based layout on mobile. `AdminUserMenu` provides sign-out.
+- **Key files:** `frontend/app/(admin)/admin/layout.tsx`, `frontend/app/(admin)/admin/page.tsx`, `frontend/app/(admin)/admin/leads/page.tsx`, `frontend/app/(admin)/admin/users/page.tsx`, `frontend/components/admin/AdminUserMenu.tsx`, `frontend/app/login/`
+- **Gotchas/lessons:** Mobile-first development strategy documented separately (see `docs: add mobile-first development guidelines` commit). Sidebar uses `translate-x` toggling with a backdrop overlay rather than a portal — avoids z-index conflicts with the sticky header. The `users` nav link is conditionally rendered for `role === "root"` only; the route itself must still be guarded server-side.
+
+### Staff authentication — 2026-09-13
+- **What:** Session-based staff auth: `POST /auth/login` issues a hashed bearer token stored in `staff_sessions`, `POST /auth/logout` revokes it, `GET /auth/me` validates the current session. Two new DB tables: `staff_users` (bcrypt passwords, role column) and `staff_sessions` (token_hash, expires_at, revoked_at). Frontend `lib/api.ts` extended with `getCurrentUser` / `logout` helpers; cookies carry the token between requests.
+- **Key files:** `backend/app/api/auth.py`, `backend/app/models/auth.py`, `backend/alembic/versions/20260913_1a2b3c4d5e6f_create_staff_auth_tables.py`, `backend/alembic/versions/20260913_3c4d5e6f7a8b_add_staff_roles.py`
+
+### Agent modularisation & seller lane — 2026-09-14
+- **What:** Refactored the monolithic `prompts.py` into three focused modules: `persona.py` (Amaya's voice, primary phone-capture objective, seller/buyer lanes), `guardrails.py` (inventory rules, never-do list, lead remarks instruction), `schema_intro.py` (derives the seller field list at runtime from `PropertyCreate` so the prompt never drifts from the schema). `prompt_builder.build_system_prompt()` assembles them. `prompts.py` is now a thin shim for backward compatibility.
+- **Key files:** `backend/app/agent/persona.py`, `backend/app/agent/guardrails.py`, `backend/app/agent/schema_intro.py`, `backend/app/agent/prompt_builder.py`, `backend/app/agent/prompts.py`
+- **Gotchas/lessons:** `schema_intro` uses `get_args`/`get_origin` to unwrap `Optional` annotations and reads enum members to produce the human-readable options list. `{{SELLER_FIELDS}}` is a template placeholder replaced at call time — safe because `build_system_prompt` is called per request (not at import). Seller leads are now flagged as highest-priority, with phone capture asked early alongside property detail gathering.
+
+### Property schema expansion — 2026-09-12
+- **What:** Expanded `properties` with richer listing fields (`listing_type` sale/rent, `is_price_per_perch`, `is_featured` flag, `latitude`/`longitude`, `land_size_perches`, `floor_area_sqft`, `parking_spaces`, `build_year`, `road_access_ft`, `furnishing_status`, `amenities` JSON). `is_featured` replaces the old \"newest-available-limit-8\" heuristic; the featured endpoint now queries the flag directly.
+- **Key files:** `backend/app/models/property.py`, `backend/alembic/versions/20260912_7c1f5b8a2d3e_expand_property_details.py`, `backend/alembic/versions/20260912_9a6e1f4c2b7d_add_property_featured_flag.py`
+
+### Lead enrichment fields — 2026-09-14
+- **What:** Extended `leads` with `interest` (typed category: apartment_sale/rent, house_sale/rent, land, selling, other), `source` (ai_agent, manual, fallback), `remarks` (brief operational notes for next agent), and `edited_by_id` FK to `staff_users`. These fields surface in the admin Leads table and are populated by `capture_lead` when the agent has enough context.
+- **Key files:** `backend/app/models/lead.py`, `backend/alembic/versions/20260914_4d5e6f7a8b9c_add_lead_sources.py`, `backend/alembic/versions/20260914_5e6f7a8b9c0d_add_lead_remarks.py`, `backend/alembic/versions/20260914_6f7a8b9c0d1e_add_lead_interest.py`, `backend/alembic/versions/20260914_7a8b9c0d1e2f_add_staff_names_and_lead_editors.py`
+
+### Observability — structured logging — 2026-09-15
+- **What:** Added `structlog` middleware to `app/main.py` that logs every HTTP request as a JSON line: method, path, status code, duration_ms. No per-endpoint changes needed; the middleware wraps all routes. Also added `pyproject.toml` metrics dependencies.
+- **Key files:** `backend/app/main.py`, `backend/pyproject.toml`
+
+### Hide property prices in public UI — 2026-09-14
+- **What:** Property cards on the homepage no longer show LKR prices. The change turns pricing into a hook: Amaya is instructed to mention she has pricing details and to ask for a phone number to share them. Buyers who directly ask for the price receive it but are immediately followed up with a contact ask.
+- **Key files:** `frontend/components/properties/PropertyCard.tsx`, `backend/app/agent/persona.py`
 
 ### Frontend live property data — 2026-08-27
 - **What:** Replaced the homepage property fixtures with live `GET /properties/featured` data while keeping the existing card layout, accessible section structure, and state handling for loading, empty, and error cases.

@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Frontend shell is complete; the backend is deployed on Render with its database layer and agent module, but the two are not yet connected.**
+**The full public-facing stack is live and connected. The admin dashboard is built and wired to the backend. Observability (structured JSON logging via structlog) is in production.**
 
-`frontend/` — Next **16.2.12**, React 19.2.4, Tailwind **v4**, TypeScript, pnpm. Every region of the homepage is built (header, hero, featured grid, chat panel, footer). It still runs entirely on local fixtures: `lib/properties.ts` and `lib/chat.ts`. Nothing fetches from the backend yet — there is no API client and `NEXT_PUBLIC_API_URL` is unset.
+`frontend/` — Next **16.2.12**, React 19.2.4, Tailwind **v4**, TypeScript, pnpm. The homepage is complete and fetches live data from the backend (`GET /properties/featured` via `lib/api.ts`, `POST /chat` via `ChatPanel`). Property prices are intentionally hidden from the public UI to encourage user-agent contact. An admin dashboard lives at `/admin` (route group `app/(admin)/admin/`), with pages for Properties, Leads, and Users (root-only). The admin layout has a responsive collapsible sidebar and session-based auth guard (`getCurrentUser`).
 
-`backend/` — FastAPI on **uv + `pyproject.toml`** (not `requirements.txt`, which the spec mentions), Python 3.11. Has SQLAlchemy 2.0 + Alembic against Neon, all four tables (`properties`, `conversations`, `messages`, `leads`), and `GET /properties/featured` alongside `GET /health`. `app/agent/` now exists and is tested — `loop.run_turn`, `tools.search_properties`/`tools.capture_lead`, `prompts.SYSTEM_PROMPT`, and the `client.GeminiClient` wrapper — but **nothing calls it over HTTP**: `POST /chat` and `GET /properties` still don't exist, so the loop is unreachable from the outside and the three chat tables stay empty in production. Wiring that endpoint is the next backend step.
+`backend/` — FastAPI on **uv + `pyproject.toml`**, Python 3.11. SQLAlchemy 2.0 + Alembic against Neon. All tables are live: `properties`, `conversations`, `messages`, `leads`, `staff_users`, `staff_sessions`. Active endpoints: `GET /health`, `GET /properties/featured`, `GET /properties` (admin), `POST /chat`, `GET /leads` (auth-protected), `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`. Structured JSON logging is applied at the middleware level via `structlog`. `app/agent/` is fully wired: `loop.run_turn` is called by `POST /chat` and `GEMINI_API_KEY` is set in production.
 
-Deployed to Render's free tier off `main`, with `/health` and `/properties/featured` verified against Neon in production. `GEMINI_API_KEY` is deliberately unset there until `POST /chat` lands. Note that migrations and seeding are run **locally** against Neon rather than on Render — the free tier has no shell — so a deploy alone never changes the schema. Details in [backend/README.md](backend/README.md).
+Deployed: frontend on Vercel, backend on Render (`https://property-advisor-96sg.onrender.com`). Migrations run **locally** against Neon (free tier has no shell). Details in [backend/README.md](backend/README.md).
 
 Backend commands run from `backend/`: `uv sync`, `uv run alembic upgrade head`, `uv run python -m app.db.seed`, `uv run fastapi dev app/main.py`, `uv run pytest`. See [backend/README.md](backend/README.md).
 
@@ -44,7 +44,7 @@ The loop lives in `backend/app/agent/loop.py`: append user message → send full
 
 Model: `gemini-3.1-flash-lite` via AI Studio, using the `google-genai` Python SDK (`GEMINI_API_KEY`). It's the cheapest tier in its generation; if it proves unreliable at chaining `search_properties` → `capture_lead` across one conversation, the non-lite Flash model of the same generation is a drop-in upgrade (model string only). Don't silently swap the model to work around a prompt bug — fix the prompt first. Keep the model string in one place (config/settings), not inlined at the call site.
 
-Agent tools (`backend/app/agent/tools.py`): `search_properties`, `capture_lead`, and optionally `get_property_details`. Persona and behavior rules (ask clarifying questions before searching; work toward name/phone naturally rather than demanding it upfront) belong in `backend/app/agent/prompts.py`, not scattered through the loop.
+Agent tools (`backend/app/agent/tools.py`): `search_properties` and `capture_lead` are live. The system prompt is assembled at request time by `prompt_builder.build_system_prompt()`, which concatenates three focused modules — `persona.py` (Amaya's voice, goals, seller/buyer lanes), `guardrails.py` (inventory rules, never-do list), and `schema_intro.py` (seller field list derived from `PropertyCreate` at runtime). `prompts.py` is now a thin compatibility shim; new behavior changes go to the appropriate module. Do not add prompt logic directly to the loop or the endpoint.
 
 ## Feature workflow (skills)
 
