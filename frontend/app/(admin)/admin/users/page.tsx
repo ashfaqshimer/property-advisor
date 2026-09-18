@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { createAgent, getStaffUsers, StaffUser, updateAgent } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -9,6 +10,7 @@ export default function AdminUsersPage() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,7 +56,15 @@ export default function AdminUsersPage() {
       <form onSubmit={submit} className="mb-8 flex flex-col items-stretch gap-4 rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm sm:flex-row sm:flex-wrap sm:items-end">
         <label className="flex-1 min-w-48 text-sm font-medium">Agent name<input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm" /></label>
         <label className="flex-1 min-w-48 text-sm font-medium">Agent email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm" /></label>
-        <label className="flex-1 min-w-48 text-sm font-medium">Temporary password<input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm" /></label>
+        <div className="flex-1 min-w-48">
+          <label className="text-sm font-medium">Temporary password</label>
+          <div className="relative mt-2">
+            <input required minLength={8} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 pr-10 text-sm" />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] hover:text-[#1a2923] focus:outline-none" aria-label={showPassword ? "Hide password" : "Show password"}>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
         <button type="submit" disabled={saving} className="rounded-lg bg-[#28513f] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Spinner className="mx-auto h-4 w-4" /> : 'Create agent'}</button>
       </form>
       <div className="overflow-hidden rounded-xl border border-[#dce4df] bg-white shadow-sm">

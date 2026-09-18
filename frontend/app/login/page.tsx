@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 
 import { AuthError, login } from "../../lib/api";
 
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,7 +37,12 @@ export default function LoginPage() {
         <label className="mt-8 block text-sm font-medium" htmlFor="email">Email</label>
         <input id="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 outline-none focus:border-[#28513f]" />
         <label className="mt-5 block text-sm font-medium" htmlFor="password">Password</label>
-        <input id="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 outline-none focus:border-[#28513f]" />
+        <div className="relative mt-2">
+          <input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 pr-10 outline-none focus:border-[#28513f]" />
+          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] hover:text-[#1a2923] focus:outline-none" aria-label={showPassword ? "Hide password" : "Show password"}>
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
         {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
         <button type="submit" disabled={submitting} className="mt-7 w-full rounded-lg bg-[#19352b] px-4 py-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60">
           {submitting ? "Signing in..." : "Sign in"}
