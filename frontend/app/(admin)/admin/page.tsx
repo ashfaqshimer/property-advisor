@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
@@ -29,7 +30,6 @@ const statusStyles: Record<PropertyStatus, string> = {
 
 export default function AdminPropertiesPage() {
 	const [properties, setProperties] = useState<Property[]>([]);
-	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(true);
 	const [busyProperty, setBusyProperty] = useState<string | null>(null);
 	const [canDelete, setCanDelete] = useState(false);
@@ -50,7 +50,7 @@ export default function AdminPropertiesPage() {
 				),
 			)
 			.catch((reason) =>
-				setError(
+				toast.error(
 					reason instanceof Error
 						? reason.message
 						: 'Could not load properties.',
@@ -69,8 +69,9 @@ export default function AdminPropertiesPage() {
 						: property,
 				),
 			);
+			toast.success('Property updated successfully.');
 		} catch (reason) {
-			setError(
+			toast.error(
 				reason instanceof Error
 					? reason.message
 					: 'Could not update the property.',
@@ -86,8 +87,9 @@ export default function AdminPropertiesPage() {
 			setProperties((current) =>
 				current.filter((property) => property.id !== id),
 			);
+			toast.success('Property deleted successfully.');
 		} catch (reason) {
-			setError(
+			toast.error(
 				reason instanceof Error
 					? reason.message
 					: 'Could not delete the property.',
@@ -125,7 +127,6 @@ export default function AdminPropertiesPage() {
 					</Link>
 				</div>
 			</div>
-			<div className='mb-3 text-right text-sm text-[#a34d4d]'>{error}</div>
 			<div className='overflow-hidden rounded-xl border border-[#dce4df] bg-white shadow-[0_8px_24px_rgba(25,53,43,0.04)]'>
 				<div className='flex items-center justify-between border-b border-[#e6ebe8] px-5 py-4'>
 					<p className='text-sm font-semibold'>
