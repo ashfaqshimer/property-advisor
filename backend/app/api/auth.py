@@ -50,7 +50,7 @@ def login(payload: LoginRequest, response: Response, db: DbSession) -> LoginResp
         secure=settings.auth_cookie_secure,
         samesite=settings.auth_cookie_samesite,
     )
-    return LoginResponse(user=StaffUserRead.model_validate(user))
+    return LoginResponse(user=StaffUserRead.model_validate(user), token=token)
 
 
 @router.get("/me", response_model=StaffUserRead)

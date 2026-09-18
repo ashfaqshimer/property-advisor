@@ -54,7 +54,15 @@ def create_session(db: Session, user: StaffUser) -> str:
 
 
 def get_current_user(request: Request, db: DbSession) -> StaffUser:
-    session_token = request.cookies.get(get_settings().auth_cookie_name)
+    session_token = None
+    
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        session_token = auth_header[len("Bearer "):]
+        
+    if not session_token:
+        session_token = request.cookies.get(get_settings().auth_cookie_name)
+        
     if not session_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 

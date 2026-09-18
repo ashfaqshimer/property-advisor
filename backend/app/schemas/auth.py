@@ -47,3 +47,4 @@ class StaffUserUpdate(BaseModel):
 
 class LoginResponse(BaseModel):
     user: StaffUserRead
+    token: str
