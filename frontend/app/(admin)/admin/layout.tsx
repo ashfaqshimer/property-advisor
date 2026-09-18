@@ -11,7 +11,7 @@ import AdminUserMenu from "../../../components/admin/AdminUserMenu";
 const navigation = [
   { label: "Properties", href: "/admin" },
   { label: "Leads", href: "/admin/leads" },
-  { label: "Settings", href: "#", disabled: true },
+  { label: "Settings", href: "/admin/settings" },
 ];
 
 export default function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {

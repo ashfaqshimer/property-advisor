@@ -25,6 +25,7 @@ from app.schemas.auth import (
     StaffUserCreate,
     StaffUserRead,
     StaffUserUpdate,
+    PasswordChangeRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -56,6 +57,18 @@ def login(payload: LoginRequest, response: Response, db: DbSession) -> LoginResp
 @router.get("/me", response_model=StaffUserRead)
 def current_user(user: CurrentStaffUser) -> StaffUserRead:
     return StaffUserRead.model_validate(user)
+
+
+@router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(payload: PasswordChangeRequest, user: CurrentStaffUser, db: DbSession) -> None:
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect current password.",
+        )
+    user.password_hash = hash_password(payload.new_password)
+    db.commit()
+
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

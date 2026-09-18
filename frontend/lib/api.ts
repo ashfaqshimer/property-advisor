@@ -236,6 +236,28 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   return (await response.json()) as AuthUser;
 }
 
+export async function changePassword(current_password: string, new_password: string): Promise<void> {
+  const response = await fetch(`${baseUrl()}/auth/me/password`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password, new_password }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    if (response.status === 400 || response.status === 401) {
+      let detail = "Authentication failed.";
+      try {
+        const payload = (await response.json()) as { detail?: unknown };
+        if (typeof payload.detail === "string") detail = payload.detail;
+      } catch {}
+      throw new ChatError("unexpected", detail, response.status);
+    }
+    throw new ChatError("unexpected", `Password change failed (${response.status}).`, response.status);
+  }
+}
+
+
 export async function getStaffUsers(): Promise<StaffUser[]> {
   const response = await fetch(`${baseUrl()}/admin/users`, {
     method: "GET",
