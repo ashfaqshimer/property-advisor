@@ -26,6 +26,7 @@ from app.schemas.auth import (
     StaffUserRead,
     StaffUserUpdate,
     PasswordChangeRequest,
+    ProfileUpdateRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -56,6 +57,13 @@ def login(payload: LoginRequest, response: Response, db: DbSession) -> LoginResp
 
 @router.get("/me", response_model=StaffUserRead)
 def current_user(user: CurrentStaffUser) -> StaffUserRead:
+    return StaffUserRead.model_validate(user)
+
+
+@router.patch("/me", response_model=StaffUserRead)
+def update_profile(payload: ProfileUpdateRequest, user: CurrentStaffUser, db: DbSession) -> StaffUserRead:
+    user.name = payload.name
+    db.commit()
     return StaffUserRead.model_validate(user)
 
 

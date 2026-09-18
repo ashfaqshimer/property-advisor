@@ -4,7 +4,8 @@ import { FormEvent, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-import { changePassword } from "../../../../lib/api";
+import { useEffect } from "react";
+import { changePassword, getCurrentUser, updateProfile } from "../../../../lib/api";
 
 export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -17,6 +18,30 @@ export default function SettingsPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [name, setName] = useState("");
+  const [updatingName, setUpdatingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCurrentUser().then((user) => {
+      if (user) setName(user.name);
+    });
+  }, []);
+
+  async function handleUpdateName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setNameError(null);
+    setUpdatingName(true);
+    try {
+      await updateProfile(name);
+      toast.success("Profile updated successfully.");
+    } catch (caught) {
+      setNameError(caught instanceof Error ? caught.message : "Failed to update profile.");
+    } finally {
+      setUpdatingName(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,6 +78,30 @@ export default function SettingsPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <p className="mt-2 text-sm text-[#64736b]">Manage your account settings and preferences.</p>
+
+      <div className="mt-8 rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-medium">Profile Details</h2>
+        <form onSubmit={handleUpdateName} className="mt-6 max-w-md">
+          <label className="block text-sm font-medium" htmlFor="name">Full Name</label>
+          <input
+            id="name"
+            type="text"
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="mt-2 w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 outline-none focus:border-[#28513f]"
+          />
+          {nameError && <p role="alert" className="mt-4 text-sm text-red-700">{nameError}</p>}
+          
+          <button
+            type="submit"
+            disabled={updatingName}
+            className="mt-6 rounded-lg bg-[#19352b] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+          >
+            {updatingName ? "Saving..." : "Save changes"}
+          </button>
+        </form>
+      </div>
 
       <div className="mt-8 rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm">
         <h2 className="text-lg font-medium">Change Password</h2>

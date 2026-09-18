@@ -236,6 +236,19 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   return (await response.json()) as AuthUser;
 }
 
+export async function updateProfile(name: string): Promise<AuthUser> {
+  const response = await fetch(`${baseUrl()}/auth/me`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Profile update failed (${response.status}).`, response.status);
+  return (await response.json()) as AuthUser;
+}
+
+
 export async function changePassword(current_password: string, new_password: string): Promise<void> {
   const response = await fetch(`${baseUrl()}/auth/me/password`, {
     method: "PATCH",
