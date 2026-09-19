@@ -8,7 +8,7 @@ import { AuthUser, getCurrentUser, logout } from "../../../lib/api";
 import { Spinner } from "../../../components/ui/spinner";
 import AdminUserMenu from "../../../components/admin/AdminUserMenu";
 
-const navigation = [
+const navigation: { label: string; href: string; disabled?: boolean }[] = [
   { label: "Properties", href: "/admin" },
   { label: "Leads", href: "/admin/leads" },
   { label: "Settings", href: "/admin/settings" },
