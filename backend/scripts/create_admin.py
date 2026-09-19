@@ -8,11 +8,10 @@ import hmac
 
 from sqlalchemy import select
 
-from app.auth import hash_password
+from app.api.auth import password_hasher
 from app.config import get_settings
 from app.db.session import SessionLocal
 from app.models.auth import StaffUser
-from app.schemas.auth import StaffRole
 
 
 def main() -> None:
@@ -25,7 +24,7 @@ def main() -> None:
         raise SystemExit("Invalid bootstrap secret.")
 
     with SessionLocal() as db:
-        if db.scalar(select(StaffUser).where(StaffUser.role == StaffRole.ROOT)) is not None:
+        if db.scalar(select(StaffUser).where(StaffUser.is_superuser == True)) is not None:
             raise SystemExit("A root account already exists. Create agents from the admin workspace.")
 
     email = input("Staff email: ").strip().lower()
@@ -39,7 +38,14 @@ def main() -> None:
     with SessionLocal() as db:
         if db.scalar(select(StaffUser).where(StaffUser.email == email)) is not None:
             raise SystemExit("A staff account with that email already exists.")
-        db.add(StaffUser(email=email, password_hash=hash_password(password), role="root"))
+        db.add(StaffUser(
+            email=email,
+            hashed_password=password_hasher.hash(password),
+            role="root",
+            is_superuser=True,
+            is_active=True,
+            is_verified=True,
+        ))
         db.commit()
     print(f"Created staff account for {email}.")
 

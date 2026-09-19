@@ -206,7 +206,13 @@ async function parseAuthError(response: Response): Promise<never> {
   let detail = "Authentication failed.";
   try {
     const payload = (await response.json()) as { detail?: unknown };
-    if (typeof payload.detail === "string") detail = payload.detail;
+    if (typeof payload.detail === "string") {
+      if (payload.detail === "LOGIN_BAD_CREDENTIALS") {
+        detail = "Invalid email or password.";
+      } else {
+        detail = payload.detail;
+      }
+    }
   } catch {
     // Keep the stable fallback for an empty or malformed error response.
   }
@@ -214,16 +220,21 @@ async function parseAuthError(response: Response): Promise<never> {
 }
 
 export async function login(email: string, password: string): Promise<AuthUser> {
+  const body = new URLSearchParams();
+  body.append("username", email);
+  body.append("password", password);
+
   const response = await fetch(`${baseUrl()}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     credentials: "include",
-    body: JSON.stringify({ email, password }),
+    body,
   });
   if (!response.ok) return parseAuthError(response);
-  const payload = (await response.json()) as { user?: AuthUser };
-  if (!payload.user) throw new AuthError("The backend returned an invalid user.", response.status);
-  return payload.user;
+  
+  const user = await getCurrentUser();
+  if (!user) throw new AuthError("Failed to fetch user details after login.", 401);
+  return user;
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {

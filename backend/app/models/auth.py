@@ -3,21 +3,19 @@
 import uuid
 from datetime import datetime
 
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
+from fastapi_users_db_sqlalchemy.access_token import SQLAlchemyBaseAccessTokenTableUUID
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
-class StaffUser(Base):
+class StaffUser(SQLAlchemyBaseUserTableUUID, Base):
     __tablename__ = "staff_users"
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(120), nullable=False, default="root", server_default="root")
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="root", server_default="root")
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -27,18 +25,13 @@ class StaffUser(Base):
     )
 
 
-class StaffSession(Base):
-    __tablename__ = "staff_sessions"
+from fastapi_users_db_sqlalchemy.generics import GUID
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+class StaffSession(SQLAlchemyBaseAccessTokenTableUUID, Base):
+    __tablename__ = "staff_sessions"
+    
     user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("staff_users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        GUID, ForeignKey("staff_users.id", ondelete="cascade"), nullable=False
     )
 
     user: Mapped[StaffUser] = relationship(back_populates="sessions")

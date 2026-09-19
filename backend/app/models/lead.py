@@ -14,6 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models._enum import enum_column
+from fastapi_users_db_sqlalchemy.generics import GUID
 
 
 class LeadIntent(str, enum.Enum):
@@ -77,9 +78,8 @@ class Lead(Base):
     source: Mapped[LeadSource | None] = mapped_column(
         enum_column(LeadSource, "lead_source"), nullable=True, index=True
     )
-
     edited_by_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+        GUID,
         ForeignKey("staff_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,

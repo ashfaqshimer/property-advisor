@@ -1,9 +1,10 @@
 """Staff login and session endpoints."""
 
-from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -11,89 +12,32 @@ from app.auth import (
     CurrentStaffUser,
     DbSession,
     RootStaffUser,
-    _hash_session_token,
-    create_session,
-    hash_password,
-    verify_password,
+    auth_backend,
+    fastapi_users,
 )
-from app.config import get_settings
-from app.models.auth import StaffSession, StaffUser
+from app.models.auth import StaffUser
 from app.schemas.auth import (
-    LoginRequest,
-    LoginResponse,
     StaffRole,
     StaffUserCreate,
     StaffUserRead,
     StaffUserUpdate,
-    PasswordChangeRequest,
-    ProfileUpdateRequest,
 )
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+password_hasher = PasswordHash((BcryptHasher(),))
+
+router = APIRouter(tags=["auth"])
+
+# Include fastapi-users routers
+router.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth",
+)
+router.include_router(
+    fastapi_users.get_users_router(StaffUserRead, StaffUserUpdate),
+    prefix="/auth",
+)
+
 admin_router = APIRouter(prefix="/admin/users", tags=["admin-users"])
-
-
-@router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest, response: Response, db: DbSession) -> LoginResponse:
-    user = db.scalar(select(StaffUser).where(StaffUser.email == payload.email.lower()))
-    if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password.",
-        )
-
-    token = create_session(db, user)
-    settings = get_settings()
-    response.set_cookie(
-        settings.auth_cookie_name,
-        token,
-        max_age=settings.auth_session_days * 24 * 60 * 60,
-        httponly=True,
-        secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
-    )
-    return LoginResponse(user=StaffUserRead.model_validate(user), token=token)
-
-
-@router.get("/me", response_model=StaffUserRead)
-def current_user(user: CurrentStaffUser) -> StaffUserRead:
-    return StaffUserRead.model_validate(user)
-
-
-@router.patch("/me", response_model=StaffUserRead)
-def update_profile(payload: ProfileUpdateRequest, user: CurrentStaffUser, db: DbSession) -> StaffUserRead:
-    user.name = payload.name
-    db.commit()
-    return StaffUserRead.model_validate(user)
-
-
-@router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
-def change_password(payload: PasswordChangeRequest, user: CurrentStaffUser, db: DbSession) -> None:
-    if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect current password.",
-        )
-    user.password_hash = hash_password(payload.new_password)
-    db.commit()
-
-
-
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(
-    response: Response,
-    db: DbSession,
-    request: Request,
-) -> None:
-    session_token = request.cookies.get(get_settings().auth_cookie_name)
-    if session_token:
-        session = db.scalar(
-            select(StaffSession).where(StaffSession.token_hash == _hash_session_token(session_token))
-        )
-        if session is not None:
-            session.revoked_at = datetime.now(UTC)
-            db.commit()
-    response.delete_cookie(get_settings().auth_cookie_name)
 
 
 @admin_router.get("", response_model=list[StaffUserRead])
@@ -106,8 +50,11 @@ def create_agent(payload: StaffUserCreate, db: DbSession, _user: RootStaffUser) 
     agent = StaffUser(
         name=payload.name,
         email=payload.email.lower(),
-        password_hash=hash_password(payload.password),
+        hashed_password=password_hasher.hash(payload.password),
         role=StaffRole.AGENT,
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
     )
     db.add(agent)
     try:
@@ -130,7 +77,7 @@ def update_agent(
     if "email" in changes:
         agent.email = changes["email"].lower()
     if "password" in changes and changes["password"] is not None:
-        agent.password_hash = hash_password(changes["password"])
+        agent.hashed_password = password_hasher.hash(changes["password"])
     if "is_active" in changes and changes["is_active"] is not None:
         agent.is_active = changes["is_active"]
     try:

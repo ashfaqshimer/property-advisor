@@ -19,6 +19,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    // When BACKEND_URL is set (e.g., in Vercel production), proxy /api requests to the Render backend.
+    // This avoids cross-origin cookie rejection (SameSite=Lax) on the frontend.
+    // Set NEXT_PUBLIC_API_URL=/api in your Vercel environment so the browser calls the proxy.
+    if (process.env.BACKEND_URL) {
+      return [
+        {
+          source: "/api/:path*",
+          destination: `${process.env.BACKEND_URL.replace(/\/+$/, '')}/:path*`,
+        },
+      ];
+    }
+    return [];
+  },
 };
 
 export default nextConfig;
