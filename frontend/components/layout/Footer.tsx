@@ -127,7 +127,7 @@ export default async function Footer() {
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z" />
                     </ContactIcon>
                     <div className="flex flex-col gap-1">
-                      {siteConfig.phone_numbers.values.map((phone, i) => (
+                      {siteConfig?.phone_numbers?.values?.map((phone, i) => (
                         <a key={i} href={`tel:${phone.replace(/\s+/g, "")}`} className={linkClass}>
                           {phone}
                         </a>
@@ -146,8 +146,8 @@ export default async function Footer() {
                       unbroken string in the footer and would otherwise widen the
                       page rather than wrap.
                     */}
-                    <a href={`mailto:${siteConfig.contact_email.value}`} className={`${linkClass} break-all`}>
-                      {siteConfig.contact_email.value}
+                    <a href={`mailto:${siteConfig?.contact_email?.value}`} className={`${linkClass} break-all`}>
+                      {siteConfig?.contact_email?.value}
                     </a>
                   </li>
                 )}
@@ -159,7 +159,7 @@ export default async function Footer() {
                       <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
                       <circle cx="12" cy="10" r="3" />
                     </ContactIcon>
-                    <span>{siteConfig.city.value}</span>
+                    <span>{siteConfig?.city?.value}</span>
                   </li>
                 )}
               </ul>
