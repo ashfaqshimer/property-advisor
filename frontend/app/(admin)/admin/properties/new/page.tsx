@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
-import { createProperty, uploadPropertyImages } from '@/lib/api';
+import { createProperty, getPropertyContacts, uploadPropertyImages, type PropertyContact } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
 
 type FormValues = {
@@ -24,6 +24,7 @@ type FormValues = {
 	description: string;
 	status: string;
 	isFeatured: boolean;
+	propertyContactId: string;
 };
 type ImagePreview = { file: File; url: string };
 const emptyForm: FormValues = {
@@ -45,6 +46,7 @@ const emptyForm: FormValues = {
 	description: '',
 	status: 'available',
 	isFeatured: false,
+	propertyContactId: '',
 };
 
 export default function NewPropertyPage() {
@@ -54,11 +56,12 @@ export default function NewPropertyPage() {
 	const [errors, setErrors] = useState<Record<string, string>>({});
 	const [saving, setSaving] = useState(false);
 	const [success, setSuccess] = useState(false);
-	useEffect(
-		() => () =>
-			imagesRef.current.forEach((image) => URL.revokeObjectURL(image.url)),
-		[],
-	);
+	const [contacts, setContacts] = useState<PropertyContact[]>([]);
+	useEffect(() => {
+		getPropertyContacts().then(setContacts).catch(() => {});
+		return () =>
+			imagesRef.current.forEach((image) => URL.revokeObjectURL(image.url));
+	}, []);
 	function updateField(field: keyof FormValues, value: string | boolean) {
 		setForm((current) => ({ ...current, [field]: value }));
 		setErrors((current) => ({ ...current, [field]: '' }));
@@ -139,6 +142,7 @@ export default function NewPropertyPage() {
 				image_alt: form.title.trim(),
 				is_featured: form.isFeatured,
 				status: form.status as 'available' | 'under_offer' | 'sold',
+				property_contact_id: form.propertyContactId || null,
 			});
 			setSuccess(true);
 		} catch (error) {
@@ -261,6 +265,21 @@ export default function NewPropertyPage() {
 								placeholder='Colombo 5'
 							/>
 							{errorText('location')}
+						</label>
+						<label className='text-sm font-medium sm:col-span-2'>
+							Contact (Owner / Broker)
+							<select
+								className={fieldClass}
+								value={form.propertyContactId}
+								onChange={(e) => updateField('propertyContactId', e.target.value)}
+							>
+								<option value=''>— None —</option>
+								{contacts.map((c) => (
+									<option key={c.id} value={c.id}>
+										{c.full_name} {c.company_name ? `(${c.company_name})` : ''}
+									</option>
+								))}
+							</select>
 						</label>
 					</div>
 				</div>

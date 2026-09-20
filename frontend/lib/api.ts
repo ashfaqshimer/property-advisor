@@ -139,6 +139,7 @@ export type CreatePropertyPayload = {
   location: string;
   property_type: "house" | "apartment" | "land" | "commercial";
   bedrooms: number | null;
+  property_contact_id?: string | null;
   bathrooms: number | null;
   land_size_perches?: number | null;
   floor_area_sqft: number | null;
