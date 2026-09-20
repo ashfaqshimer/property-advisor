@@ -204,22 +204,19 @@ export type AdminLead = {
   updated_at: string;
 };
 
+export type StringConfigField = { value: string | null; show: boolean };
+export type ListConfigField = { values: string[]; show: boolean };
+
 export type SiteConfiguration = {
   id: string;
-  phone_numbers: string[];
-  show_phone_numbers: boolean;
-  contact_email: string | null;
-  show_contact_email: boolean;
-  instagram_link: string | null;
-  show_instagram_link: boolean;
-  facebook_link: string | null;
-  show_facebook_link: boolean;
-  x_link: string | null;
-  show_x_link: boolean;
-  tiktok_link: string | null;
-  show_tiktok_link: boolean;
-  city: string | null;
-  show_city: boolean;
+  phone_numbers: ListConfigField;
+  contact_email: StringConfigField;
+  whatsapp: StringConfigField;
+  instagram_link: StringConfigField;
+  facebook_link: StringConfigField;
+  x_link: StringConfigField;
+  tiktok_link: StringConfigField;
+  city: StringConfigField;
   extra_settings: Record<string, unknown> | null;
 };
 

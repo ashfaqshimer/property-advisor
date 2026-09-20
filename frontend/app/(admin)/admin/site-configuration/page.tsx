@@ -84,6 +84,20 @@ export default function SiteConfigurationPage() {
   const [phoneInput, setPhoneInput] = useState("");
   const [loading, setLoading] = useState(true);
 
+  function updateStringValue(key: keyof SiteConfiguration, value: string) {
+    setSiteConfig(s => {
+      const field = (s[key] as any) || { value: null, show: true };
+      return { ...s, [key]: { ...field, value: value || null } };
+    });
+  }
+
+  function updateStringShow(key: keyof SiteConfiguration, show: boolean) {
+    setSiteConfig(s => {
+      const field = (s[key] as any) || { value: null, show: true };
+      return { ...s, [key]: { ...field, show } };
+    });
+  }
+
   useEffect(() => {
     getCurrentUser().then((user) => {
       if (!user || user.role !== "root") {
@@ -94,7 +108,7 @@ export default function SiteConfigurationPage() {
       getSiteConfiguration().then((config) => {
         if (config) {
           setSiteConfig(config);
-          setPhoneInput(config.phone_numbers.join(", "));
+          setPhoneInput(config.phone_numbers?.values?.join(", ") || "");
         }
       }).catch(() => {}).finally(() => setLoading(false));
     }).catch(() => router.replace("/login"));
@@ -106,23 +120,17 @@ export default function SiteConfigurationPage() {
     try {
       const phones = phoneInput.split(",").map(p => p.trim()).filter(Boolean);
       const updated = await updateSiteConfiguration({
-        contact_email: siteConfig.contact_email || null,
-        show_contact_email: siteConfig.show_contact_email ?? true,
-        city: siteConfig.city || null,
-        show_city: siteConfig.show_city ?? true,
-        phone_numbers: phones,
-        show_phone_numbers: siteConfig.show_phone_numbers ?? true,
-        instagram_link: siteConfig.instagram_link || null,
-        show_instagram_link: siteConfig.show_instagram_link ?? true,
-        facebook_link: siteConfig.facebook_link || null,
-        show_facebook_link: siteConfig.show_facebook_link ?? true,
-        x_link: siteConfig.x_link || null,
-        show_x_link: siteConfig.show_x_link ?? true,
-        tiktok_link: siteConfig.tiktok_link || null,
-        show_tiktok_link: siteConfig.show_tiktok_link ?? true,
+        contact_email: siteConfig.contact_email,
+        whatsapp: siteConfig.whatsapp,
+        city: siteConfig.city,
+        phone_numbers: { values: phones, show: siteConfig.phone_numbers?.show ?? true },
+        instagram_link: siteConfig.instagram_link,
+        facebook_link: siteConfig.facebook_link,
+        x_link: siteConfig.x_link,
+        tiktok_link: siteConfig.tiktok_link,
       });
       setSiteConfig(updated);
-      setPhoneInput(updated.phone_numbers.join(", "));
+      setPhoneInput(updated.phone_numbers?.values?.join(", ") || "");
       toast.success("Site configuration updated.");
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : "Failed to update site configuration.");
@@ -149,10 +157,10 @@ export default function SiteConfigurationPage() {
             label="Contact Email"
             type="email"
             placeholder="e.g. hello@example.com"
-            value={siteConfig.contact_email || ""}
-            onChange={(v) => setSiteConfig(s => ({ ...s, contact_email: v }))}
-            show={siteConfig.show_contact_email}
-            onShowChange={(v) => setSiteConfig(s => ({ ...s, show_contact_email: v }))}
+            value={siteConfig.contact_email?.value || ""}
+            onChange={(v) => updateStringValue("contact_email", v)}
+            show={siteConfig.contact_email?.show ?? true}
+            onShowChange={(v) => updateStringShow("contact_email", v)}
           />
 
           <ConfigField
@@ -161,18 +169,28 @@ export default function SiteConfigurationPage() {
             placeholder="+94770000000, +94112222222"
             value={phoneInput}
             onChange={(v) => setPhoneInput(v)}
-            show={siteConfig.show_phone_numbers}
-            onShowChange={(v) => setSiteConfig(s => ({ ...s, show_phone_numbers: v }))}
+            show={siteConfig.phone_numbers?.show ?? true}
+            onShowChange={(v) => setSiteConfig(s => ({ ...s, phone_numbers: { values: s.phone_numbers?.values || [], show: v } }))}
+          />
+
+          <ConfigField
+            id="whatsapp"
+            label="WhatsApp Number"
+            placeholder="+94770000000"
+            value={siteConfig.whatsapp?.value || ""}
+            onChange={(v) => updateStringValue("whatsapp", v)}
+            show={siteConfig.whatsapp?.show ?? true}
+            onShowChange={(v) => updateStringShow("whatsapp", v)}
           />
 
           <ConfigField
             id="city"
             label="City"
             placeholder="e.g. Colombo"
-            value={siteConfig.city || ""}
-            onChange={(v) => setSiteConfig(s => ({ ...s, city: v }))}
-            show={siteConfig.show_city}
-            onShowChange={(v) => setSiteConfig(s => ({ ...s, show_city: v }))}
+            value={siteConfig.city?.value || ""}
+            onChange={(v) => updateStringValue("city", v)}
+            show={siteConfig.city?.show ?? true}
+            onShowChange={(v) => updateStringShow("city", v)}
           />
 
           <ConfigField
@@ -180,10 +198,10 @@ export default function SiteConfigurationPage() {
             label="Facebook Link"
             type="url"
             placeholder="https://facebook.com/..."
-            value={siteConfig.facebook_link || ""}
-            onChange={(v) => setSiteConfig(s => ({ ...s, facebook_link: v }))}
-            show={siteConfig.show_facebook_link}
-            onShowChange={(v) => setSiteConfig(s => ({ ...s, show_facebook_link: v }))}
+            value={siteConfig.facebook_link?.value || ""}
+            onChange={(v) => updateStringValue("facebook_link", v)}
+            show={siteConfig.facebook_link?.show ?? true}
+            onShowChange={(v) => updateStringShow("facebook_link", v)}
           />
 
           <ConfigField
@@ -191,10 +209,10 @@ export default function SiteConfigurationPage() {
             label="Instagram Link"
             type="url"
             placeholder="https://instagram.com/..."
-            value={siteConfig.instagram_link || ""}
-            onChange={(v) => setSiteConfig(s => ({ ...s, instagram_link: v }))}
-            show={siteConfig.show_instagram_link}
-            onShowChange={(v) => setSiteConfig(s => ({ ...s, show_instagram_link: v }))}
+            value={siteConfig.instagram_link?.value || ""}
+            onChange={(v) => updateStringValue("instagram_link", v)}
+            show={siteConfig.instagram_link?.show ?? true}
+            onShowChange={(v) => updateStringShow("instagram_link", v)}
           />
 
           <ConfigField
@@ -202,10 +220,10 @@ export default function SiteConfigurationPage() {
             label="X (Twitter) Link"
             type="url"
             placeholder="https://x.com/..."
-            value={siteConfig.x_link || ""}
-            onChange={(v) => setSiteConfig(s => ({ ...s, x_link: v }))}
-            show={siteConfig.show_x_link}
-            onShowChange={(v) => setSiteConfig(s => ({ ...s, show_x_link: v }))}
+            value={siteConfig.x_link?.value || ""}
+            onChange={(v) => updateStringValue("x_link", v)}
+            show={siteConfig.x_link?.show ?? true}
+            onShowChange={(v) => updateStringShow("x_link", v)}
           />
 
           <ConfigField
@@ -213,10 +231,10 @@ export default function SiteConfigurationPage() {
             label="TikTok Link"
             type="url"
             placeholder="https://tiktok.com/..."
-            value={siteConfig.tiktok_link || ""}
-            onChange={(v) => setSiteConfig(s => ({ ...s, tiktok_link: v }))}
-            show={siteConfig.show_tiktok_link}
-            onShowChange={(v) => setSiteConfig(s => ({ ...s, show_tiktok_link: v }))}
+            value={siteConfig.tiktok_link?.value || ""}
+            onChange={(v) => updateStringValue("tiktok_link", v)}
+            show={siteConfig.tiktok_link?.show ?? true}
+            onShowChange={(v) => updateStringShow("tiktok_link", v)}
           />
 
           <button
