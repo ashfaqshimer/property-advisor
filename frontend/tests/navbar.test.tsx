@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import Navbar from "@/components/layout/Navbar";
-import { CHAT_HREF, NAV_LINKS } from "@/components/layout/nav-links";
+import { NAV_LINKS } from "@/components/layout/nav-links";
 
 /**
  * SCOPE LIMIT: jsdom applies no CSS, so nothing here proves the header *looks*
@@ -99,7 +99,7 @@ describe("Navbar CTA", () => {
       "link",
       { name: "Chat with our AI Agent" },
     );
-    expect(cta).toHaveAttribute("href", CHAT_HREF);
+    expect(cta).toHaveAttribute("href", "#chat");
   });
 
   it("is a link, not a button — it navigates rather than opening a session", () => {

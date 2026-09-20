@@ -27,6 +27,8 @@ const record: PropertyApiRecord = {
   image_alt: "White villa beside a pool",
   status: "available",
   created_at: "2026-08-26T00:00:00Z",
+  property_contact_id: null,
+  property_contact: null,
 };
 
 const jsonResponse = (status: number, body: unknown) =>
