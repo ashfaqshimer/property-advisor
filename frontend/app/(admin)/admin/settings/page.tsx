@@ -1,10 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-import { useEffect } from "react";
 import { changePassword, getCurrentUser, updateProfile } from "../../../../lib/api";
 
 export default function SettingsPage() {

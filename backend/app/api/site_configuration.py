@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth import CurrentStaffUser
+from app.auth import RootStaffUser
 from app.db.session import get_db
 from app.models.site_configuration import SiteConfiguration
 from app.schemas.site_configuration import SiteConfigurationResponse, SiteConfigurationUpdate
@@ -34,7 +34,7 @@ def get_site_configuration(db: DbSession) -> SiteConfiguration:
 
 @admin_router.put("", response_model=SiteConfigurationResponse)
 def update_site_configuration(
-    payload: SiteConfigurationUpdate, db: DbSession, _user: CurrentStaffUser
+    payload: SiteConfigurationUpdate, db: DbSession, _user: RootStaffUser
 ) -> SiteConfiguration:
     """Update or create the site configuration."""
     config = db.scalar(select(SiteConfiguration).limit(1))

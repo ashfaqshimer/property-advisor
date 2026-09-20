@@ -204,6 +204,49 @@ export type AdminLead = {
   updated_at: string;
 };
 
+export type SiteConfiguration = {
+  id: string;
+  phone_numbers: string[];
+  show_phone_numbers: boolean;
+  contact_email: string | null;
+  show_contact_email: boolean;
+  instagram_link: string | null;
+  show_instagram_link: boolean;
+  facebook_link: string | null;
+  show_facebook_link: boolean;
+  x_link: string | null;
+  show_x_link: boolean;
+  tiktok_link: string | null;
+  show_tiktok_link: boolean;
+  city: string | null;
+  show_city: boolean;
+  extra_settings: Record<string, unknown> | null;
+};
+
+export type SiteConfigurationUpdate = Partial<Omit<SiteConfiguration, "id">>;
+
+export async function getSiteConfiguration(): Promise<SiteConfiguration | null> {
+  const response = await fetch(`${baseUrl()}/site-configuration`, {
+    method: "GET",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new ChatError("unexpected", `Site config fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as SiteConfiguration;
+}
+
+export async function updateSiteConfiguration(payload: SiteConfigurationUpdate): Promise<SiteConfiguration> {
+  const response = await fetch(`${baseUrl()}/admin/site-configuration`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Site config update failed (${response.status}).`, response.status);
+  return (await response.json()) as SiteConfiguration;
+}
+
 export type AuthUser = {
   id: string;
   name: string;

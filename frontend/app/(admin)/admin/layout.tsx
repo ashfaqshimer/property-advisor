@@ -72,7 +72,12 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
         </div>
         <nav aria-label="Admin navigation" className="space-y-1 px-4 py-7">
           {navigation.map((item) => item.disabled ? <span key={item.label} aria-disabled="true" className="block cursor-not-allowed rounded-lg px-4 py-3 text-sm font-medium text-white/35">{item.label}<span className="ml-2 text-[10px] uppercase tracking-wide">Disabled</span></span> : <Link key={item.label} href={item.href} className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname === item.href || (item.href === "/admin" && pathname.startsWith("/admin/properties")) ? "bg-white/12 text-white" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white"}`}>{item.label}</Link>)}
-          {user.role === "root" && <Link href="/admin/users" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/users") ? "bg-white/12 text-white" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white"}`}>Users</Link>}
+          {user.role === "root" && (
+            <>
+              <Link href="/admin/users" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/users") ? "bg-white/12 text-white" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white"}`}>Users</Link>
+              <Link href="/admin/site-configuration" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/site-configuration") ? "bg-white/12 text-white" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white"}`}>Site Config</Link>
+            </>
+          )}
         </nav>
         <div className="mt-auto border-t border-white/10 px-7 py-6 text-xs text-[#a8c0b4]">Internal tools only</div>
       </aside>
