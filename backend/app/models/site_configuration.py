@@ -32,6 +32,7 @@ class SiteConfiguration(Base):
     city: Mapped[dict[str, Any]] = mapped_column(JSON(), nullable=False, server_default=sa.text("'{\"value\": null, \"show\": true}'"))
 
     extra_settings: Mapped[dict[str, Any] | None] = mapped_column(JSON(), nullable=True, default=dict)
+    prospect_retention_days: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default=sa.text("30"))
 
     def __repr__(self) -> str:
         return f"<SiteConfiguration {self.id!s}>"

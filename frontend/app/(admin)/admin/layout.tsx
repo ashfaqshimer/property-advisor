@@ -12,6 +12,7 @@ const navigation: { label: string; href: string; disabled?: boolean }[] = [
   { label: "Properties", href: "/admin" },
   { label: "Contacts", href: "/admin/contacts" },
   { label: "Leads", href: "/admin/leads" },
+  { label: "Prospects", href: "/admin/prospects" },
   { label: "Settings", href: "/admin/settings" },
 ];
 

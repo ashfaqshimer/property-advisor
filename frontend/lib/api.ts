@@ -218,6 +218,7 @@ export type SiteConfiguration = {
   tiktok_link: StringConfigField;
   city: StringConfigField;
   extra_settings: Record<string, unknown> | null;
+  prospect_retention_days: number;
 };
 
 export type SiteConfigurationUpdate = Partial<Omit<SiteConfiguration, "id">>;
@@ -794,8 +795,71 @@ export async function createPropertyContact(
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
-  if (!response.ok) throw new ChatError("unexpected", `Contact creation failed (${response.status}).`, response.status);
-  return (await response.json()) as PropertyContact;
+}
+
+export type Prospect = {
+  id: string;
+  ikman_url: string;
+  title: string;
+  price: string;
+  location: string;
+  property_type: string;
+  listing_type: string;
+  poster_name: string | null;
+  phone_number: string | null;
+  classification: string;
+  confidence: number;
+  status: string;
+  first_seen_at: string;
+};
+
+export async function getProspects(filters?: { classification?: string; status?: string }): Promise<Prospect[]> {
+  const params = new URLSearchParams();
+  if (filters?.classification) params.append("classification", filters.classification);
+  if (filters?.status) params.append("status", filters.status);
+  
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`${baseUrl()}/admin/prospects${qs}`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Prospect list failed (${response.status}).`, response.status);
+  return (await response.json()) as Prospect[];
+}
+
+export async function updateProspect(id: string, status: string): Promise<Prospect> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Prospect update failed (${response.status}).`, response.status);
+  return (await response.json()) as Prospect;
+}
+
+export async function startProspectScan(payload: { categories: string[]; pages_per_category: number; phone_fetch_confidence_threshold: number }): Promise<{ job_id: string }> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/scan`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Scan start failed (${response.status}).`, response.status);
+  return (await response.json()) as { job_id: string };
+}
+
+export async function getScanStatus(jobId: string): Promise<{ status: string; progress: string; error?: string }> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/scan/${jobId}/status`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Scan status failed (${response.status}).`, response.status);
+  return (await response.json()) as { status: string; progress: string; error?: string };
 }
 
 export async function updatePropertyContact(

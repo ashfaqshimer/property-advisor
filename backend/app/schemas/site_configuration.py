@@ -22,6 +22,7 @@ class SiteConfigurationBase(BaseModel):
     tiktok_link: StringConfigField = Field(default_factory=StringConfigField)
     city: StringConfigField = Field(default_factory=StringConfigField)
     extra_settings: dict[str, Any] | None = Field(default_factory=dict)
+    prospect_retention_days: int = Field(default=30)
 
 
 class SiteConfigurationCreate(SiteConfigurationBase):
@@ -38,6 +39,7 @@ class SiteConfigurationUpdate(BaseModel):
     tiktok_link: StringConfigField | None = None
     city: StringConfigField | None = None
     extra_settings: dict[str, Any] | None = None
+    prospect_retention_days: int | None = None
 
 
 class SiteConfigurationResponse(SiteConfigurationBase):

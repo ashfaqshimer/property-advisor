@@ -237,6 +237,18 @@ export default function SiteConfigurationPage() {
             onShowChange={(v) => updateStringShow("tiktok_link", v)}
           />
 
+          <div className="mb-4">
+            <label className="block text-sm font-medium" htmlFor="retention_days">Data Retention: Old Prospects Auto-purge (days)</label>
+            <input
+              id="retention_days"
+              type="number"
+              min="1"
+              value={siteConfig.prospect_retention_days || 30}
+              onChange={(e) => setSiteConfig(s => ({ ...s, prospect_retention_days: parseInt(e.target.value) || 30 }))}
+              className="mt-2 w-full sm:w-32 rounded-lg border border-[#cbd8d1] px-3 py-2.5 outline-none focus:border-[#28513f]"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={updatingSiteConfig}
