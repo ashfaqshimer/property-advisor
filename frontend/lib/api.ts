@@ -84,6 +84,24 @@ export type FallbackLeadPayload = {
   phone: string;
 };
 
+export type PropertyContactPhone = {
+  id: string;
+  phone: string;
+  label: string | null;
+  is_whatsapp: boolean;
+};
+
+export type PropertyContact = {
+  id: string;
+  contact_type: "owner" | "broker";
+  full_name: string;
+  company_name: string | null;
+  email: string | null;
+  notes: string | null;
+  created_at: string;
+  phones: PropertyContactPhone[];
+};
+
 export type PropertyApiRecord = {
   id: string;
   title: string;
@@ -108,6 +126,8 @@ export type PropertyApiRecord = {
   image_alt: string;
   status: string;
   created_at: string;
+  property_contact_id: string | null;
+  property_contact: PropertyContact | null;
 };
 
 export type CreatePropertyPayload = {
@@ -141,6 +161,7 @@ export type AdminPropertyUpdatePayload = Partial<CreatePropertyPayload> & {
   road_access_ft?: number | null;
   furnishing_status?: "unfurnished" | "semi_furnished" | "fully_furnished" | null;
   amenities?: Record<string, boolean> | null;
+  property_contact_id?: string | null;
 };
 
 export type LeadSource = "ai_agent" | "manual" | "fallback";
@@ -384,7 +405,8 @@ function isPropertyApiRecord(value: unknown): value is PropertyApiRecord {
     candidate.image_urls.every((url) => typeof url === "string") &&
     typeof candidate.image_alt === "string" &&
     typeof candidate.status === "string" &&
-    typeof candidate.created_at === "string"
+    typeof candidate.created_at === "string" &&
+    (typeof candidate.property_contact_id === "string" || candidate.property_contact_id === null)
   );
 }
 
@@ -681,6 +703,76 @@ export async function createAdminLead(payload: ManualLeadPayload): Promise<Admin
     throw new ChatError("unexpected", "The backend returned an unrecognised lead.");
   }
   return result;
+}
+
+/**
+ * Nudge the Render service awake, and don't wait around for it.
+ *
+ * The free tier spins down when idle, so a visitor's first message would otherwise pay a
+ * ~22s cold start on top of the model call. Calling this as the panel mounts spends that
+ * time while they read the page instead.
+ *
+ * Every failure is swallowed: nothing about the page depends on it, a missing base URL will
+ * be reported properly by the first real send, and an unhandled rejection here would show
+ * up in the console as a bug that isn't one.
+ */
+export type CreatePropertyContactPayload = {
+  contact_type: "owner" | "broker";
+  full_name: string;
+  company_name?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  phones: { phone: string; label?: string | null; is_whatsapp?: boolean }[];
+};
+
+export type UpdatePropertyContactPayload = Partial<CreatePropertyContactPayload>;
+
+export async function getPropertyContacts(): Promise<PropertyContact[]> {
+  const response = await fetch(`${baseUrl()}/admin/property-contacts`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Contact list failed (${response.status}).`, response.status);
+  return (await response.json()) as PropertyContact[];
+}
+
+export async function createPropertyContact(
+  payload: CreatePropertyContactPayload,
+): Promise<PropertyContact> {
+  const response = await fetch(`${baseUrl()}/admin/property-contacts`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Contact creation failed (${response.status}).`, response.status);
+  return (await response.json()) as PropertyContact;
+}
+
+export async function updatePropertyContact(
+  contactId: string,
+  payload: UpdatePropertyContactPayload,
+): Promise<PropertyContact> {
+  const response = await fetch(`${baseUrl()}/admin/property-contacts/${contactId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Contact update failed (${response.status}).`, response.status);
+  return (await response.json()) as PropertyContact;
+}
+
+export async function deletePropertyContact(contactId: string): Promise<void> {
+  const response = await fetch(`${baseUrl()}/admin/property-contacts/${contactId}`, {
+    method: "DELETE",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Contact deletion failed (${response.status}).`, response.status);
 }
 
 /**

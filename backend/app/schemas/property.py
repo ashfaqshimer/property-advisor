@@ -13,6 +13,7 @@ from app.models.property import (
     PropertyStatus,
     PropertyType,
 )
+from app.schemas.property_contact import PropertyContactRead
 
 
 class PropertyRead(BaseModel):
@@ -51,6 +52,8 @@ class PropertyRead(BaseModel):
     image_alt: str
     status: PropertyStatus
     created_at: datetime
+    property_contact_id: UUID | None
+    property_contact: PropertyContactRead | None
 
     @field_serializer("price", "land_size_perches")
     def _decimal_as_number(self, value: Decimal | None) -> float | None:
@@ -105,3 +108,4 @@ class PropertyUpdate(BaseModel):
     image_urls: list[str] | None = None
     image_alt: str | None = None
     status: PropertyStatus | None = None
+    property_contact_id: UUID | None = None

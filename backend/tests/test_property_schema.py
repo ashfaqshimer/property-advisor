@@ -37,6 +37,8 @@ EXPECTED_KEYS = {
     "image_alt",
     "status",
     "created_at",
+    "property_contact_id",
+    "property_contact",
 }
 
 

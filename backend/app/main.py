@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.agent.client import GeminiNotConfigured
-from app.api import auth, chat, leads, properties
+from app.api import auth, chat, leads, properties, property_contacts
 from app.config import get_settings
 
 structlog.configure(
@@ -47,6 +47,7 @@ app.add_middleware(
 
 app.include_router(properties.router)
 app.include_router(properties.admin_router)
+app.include_router(property_contacts.router)
 app.include_router(leads.public_router)
 app.include_router(leads.router)
 app.include_router(chat.router)

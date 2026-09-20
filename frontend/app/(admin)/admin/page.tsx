@@ -6,8 +6,10 @@ import { toast } from 'sonner';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
+	getPropertyContacts,
 	getCurrentUser,
 	updateAdminProperty,
+	type PropertyContact,
 } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -20,6 +22,8 @@ type Property = {
 	price: string;
 	status: PropertyStatus;
 	featured: boolean;
+	contactId: string | null;
+	contactName: string | null;
 };
 
 const statusStyles: Record<PropertyStatus, string> = {
@@ -30,11 +34,14 @@ const statusStyles: Record<PropertyStatus, string> = {
 
 export default function AdminPropertiesPage() {
 	const [properties, setProperties] = useState<Property[]>([]);
+	const [contacts, setContacts] = useState<PropertyContact[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [busyProperty, setBusyProperty] = useState<string | null>(null);
 	const [canDelete, setCanDelete] = useState(false);
+	const [assigningId, setAssigningId] = useState<string | null>(null);
 	useEffect(() => {
 		getCurrentUser().then((user) => setCanDelete(user?.role === 'root')).catch(() => {});
+		getPropertyContacts().then(setContacts).catch(() => {});
 		getAdminProperties()
 			.then((records) =>
 				setProperties(
@@ -46,6 +53,8 @@ export default function AdminPropertiesPage() {
 						price: `LKR ${record.price.toLocaleString()}`,
 						status: record.status as PropertyStatus,
 						featured: record.is_featured,
+						contactId: record.property_contact_id,
+						contactName: record.property_contact?.full_name ?? null,
 					})),
 				),
 			)
@@ -78,6 +87,25 @@ export default function AdminPropertiesPage() {
 			);
 		} finally {
 			setBusyProperty(null);
+		}
+	}
+	async function assignContact(propertyId: string, contactId: string | null) {
+		setAssigningId(propertyId);
+		try {
+			const updated = await updateAdminProperty(propertyId, { property_contact_id: contactId });
+			const matched = contacts.find((c) => c.id === updated.property_contact_id) ?? null;
+			setProperties((current) =>
+				current.map((p) =>
+					p.id === propertyId
+						? { ...p, contactId: updated.property_contact_id, contactName: matched?.full_name ?? null }
+						: p,
+				),
+			);
+			toast.success('Contact assigned.');
+		} catch (reason) {
+			toast.error(reason instanceof Error ? reason.message : 'Could not assign contact.');
+		} finally {
+			setAssigningId(null);
 		}
 	}
 	async function deleteProperty(id: string) {
@@ -146,6 +174,7 @@ export default function AdminPropertiesPage() {
 								<th className='px-4 py-4 font-semibold'>Location</th>
 								<th className='px-4 py-4 font-semibold'>Price (LKR)</th>
 								<th className='px-4 py-4 font-semibold'>Status</th>
+								<th className='px-4 py-4 font-semibold'>Contact</th>
 								<th className='px-4 py-4 font-semibold'>Featured</th>
 								<th className='px-5 py-4 text-right font-semibold'>Actions</th>
 							</tr>
@@ -178,6 +207,22 @@ export default function AdminPropertiesPage() {
 										>
 											{property.status.replace('_', ' ')}
 										</span>
+									</td>
+									<td className='px-4 py-4 text-sm'>
+										{assigningId === property.id ? (
+											<Spinner className='h-4 w-4 text-[#28513f]' />
+										) : (
+											<select
+												value={property.contactId ?? ''}
+												onChange={(e) => assignContact(property.id, e.target.value || null)}
+												className='max-w-[160px] truncate rounded border border-[#d0dbd4] bg-white px-2 py-1 text-xs text-[#1a2923] focus:border-[#35664f] focus:outline-none'
+											>
+												<option value=''>— none —</option>
+												{contacts.map((c) => (
+													<option key={c.id} value={c.id}>{c.full_name}</option>
+												))}
+											</select>
+										)}
 									</td>
 									<td className='px-4 py-4'>
 										<button
@@ -236,6 +281,24 @@ export default function AdminPropertiesPage() {
 							</div>
 							<div className='text-sm text-[#65736b]'>
 								📍 {property.location}
+							</div>
+							{/* Contact assign on mobile */}
+							<div className='flex items-center gap-2 text-xs text-[#65736b]'>
+								<span className='shrink-0'>Contact:</span>
+								{assigningId === property.id ? (
+									<Spinner className='h-3.5 w-3.5 text-[#28513f]' />
+								) : (
+									<select
+										value={property.contactId ?? ''}
+										onChange={(e) => assignContact(property.id, e.target.value || null)}
+										className='flex-1 rounded border border-[#d0dbd4] bg-white px-2 py-1 text-xs text-[#1a2923] focus:border-[#35664f] focus:outline-none'
+									>
+										<option value=''>— none —</option>
+										{contacts.map((c) => (
+											<option key={c.id} value={c.id}>{c.full_name}</option>
+										))}
+									</select>
+								)}
 							</div>
 							<div className='mt-2 flex items-center justify-between border-t border-[#edf0ee] pt-4'>
 								<button

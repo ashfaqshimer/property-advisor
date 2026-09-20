@@ -10,6 +10,7 @@ import AdminUserMenu from "../../../components/admin/AdminUserMenu";
 
 const navigation: { label: string; href: string; disabled?: boolean }[] = [
   { label: "Properties", href: "/admin" },
+  { label: "Contacts", href: "/admin/contacts" },
   { label: "Leads", href: "/admin/leads" },
   { label: "Settings", href: "/admin/settings" },
 ];
