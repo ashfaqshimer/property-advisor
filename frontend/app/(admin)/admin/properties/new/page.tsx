@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
-import { createProperty, getPropertyContacts, uploadPropertyImages, type PropertyContact } from '@/lib/api';
+import { toast } from 'sonner';
+import { createProperty, createPropertyContact, getPropertyContacts, uploadPropertyImages, type PropertyContact } from '@/lib/api';
+import { ContactForm } from '@/components/admin/ContactForm';
 import { Spinner } from '@/components/ui/spinner';
 
 type FormValues = {
@@ -57,6 +59,8 @@ export default function NewPropertyPage() {
 	const [saving, setSaving] = useState(false);
 	const [success, setSuccess] = useState(false);
 	const [contacts, setContacts] = useState<PropertyContact[]>([]);
+	const [showContactForm, setShowContactForm] = useState(false);
+	const [creatingContact, setCreatingContact] = useState(false);
 	useEffect(() => {
 		getPropertyContacts().then(setContacts).catch(() => {});
 		return () =>
@@ -65,6 +69,21 @@ export default function NewPropertyPage() {
 	function updateField(field: keyof FormValues, value: string | boolean) {
 		setForm((current) => ({ ...current, [field]: value }));
 		setErrors((current) => ({ ...current, [field]: '' }));
+	}
+
+	async function handleCreateContact(data: Parameters<typeof createPropertyContact>[0]) {
+		setCreatingContact(true);
+		try {
+			const created = await createPropertyContact(data);
+			setContacts((prev) => [created, ...prev]);
+			updateField('propertyContactId', created.id);
+			setShowContactForm(false);
+			toast.success('Contact added.');
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Could not create contact.');
+		} finally {
+			setCreatingContact(false);
+		}
 	}
 	function handleImages(event: ChangeEvent<HTMLInputElement>) {
 		const files = Array.from(event.target.files ?? []).filter((file) =>
@@ -266,21 +285,40 @@ export default function NewPropertyPage() {
 							/>
 							{errorText('location')}
 						</label>
-						<label className='text-sm font-medium sm:col-span-2'>
-							Contact (Owner / Broker)
-							<select
-								className={fieldClass}
-								value={form.propertyContactId}
-								onChange={(e) => updateField('propertyContactId', e.target.value)}
-							>
-								<option value=''>— None —</option>
-								{contacts.map((c) => (
-									<option key={c.id} value={c.id}>
-										{c.full_name} {c.company_name ? `(${c.company_name})` : ''}
-									</option>
-								))}
-							</select>
-						</label>
+						<div className='sm:col-span-2'>
+							<div className='flex items-center justify-between mb-1'>
+								<label className='text-sm font-medium'>Contact (Owner / Broker)</label>
+								<button
+									type='button'
+									onClick={() => setShowContactForm((s) => !s)}
+									className='text-xs font-semibold text-[#35664f] hover:underline'
+								>
+									{showContactForm ? 'Cancel new contact' : '+ Add new contact'}
+								</button>
+							</div>
+							{showContactForm ? (
+								<div className='mt-2 rounded-xl border border-[#dce4df] bg-[#f9fbf9] p-4 shadow-sm'>
+									<ContactForm
+										onSave={handleCreateContact}
+										onCancel={() => setShowContactForm(false)}
+										saving={creatingContact}
+									/>
+								</div>
+							) : (
+								<select
+									className={fieldClass}
+									value={form.propertyContactId}
+									onChange={(e) => updateField('propertyContactId', e.target.value)}
+								>
+									<option value=''>— None —</option>
+									{contacts.map((c) => (
+										<option key={c.id} value={c.id}>
+											{c.full_name} {c.company_name ? `(${c.company_name})` : ''}
+										</option>
+									))}
+								</select>
+							)}
+						</div>
 					</div>
 				</div>
 				<div className='rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm sm:p-8'>
