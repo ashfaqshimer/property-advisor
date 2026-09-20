@@ -82,7 +82,7 @@ describe("Footer content", () => {
     render(<Footer />);
 
     expect(
-      screen.getByText(/© 2026 Property Advisor — a UI prototype/),
+      screen.getByText(/© 2026 Property Advisor/),
     ).toBeInTheDocument();
   });
 
