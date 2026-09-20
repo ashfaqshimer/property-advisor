@@ -17,22 +17,22 @@ from app.config import BACKEND_DIR
 
 
 class TestPersona:
-    def test_she_is_amaya(self):
-        assert "You are Amaya" in build_system_prompt()
+    def test_she_is_amaya(self, db_session):
+        assert "You are Amaya" in build_system_prompt(db_session)
 
-    def test_the_brokerage_is_not_her_name(self):
+    def test_the_brokerage_is_not_her_name(self, db_session):
         """Property Advisor is where she works. CLAUDE.md's branding section covers this;
         the old rule said the agent was named after the brand and was amended
         deliberately."""
-        assert "You are Property Advisor" not in build_system_prompt()
-        assert "Property Advisor" in build_system_prompt(), "the brokerage is still named"
+        assert "You are Property Advisor" not in build_system_prompt(db_session)
+        assert "Property Advisor" in build_system_prompt(db_session), "the brokerage is still named"
 
-    def test_no_trace_of_the_old_brand(self):
+    def test_no_trace_of_the_old_brand(self, db_session):
         """The brand was renamed from "Home Advisor"; nothing should still say it."""
-        assert "home advisor" not in build_system_prompt().lower()
+        assert "home advisor" not in build_system_prompt(db_session).lower()
 
-    def test_no_placeholder_branding_from_the_mockup(self):
-        assert "terra" not in build_system_prompt().lower()
+    def test_no_placeholder_branding_from_the_mockup(self, db_session):
+        assert "terra" not in build_system_prompt(db_session).lower()
 
     @pytest.mark.parametrize(
         "rule",
@@ -48,12 +48,12 @@ class TestPersona:
             "You have already greeted them",
         ],
     )
-    def test_settled_rule_is_still_present(self, rule: str):
-        assert rule in build_system_prompt()
+    def test_settled_rule_is_still_present(self, db_session, rule: str):
+        assert rule in build_system_prompt(db_session)
 
-    def test_lead_notes_are_recorded_when_useful(self):
-        assert "add a brief `remarks` note" in build_system_prompt()
-        assert "Do not invent, infer" in build_system_prompt()
+    def test_lead_notes_are_recorded_when_useful(self, db_session):
+        assert "add a brief `remarks` note" in build_system_prompt(db_session)
+        assert "Do not invent, infer" in build_system_prompt(db_session)
 
 class TestSchemaIntro:
     def test_seller_fields_reflect_property_create(self):

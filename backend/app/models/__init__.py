@@ -19,6 +19,7 @@ from app.models.property_contact import (
     PropertyContactPhone,
     PropertyContactType,
 )
+from app.models.site_configuration import SiteConfiguration
 
 __all__ = [
     "StaffSession",
@@ -36,4 +37,5 @@ __all__ = [
     "PropertyContact",
     "PropertyContactPhone",
     "PropertyContactType",
+    "SiteConfiguration",
 ]

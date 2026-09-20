@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.agent.client import GeminiNotConfigured
-from app.api import auth, chat, leads, properties, property_contacts
+from app.api import auth, chat, leads, properties, property_contacts, site_configuration
 from app.config import get_settings
 
 structlog.configure(
@@ -41,13 +41,15 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS", "PUT"],
     allow_headers=["Content-Type"],
 )
 
 app.include_router(properties.router)
 app.include_router(properties.admin_router)
 app.include_router(property_contacts.router)
+app.include_router(site_configuration.router)
+app.include_router(site_configuration.admin_router)
 app.include_router(leads.public_router)
 app.include_router(leads.router)
 app.include_router(chat.router)

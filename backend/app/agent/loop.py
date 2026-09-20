@@ -208,7 +208,7 @@ def run_turn(
         response = gemini.generate(
             contents=contents,
             tools=tools.TOOL_DECLARATIONS,
-            system_instruction=build_system_prompt(),
+            system_instruction=build_system_prompt(db),
         )
         usage = response.usage_metadata
         logger.info(
