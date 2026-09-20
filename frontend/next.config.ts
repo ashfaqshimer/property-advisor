@@ -20,18 +20,18 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    // When BACKEND_URL is set (e.g., in Vercel production), proxy /api requests to the Render backend.
-    // This avoids cross-origin cookie rejection (SameSite=Lax) on the frontend.
-    // Set NEXT_PUBLIC_API_URL=/api in your Vercel environment so the browser calls the proxy.
-    if (process.env.BACKEND_URL) {
-      return [
-        {
-          source: "/api/:path*",
-          destination: `${process.env.BACKEND_URL.replace(/\/+$/, '')}/:path*`,
-        },
-      ];
-    }
-    return [];
+    // In production (Vercel), BACKEND_URL proxies /api/* to the Render backend,
+    // avoiding cross-origin cookie rejection (SameSite=Lax).
+    // In local dev, fall back to localhost:8000 so the rewrite always activates
+    // and NEXT_PUBLIC_API_URL=/api works without restarting the dev server.
+    const backendUrl =
+      process.env.BACKEND_URL?.replace(/\/+$/, "") ?? "http://localhost:8000";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${backendUrl}/:path*`,
+      },
+    ];
   },
 };
 

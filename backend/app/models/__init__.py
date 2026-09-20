@@ -14,6 +14,11 @@ from app.models.property import (
     PropertyStatus,
     PropertyType,
 )
+from app.models.property_contact import (
+    PropertyContact,
+    PropertyContactPhone,
+    PropertyContactType,
+)
 
 __all__ = [
     "StaffSession",
@@ -28,4 +33,7 @@ __all__ = [
     "Property",
     "PropertyStatus",
     "PropertyType",
+    "PropertyContact",
+    "PropertyContactPhone",
+    "PropertyContactType",
 ]

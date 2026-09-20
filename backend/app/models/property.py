@@ -7,14 +7,18 @@ import enum
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Float, Numeric, String, Text, Uuid, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Numeric, String, Text, Uuid, func
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.db.base import Base
 from app.models._enum import enum_column
+
+if TYPE_CHECKING:
+    from app.models.property_contact import PropertyContact
 
 
 class PropertyType(str, enum.Enum):
@@ -116,6 +120,17 @@ class Property(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+    )
+
+    property_contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("property_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    property_contact: Mapped["PropertyContact | None"] = relationship(
+        back_populates="properties",
+        lazy="select",
     )
 
     def __repr__(self) -> str:
