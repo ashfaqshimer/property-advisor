@@ -466,6 +466,12 @@ function isPropertyApiResponse(value: unknown): value is PropertyApiRecord[] {
  * fail only in production.
  */
 function baseUrl(): string {
+  if (typeof window === "undefined") {
+    const backendUrl = process.env.BACKEND_URL?.trim();
+    if (backendUrl) return backendUrl.replace(/\/+$/, "");
+    return "http://localhost:8000";
+  }
+
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!configured) {
     throw new ChatError(
