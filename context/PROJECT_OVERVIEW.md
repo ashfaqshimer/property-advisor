@@ -144,22 +144,55 @@ property-advisor/
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
+| email | string | FastAPI Users standard field, UNIQUE, indexed |
+| hashed_password | string | FastAPI Users standard field |
+| is_active | bool | FastAPI Users standard field |
+| is_superuser | bool | FastAPI Users standard field |
+| is_verified | bool | FastAPI Users standard field |
 | name | string(120) | |
-| email | string(320) | UNIQUE, indexed |
-| password_hash | string(512) | bcrypt |
 | role | string(20) | e.g. "root", "agent" |
-| is_active | bool | |
 | created_at | timestamp | |
 
-### `staff_sessions`
+### `staff_sessions` (Access Tokens)
+| Field | Type | Notes |
+|---|---|---|
+| token | string (PK) | FastAPI Users access token |
+| user_id | FK → staff_users.id | CASCADE delete |
+| created_at | timestamp | |
+
+### `property_contacts`
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| user_id | FK → staff_users.id | CASCADE delete |
-| token_hash | string(64) | UNIQUE, indexed; SHA-256 of the bearer token |
-| expires_at | timestamp | indexed |
-| revoked_at | timestamp | nullable; set on logout |
+| contact_type | enum | owner, broker |
+| full_name | string(200) | |
+| company_name | string(200) | nullable |
+| email | string(254) | nullable |
+| notes | text | nullable |
 | created_at | timestamp | |
+
+### `property_contact_phones`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| property_contact_id | FK → property_contacts.id | CASCADE delete |
+| phone | string(32) | |
+| label | string(40) | nullable |
+| is_whatsapp | bool | |
+
+### `site_configurations`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| phone_numbers | JSON | |
+| contact_email | JSON | |
+| whatsapp | JSON | |
+| instagram_link | JSON | |
+| facebook_link | JSON | |
+| x_link | JSON | |
+| tiktok_link | JSON | |
+| city | JSON | |
+| extra_settings | JSON | nullable |
 
 ---
 
@@ -205,11 +238,13 @@ property-advisor/
 | GET | `/health` | — | Smoke-test |
 | POST | `/chat` | — | Send a user message + session_id, get back Amaya's reply |
 | GET | `/properties/featured` | — | Curated featured set for the homepage grid |
-| GET | `/properties` | Staff session | Full listing (admin) with optional query params |
+| GET/POST/PUT/DEL | `/properties` | Staff session | Full listing (admin) with optional query params / CRUD |
 | GET | `/leads` | Staff session | View captured leads |
-| POST | `/auth/login` | — | Authenticate staff, return session token |
-| POST | `/auth/logout` | Staff session | Revoke current session |
-| GET | `/auth/me` | Staff session | Return the current authenticated staff user |
+| POST | `/auth/jwt/login` | — | Authenticate staff via FastAPI Users, return session token |
+| POST | `/auth/jwt/logout` | Staff session | Revoke current session via FastAPI Users |
+| GET | `/users/me` | Staff session | Return the current authenticated staff user via FastAPI Users |
+| GET/POST/PUT/DEL | `/property-contacts` | Staff session | Manage property owners and brokers |
+| GET/PUT | `/site-configuration` | Staff session (PUT) | Retrieve and update site-wide settings |
 
 ---
 
@@ -237,31 +272,18 @@ NEXT_PUBLIC_API_URL=https://your-backend.onrender.com
 
 ---
 
-## 9. Suggested Build Phases (for Claude Code)
+## 9. Build Status (Current State)
 
-**Phase 1 — Backend foundation**
-- Set up FastAPI project structure, SQLAlchemy models, Alembic migrations
-- Seed the `properties` table with realistic sample data (6-9 properties matching the UI mockup)
+**Completed:**
+- **Backend foundation & Auth:** FastAPI project structure, SQLAlchemy models, Alembic migrations, database seeding. Fully migrated to **FastAPI Users** for authentication and session management. Added Business Contact (`property_contacts`) and Site Configuration schemas.
+- **Agent core:** Gemini API client wrapper using `google-genai` SDK, `search_properties` and `capture_lead` tools, manual tool-calling loop, persistent conversations.
+- **API endpoints:** `/chat`, `/properties`, `/leads`, `/property-contacts`, `/site-configuration`, and FastAPI Users `/auth` routes are fully wired and functional.
+- **Frontend integration:** Next.js UI integrated with backend APIs, ChatPanel wired, property grid and admin dashboard operational. Added conditional rendering of contact details and site configuration settings management.
+- **Data Models:** Added linking of property owner models.
 
-**Phase 2 — Agent core**
-- Implement the Gemini API client wrapper (`google-genai` SDK)
-- Implement `search_properties` and `capture_lead` tools
-- Build the manual tool-calling loop
-- Test via a simple script or FastAPI docs (`/docs`) before wiring up the frontend
-
-**Phase 3 — Chat API**
-- Build `/chat` endpoint tying conversation persistence + agent loop together
-- Build `/properties/featured` endpoint
-
-**Phase 4 — Frontend integration**
-- Port the v0-generated UI into the Next.js app structure
-- Wire the ChatPanel component to `/chat`
-- Wire the featured properties grid to `/properties/featured`
-
-**Phase 5 — Polish & deploy**
-- Error handling, loading states, empty states
-- Deploy frontend to Vercel, backend to Render, verify env vars and CORS
-- Smoke test the full conversation flow end-to-end
+**Pending / Next Steps:**
+- Polish and refine UI/UX (error handling, empty states).
+- E2E smoke tests and deployment (Vercel + Render).
 
 ---
 
