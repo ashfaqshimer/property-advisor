@@ -813,10 +813,21 @@ export type Prospect = {
   first_seen_at: string;
 };
 
-export async function getProspects(filters?: { classification?: string; status?: string }): Promise<Prospect[]> {
+export type PaginatedProspects = {
+  items: Prospect[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+};
+
+export async function getProspects(filters?: { status?: string; property_type?: string; listing_type?: string; page?: number; page_size?: number }): Promise<PaginatedProspects> {
   const params = new URLSearchParams();
-  if (filters?.classification) params.append("classification", filters.classification);
   if (filters?.status) params.append("status", filters.status);
+  if (filters?.property_type) params.append("property_type", filters.property_type);
+  if (filters?.listing_type) params.append("listing_type", filters.listing_type);
+  if (filters?.page) params.append("page", filters.page.toString());
+  if (filters?.page_size) params.append("page_size", filters.page_size.toString());
   
   const qs = params.toString() ? `?${params.toString()}` : "";
   const response = await fetch(`${baseUrl()}/admin/prospects${qs}`, {
@@ -825,7 +836,7 @@ export async function getProspects(filters?: { classification?: string; status?:
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Prospect list failed (${response.status}).`, response.status);
-  return (await response.json()) as Prospect[];
+  return (await response.json()) as PaginatedProspects;
 }
 
 export async function updateProspect(id: string, status: string): Promise<Prospect> {

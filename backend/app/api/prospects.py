@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, func
 from sqlalchemy.orm import Session
 import structlog
 
@@ -16,6 +16,7 @@ from app.schemas.prospect import (
     ProspectRead,
     ProspectUpdate,
     ScanRequest,
+    ProspectList,
 )
 from app.scraper.classifier import classify_listing_heuristics
 from app.scraper.ikman_client import IkmanClient, IKMAN_BASE_URL
@@ -45,6 +46,10 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             new_count += 1
             classification, confidence, reasons = classify_listing_heuristics(ad)
             
+            if classification == "broker":
+                new_count -= 1
+                continue
+                        
             phone_number = None
             poster_name = None
             
@@ -122,6 +127,8 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
                             job["progress"] = f"Fetching details for {ad.title}"
                             detail = await client.fetch_ad_detail(ad.slug)
                             if detail:
+                                if not detail.price:
+                                    detail.price = ad.price
                                 ads[i] = detail
 
                 # Now save to DB in a thread
@@ -172,18 +179,18 @@ def get_scan_status(
     return SCAN_JOBS[job_id]
 
 
-@admin_router.get("", response_model=list[ProspectRead])
+@admin_router.get("", response_model=ProspectList)
 def list_prospects(
     db: DbSession,
     _admin: CurrentStaffUser,
-    classification: str | None = None,
     status: str | None = None,
     property_type: str | None = None,
-    listing_type: str | None = None
+    listing_type: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
 ) -> Any:
-    stmt = select(Prospect).order_by(Prospect.first_seen_at.desc())
-    if classification:
-        stmt = stmt.where(Prospect.classification == classification)
+    stmt = select(Prospect).where(Prospect.classification == "owner")
+    
     if status:
         stmt = stmt.where(Prospect.status == status)
     if property_type:
@@ -191,7 +198,24 @@ def list_prospects(
     if listing_type:
         stmt = stmt.where(Prospect.listing_type == listing_type)
         
-    return db.execute(stmt).scalars().all()
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = db.execute(count_stmt).scalar_one()
+    
+    stmt = stmt.order_by(Prospect.first_seen_at.desc())
+        
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    
+    items = db.execute(stmt).scalars().all()
+    
+    total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
 
 
 @admin_router.patch("/{id}", response_model=ProspectRead)

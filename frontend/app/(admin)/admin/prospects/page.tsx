@@ -26,9 +26,11 @@ export default function ProspectsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Filters
-  const [filterClass, setFilterClass] = useState<string>("");
+  // Filters & Pagination
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
   
   // Scan State
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
@@ -41,12 +43,26 @@ export default function ProspectsPage() {
 
   const fetchProspects = async () => {
     setLoading(true);
+    
+    let property_type = undefined;
+    let listing_type = undefined;
+    if (filterCategory === "land-for-sale") { property_type = "land"; listing_type = "sale"; }
+    else if (filterCategory === "houses-for-sale") { property_type = "house"; listing_type = "sale"; }
+    else if (filterCategory === "apartments-for-sale") { property_type = "apartment"; listing_type = "sale"; }
+    else if (filterCategory === "house-rentals") { property_type = "house"; listing_type = "rent"; }
+    else if (filterCategory === "apartment-rentals") { property_type = "apartment"; listing_type = "rent"; }
+    else if (filterCategory === "room-annex-rentals") { property_type = "property"; listing_type = "rent"; }
+
     try {
       const data = await getProspects({
-        classification: filterClass || undefined,
         status: filterStatus || undefined,
+        property_type,
+        listing_type,
+        page,
+        page_size: 50
       });
-      setProspects(data);
+      setProspects(data.items);
+      setTotalPages(data.total_pages);
     } catch (err) {
       toast.error("Failed to load prospects");
     } finally {
@@ -56,7 +72,7 @@ export default function ProspectsPage() {
 
   useEffect(() => {
     fetchProspects();
-  }, [filterClass, filterStatus]);
+  }, [filterStatus, filterCategory, page]);
 
   // Polling for scan progress
   useEffect(() => {
@@ -151,15 +167,6 @@ export default function ProspectsPage() {
           <span className="font-medium text-[#1a2923]">Filters</span>
         </div>
         <select
-          value={filterClass}
-          onChange={(e) => setFilterClass(e.target.value)}
-          className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
-        >
-          <option value="">All Types</option>
-          <option value="owner">Owner (Direct)</option>
-          <option value="broker">Broker / Agent</option>
-        </select>
-        <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
@@ -169,6 +176,16 @@ export default function ProspectsPage() {
           <option value="contacted">Contacted</option>
           <option value="ignored">Ignored</option>
           <option value="converted">Converted</option>
+        </select>
+        <select
+          value={filterCategory}
+          onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
+          className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
+        >
+          <option value="">All Categories</option>
+          {CATEGORIES.map(cat => (
+            <option key={cat.id} value={cat.id}>{cat.label}</option>
+          ))}
         </select>
       </div>
 
@@ -180,7 +197,6 @@ export default function ProspectsPage() {
                 <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4">Title / Location</th>
                 <th className="px-6 py-4">Price</th>
-                <th className="px-6 py-4">Classification</th>
                 <th className="px-6 py-4">Contact Info</th>
                 <th className="px-6 py-4">Status</th>
               </tr>
@@ -217,16 +233,6 @@ export default function ProspectsPage() {
                       {prospect.price || "-"}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          prospect.classification === 'owner' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {prospect.classification.toUpperCase()}
-                        </span>
-                        <span className="text-xs text-[#64736b]">{prospect.confidence}%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
                       <div className="font-medium text-[#1a2923]">{prospect.phone_number || <span className="text-gray-400 italic">Not fetched</span>}</div>
                       <div className="mt-1 text-xs text-[#64736b]">{prospect.poster_name || "-"}</div>
                     </td>
@@ -253,6 +259,29 @@ export default function ProspectsPage() {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-[#dce4df] px-6 py-4">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm font-medium text-[#1a2923] hover:bg-[#f4f6f4] disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-[#64736b]">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm font-medium text-[#1a2923] hover:bg-[#f4f6f4] disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Scan Modal */}

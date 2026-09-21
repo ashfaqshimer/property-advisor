@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from typing import Any
+from pydantic import BaseModel, Field, model_validator
 
 
 class IkmanCategory(BaseModel):
@@ -33,3 +34,12 @@ class IkmanAd(BaseModel):
 class IkmanAdDetail(IkmanAd):
     description: str | None = None
     contactCard: IkmanContactCard | None = None
+    money: dict[str, Any] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_price(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "price" not in data and "money" in data and isinstance(data["money"], dict):
+                data["price"] = data["money"].get("amount")
+        return data
