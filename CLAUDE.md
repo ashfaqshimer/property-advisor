@@ -91,3 +91,9 @@ Backend `.env`: `DATABASE_URL` (Neon), `GEMINI_API_KEY` (AI Studio), `ALLOWED_OR
 Frontend `.env.local`: `NEXT_PUBLIC_API_URL` — the deployed backend is `https://property-advisor-96sg.onrender.com`.
 
 The Render free tier spins down when idle, so the first request after inactivity is slow — expected, not a bug.
+
+## Database Access & Safety Rules
+
+* **Scope:** Only access the `property-advisor` database.
+* **Environment:** You may access both development and production data.
+* **CRITICAL SAFETY RULE:** **NEVER** edit or delete production data without explicit user confirmation. If you are attempting to delete or edit production data, you must ask the user repeatedly to confirm before proceeding.

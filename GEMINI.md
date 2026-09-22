@@ -36,3 +36,9 @@
   * *Gotcha:* Models must stay portable across engines (e.g., use `Uuid`, `func.now()`, `ARRAY(Text).with_variant(JSON(), "sqlite")`).
   * *Gotcha:* `tests/conftest.py` sets `PRAGMA foreign_keys=ON`; without this, SQLite ignores foreign keys.
   * *Gotcha:* Alembic 1.19 has a false positive on enum columns, emitting `drop_constraint` for valid CHECKs. Ignore/filter these in migrations.
+
+## Database Access & Safety Rules
+
+* **Scope:** Only access the `property-advisor` database.
+* **Environment:** You may access both development and production data.
+* **CRITICAL SAFETY RULE:** **NEVER** edit or delete production data without explicit user confirmation. If you are attempting to delete or edit production data, you must ask the user repeatedly to confirm before proceeding.
