@@ -198,16 +198,16 @@ export default function ProspectsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Find Prospects</h1>
           <p className="mt-2 text-sm text-[#64736b]">Scrape property listings from ikman.lk to find new leads.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
           <button
             onClick={handleStartBulkPhoneFetch}
             disabled={activePhoneJobId !== null}
-            className="inline-flex items-center gap-2 rounded-lg bg-white border border-[#cbd8d1] px-4 py-2 text-sm font-semibold text-[#19352b] shadow-sm hover:bg-[#f4f6f4] disabled:opacity-50 cursor-pointer disabled:cursor-default"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-white border border-[#cbd8d1] px-4 py-2 text-sm font-semibold text-[#19352b] shadow-sm hover:bg-[#f4f6f4] disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
           >
             <PhoneCall className="h-4 w-4" />
             {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
@@ -215,7 +215,7 @@ export default function ProspectsPage() {
           <button
             onClick={() => setIsScanModalOpen(true)}
             disabled={activeJobId !== null}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#132820] disabled:opacity-50 cursor-pointer disabled:cursor-default"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#132820] disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
           >
             <Search className="h-4 w-4" />
             {activeJobId ? "Scan Running..." : "New Scan"}
@@ -248,15 +248,15 @@ export default function ProspectsPage() {
       )}
 
       {/* Filters */}
-      <div className="mt-8 flex items-center gap-4 border-b border-[#dce4df] pb-4">
-        <div className="flex items-center gap-2 text-sm">
+      <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-4 border-b border-[#dce4df] pb-4">
+        <div className="flex items-center gap-2 text-sm shrink-0">
           <Filter className="h-4 w-4 text-[#718078]" />
           <span className="font-medium text-[#1a2923]">Filters</span>
         </div>
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
+          className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f] w-full sm:w-auto"
         >
           <option value="">All Statuses</option>
           <option value="new">New</option>
@@ -267,7 +267,7 @@ export default function ProspectsPage() {
         <select
           value={filterCategory}
           onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
-          className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
+          className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f] w-full sm:w-auto"
         >
           <option value="">All Categories</option>
           {CATEGORIES.map(cat => (
@@ -277,7 +277,89 @@ export default function ProspectsPage() {
       </div>
 
       <div className="mt-6 overflow-hidden rounded-xl border border-[#dce4df] bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        
+        {/* Mobile Cards */}
+        <div className="flex flex-col divide-y divide-[#dce4df] md:hidden">
+          {loading ? (
+            <div className="p-6 text-center text-[#64736b]">Loading prospects...</div>
+          ) : prospects.length === 0 ? (
+            <div className="p-6 text-center text-[#64736b]">No prospects found.</div>
+          ) : (
+            prospects.map((prospect) => (
+              <div key={prospect.id} className="p-4 flex flex-col gap-3 hover:bg-[#f4f6f4]/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[#64736b]">
+                    {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
+                  </span>
+                  <select
+                    value={prospect.status}
+                    onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
+                    className={`cursor-pointer rounded-md border-0 py-1 pl-2 pr-6 text-xs font-medium focus:ring-2 focus:ring-[#19352b] ${
+                      prospect.status === 'new' ? 'bg-yellow-50 text-yellow-700' :
+                      prospect.status === 'contacted' ? 'bg-blue-50 text-blue-700' :
+                      prospect.status === 'ignored' ? 'bg-gray-100 text-gray-500' :
+                      'bg-green-50 text-green-700'
+                    }`}
+                  >
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="ignored">Ignored</option>
+                    <option value="converted">Converted</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-medium text-[#1a2923] line-clamp-2">{prospect.title}</span>
+                    {prospect.ikman_url && (
+                      <a href={prospect.ikman_url} target="_blank" rel="noopener noreferrer" className="shrink-0 mt-1 text-blue-600 hover:text-blue-800">
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1 text-xs text-[#64736b]">
+                    <span>{prospect.property_type}</span>
+                    <span>•</span>
+                    <span>{prospect.listing_type}</span>
+                    <span>•</span>
+                    <span>{prospect.location}</span>
+                  </div>
+                </div>
+
+                <div className="text-sm font-semibold text-[#1a2923]">
+                  {prospect.price || "Price not listed"}
+                </div>
+
+                <div className="rounded-lg bg-[#f4f6f4] p-3 text-sm flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#64736b]">Contact</span>
+                    <span className="font-medium text-[#1a2923]">{prospect.poster_name || "Unknown"}</span>
+                  </div>
+                  {prospect.phone_number ? (
+                    <div className="font-medium text-[#1a2923]">{prospect.phone_number}</div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <span className="text-gray-400 italic text-sm">Phone not fetched</span>
+                      {prospect.classification === "owner" && (
+                        <button 
+                          onClick={() => handleFetchSinglePhone(prospect.id)}
+                          disabled={fetchingPhoneId === prospect.id}
+                          className="flex w-full items-center justify-center gap-2 rounded bg-white border border-[#cbd8d1] px-3 py-2 text-sm font-medium text-[#19352b] hover:bg-[#e0e7e3] disabled:opacity-50 cursor-pointer disabled:cursor-default"
+                        >
+                          {fetchingPhoneId === prospect.id && <RefreshCw className="h-4 w-4 animate-spin" />}
+                          {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch Phone Number"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full whitespace-nowrap text-left text-sm">
             <thead className="bg-[#f4f6f4] text-xs font-semibold uppercase tracking-wider text-[#718078]">
               <tr>
@@ -427,17 +509,17 @@ export default function ProspectsPage() {
                 />
               </div>
               
-              <div className="mt-8 flex justify-end gap-3 border-t border-[#dce4df] pt-5">
+              <div className="mt-8 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-[#dce4df] pt-5">
                 <button
                   type="button"
                   onClick={() => setIsScanModalOpen(false)}
-                  className="cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-[#718078] hover:bg-[#f4f6f4] hover:text-[#1a2923]"
+                  className="cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-[#718078] hover:bg-[#f4f6f4] hover:text-[#1a2923] w-full sm:w-auto text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="cursor-pointer rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#132820]"
+                  className="cursor-pointer rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#132820] w-full sm:w-auto text-center"
                 >
                   Start Scan
                 </button>
