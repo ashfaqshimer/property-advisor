@@ -200,7 +200,7 @@ export default function ProspectsPage() {
             className="inline-flex items-center gap-2 rounded-lg bg-white border border-[#cbd8d1] px-4 py-2 text-sm font-semibold text-[#19352b] shadow-sm hover:bg-[#f4f6f4] disabled:opacity-50"
           >
             <PhoneCall className="h-4 w-4" />
-            {activePhoneJobId ? "Fetching Phones..." : "Fetch Missing Phones"}
+            {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
           </button>
           <button
             onClick={() => setIsScanModalOpen(true)}
