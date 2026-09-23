@@ -873,6 +873,16 @@ export async function getScanStatus(jobId: string): Promise<{ status: string; pr
   return (await response.json()) as { status: string; progress: string; error?: string };
 }
 
+export async function getActiveJobs(): Promise<{ scan: string | null; phone_fetch: string | null }> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/scan/active`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Active jobs fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as { scan: string | null; phone_fetch: string | null };
+}
+
 export async function fetchProspectPhone(id: string): Promise<Prospect> {
   const response = await fetch(`${baseUrl()}/admin/prospects/${id}/fetch-phone`, {
     method: "POST",

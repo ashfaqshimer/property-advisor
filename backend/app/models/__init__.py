@@ -21,6 +21,7 @@ from app.models.property_contact import (
 )
 from app.models.site_configuration import SiteConfiguration
 from app.models.prospect import Prospect
+from app.models.scan_job import ScanJob
 
 __all__ = [
     "StaffSession",
@@ -40,4 +41,5 @@ __all__ = [
     "PropertyContactType",
     "SiteConfiguration",
     "Prospect",
+    "ScanJob",
 ]

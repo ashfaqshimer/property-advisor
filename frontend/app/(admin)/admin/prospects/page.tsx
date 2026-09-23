@@ -80,6 +80,16 @@ export default function ProspectsPage() {
     fetchProspects();
   }, [filterStatus, filterCategory, page]);
 
+  useEffect(() => {
+    // Check for active jobs on mount
+    import("../../../../lib/api").then(({ getActiveJobs }) => {
+      getActiveJobs().then((active) => {
+        if (active.scan) setActiveJobId(active.scan);
+        if (active.phone_fetch) setActivePhoneJobId(active.phone_fetch);
+      }).catch(() => {}); // ignore if it fails
+    });
+  }, []);
+
   // Polling for scan progress
   useEffect(() => {
     if (!activeJobId) return;
@@ -197,7 +207,7 @@ export default function ProspectsPage() {
           <button
             onClick={handleStartBulkPhoneFetch}
             disabled={activePhoneJobId !== null}
-            className="inline-flex items-center gap-2 rounded-lg bg-white border border-[#cbd8d1] px-4 py-2 text-sm font-semibold text-[#19352b] shadow-sm hover:bg-[#f4f6f4] disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-white border border-[#cbd8d1] px-4 py-2 text-sm font-semibold text-[#19352b] shadow-sm hover:bg-[#f4f6f4] disabled:opacity-50 cursor-pointer disabled:cursor-default"
           >
             <PhoneCall className="h-4 w-4" />
             {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
@@ -205,7 +215,7 @@ export default function ProspectsPage() {
           <button
             onClick={() => setIsScanModalOpen(true)}
             disabled={activeJobId !== null}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#132820] disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#132820] disabled:opacity-50 cursor-pointer disabled:cursor-default"
           >
             <Search className="h-4 w-4" />
             {activeJobId ? "Scan Running..." : "New Scan"}
@@ -246,7 +256,7 @@ export default function ProspectsPage() {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
+          className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
         >
           <option value="">All Statuses</option>
           <option value="new">New</option>
@@ -257,7 +267,7 @@ export default function ProspectsPage() {
         <select
           value={filterCategory}
           onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
-          className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
+          className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f]"
         >
           <option value="">All Categories</option>
           {CATEGORIES.map(cat => (
@@ -319,7 +329,7 @@ export default function ProspectsPage() {
                             <button 
                               onClick={() => handleFetchSinglePhone(prospect.id)}
                               disabled={fetchingPhoneId === prospect.id}
-                              className="inline-flex items-center gap-1 rounded bg-[#f4f6f4] px-2 py-1 text-xs font-medium text-[#19352b] hover:bg-[#e0e7e3] disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded bg-[#f4f6f4] px-2 py-1 text-xs font-medium text-[#19352b] hover:bg-[#e0e7e3] disabled:opacity-50 cursor-pointer disabled:cursor-default"
                             >
                               {fetchingPhoneId === prospect.id && <RefreshCw className="h-3 w-3 animate-spin" />}
                               {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}
@@ -333,7 +343,7 @@ export default function ProspectsPage() {
                       <select
                         value={prospect.status}
                         onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
-                        className={`rounded-md border-0 py-1 pl-2 pr-6 text-xs font-medium focus:ring-2 focus:ring-[#19352b] ${
+                        className={`cursor-pointer rounded-md border-0 py-1 pl-2 pr-6 text-xs font-medium focus:ring-2 focus:ring-[#19352b] ${
                           prospect.status === 'new' ? 'bg-yellow-50 text-yellow-700' :
                           prospect.status === 'contacted' ? 'bg-blue-50 text-blue-700' :
                           prospect.status === 'ignored' ? 'bg-gray-100 text-gray-500' :
@@ -359,7 +369,7 @@ export default function ProspectsPage() {
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm font-medium text-[#1a2923] hover:bg-[#f4f6f4] disabled:opacity-50"
+              className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm font-medium text-[#1a2923] hover:bg-[#f4f6f4] disabled:opacity-50 disabled:cursor-default"
             >
               Previous
             </button>
@@ -369,7 +379,7 @@ export default function ProspectsPage() {
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm font-medium text-[#1a2923] hover:bg-[#f4f6f4] disabled:opacity-50"
+              className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm font-medium text-[#1a2923] hover:bg-[#f4f6f4] disabled:opacity-50 disabled:cursor-default"
             >
               Next
             </button>
@@ -389,7 +399,7 @@ export default function ProspectsPage() {
                 <label className="block text-sm font-medium text-[#1a2923]">Categories</label>
                 <div className="mt-3 space-y-2">
                   {CATEGORIES.map(cat => (
-                    <label key={cat.id} className="flex items-center gap-2">
+                    <label key={cat.id} className="flex cursor-pointer items-center gap-2">
                       <input 
                         type="checkbox" 
                         checked={scanCategories.includes(cat.id)}
@@ -397,7 +407,7 @@ export default function ProspectsPage() {
                           if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
                           else setScanCategories(scanCategories.filter(c => c !== cat.id));
                         }}
-                        className="rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b]"
+                        className="cursor-pointer rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b]"
                       />
                       <span className="text-sm text-[#1a2923]">{cat.label}</span>
                     </label>
@@ -421,13 +431,13 @@ export default function ProspectsPage() {
                 <button
                   type="button"
                   onClick={() => setIsScanModalOpen(false)}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-[#718078] hover:bg-[#f4f6f4] hover:text-[#1a2923]"
+                  className="cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-[#718078] hover:bg-[#f4f6f4] hover:text-[#1a2923]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#132820]"
+                  className="cursor-pointer rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#132820]"
                 >
                   Start Scan
                 </button>

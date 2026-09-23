@@ -5,12 +5,14 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import delete, select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import structlog
 
 from app.auth import CurrentStaffUser
 from app.db.session import SessionLocal, get_db
 from app.models.prospect import Prospect
+from app.models.scan_job import ScanJob
 from app.models.site_configuration import SiteConfiguration
 from app.schemas.prospect import (
     ProspectRead,
@@ -26,8 +28,19 @@ logger = structlog.get_logger(__name__)
 admin_router = APIRouter(prefix="/admin/prospects", tags=["Admin Prospects"])
 DbSession = Annotated[Session, Depends(get_db)]
 
-# In-memory dictionary to track scan jobs
-SCAN_JOBS: dict[str, dict[str, Any]] = {}
+
+def _update_job_status(job_id: str, status: str, progress: str, error: str | None = None) -> None:
+    with SessionLocal() as db:
+        try:
+            job = db.get(ScanJob, uuid.UUID(job_id))
+            if job:
+                job.status = status
+                job.progress = progress
+                if error is not None:
+                    job.error = error
+                db.commit()
+        except ValueError:
+            pass  # invalid uuid
 
 
 def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int, int]:
@@ -43,6 +56,10 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             if existing:
                 existing.last_seen_at = datetime.now(timezone.utc)
                 known_count += 1
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
                 continue
                 
             new_count += 1
@@ -97,14 +114,26 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
                 shop_name=ad.shopName
             )
             db.add(new_prospect)
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                # Race condition: another concurrent task just inserted this ad!
+                new_count -= 1
+                known_count += 1
+                existing_after = db.execute(select(Prospect).where(Prospect.ikman_ad_id == ad.id)).scalar_one_or_none()
+                if existing_after:
+                    existing_after.last_seen_at = datetime.now(timezone.utc)
+                    try:
+                        db.commit()
+                    except Exception:
+                        db.rollback()
             
-        db.commit()
     return found, new_count, known_count
 
 
 async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
     """Background task to run the scraper with concurrency and early exit."""
-    job = SCAN_JOBS[job_id]
     client = IkmanClient(delay=1.0)
     found_total = 0
     new_total = 0
@@ -113,7 +142,7 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
     
     async def _fetch_and_save(category: str, page: int) -> tuple[int, int, int]:
         async with semaphore:
-            job["progress"] = f"Fetching {category} (page {page}/{request.pages_per_category})"
+            _update_job_status(job_id, "running", f"Fetching {category} (page {page}/{request.pages_per_category})")
             logger.info("scraping_page", category=category, page=page)
             ads = await client.fetch_listing_page(category, page=page)
             if not ads:
@@ -128,8 +157,10 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
         for category in request.categories:
             chunk_size = 3
             for chunk_start in range(1, request.pages_per_category + 1, chunk_size):
-                if job["status"] == "failed":
-                    break
+                with SessionLocal() as db:
+                    current_job = db.get(ScanJob, uuid.UUID(job_id))
+                    if not current_job or current_job.status == "failed":
+                        break
                     
                 chunk_end = min(chunk_start + chunk_size, request.pages_per_category + 1)
                 
@@ -148,23 +179,20 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
                     if found > 0 and known_c < found:
                         chunk_all_known = False
                         
-                job["pages_processed"] = pages_processed
-                
                 # Early Exit logic
-                # If we processed ads in this chunk, but every single ad we saw was already in our DB,
-                # there's no need to continue deeper into the pagination for this category!
                 if chunk_all_known and any(found > 0 for (found, new_c, known_c) in results):
                     logger.info("early_exit_triggered", category=category, at_page=chunk_end-1)
-                    job["progress"] = f"Early exit for {category}: all ads known up to page {chunk_end-1}."
+                    _update_job_status(job_id, "running", f"Early exit for {category}: all ads known up to page {chunk_end-1}.")
                     break
                 
-        job["status"] = "completed"
-        job["progress"] = f"Done. Found {found_total} listings, {new_total} new."
+        _update_job_status(job_id, "completed", f"Done. Found {found_total} listings, {new_total} new.")
         
     except Exception as e:
         logger.exception("scan_job_failed", error=str(e))
-        job["status"] = "failed"
-        job["error"] = str(e)
+        error_msg = str(e)
+        if "[SQL:" in error_msg:
+            error_msg = error_msg.split("[SQL:")[0].strip()
+        _update_job_status(job_id, "failed", f"Failed: {error_msg}", error=error_msg)
     finally:
         await client.close()
 
@@ -173,16 +201,18 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
 def start_scan(
     request: ScanRequest, 
     background_tasks: BackgroundTasks,
+    db: DbSession,
     _admin: CurrentStaffUser
 ) -> dict[str, str]:
     job_id = str(uuid.uuid4())
-    SCAN_JOBS[job_id] = {
-        "status": "running",
-        "progress": "Starting up...",
-        "pages_processed": 0,
-        "total_pages": len(request.categories) * request.pages_per_category,
-        "started_at": datetime.now(timezone.utc).isoformat()
-    }
+    new_job = ScanJob(
+        id=uuid.UUID(job_id),
+        job_type="scan",
+        status="running",
+        progress="Starting up..."
+    )
+    db.add(new_job)
+    db.commit()
     
     background_tasks.add_task(_run_scan_job, job_id, request)
     return {"job_id": job_id}
@@ -191,17 +221,37 @@ def start_scan(
 @admin_router.get("/scan/{job_id}/status")
 def get_scan_status(
     job_id: str, 
+    db: DbSession,
     _admin: CurrentStaffUser
 ) -> dict[str, Any]:
-    if job_id not in SCAN_JOBS:
+    try:
+        job = db.get(ScanJob, uuid.UUID(job_id))
+        if not job or job.job_type != "scan":
+            return {"status": "not_found"}
+        return {"status": job.status, "progress": job.progress, "error": job.error}
+    except ValueError:
         return {"status": "not_found"}
-    return SCAN_JOBS[job_id]
 
 
-PHONE_JOBS: dict[str, dict[str, Any]] = {}
+@admin_router.get("/scan/active")
+def get_active_jobs(
+    db: DbSession,
+    _admin: CurrentStaffUser
+) -> dict[str, str | None]:
+    stmt = select(ScanJob).where(ScanJob.status == "running")
+    running_jobs = db.execute(stmt).scalars().all()
+    
+    active: dict[str, str | None] = {"scan": None, "phone_fetch": None}
+    for job in running_jobs:
+        if job.job_type == "scan":
+            active["scan"] = str(job.id)
+        elif job.job_type == "phone_fetch":
+            active["phone_fetch"] = str(job.id)
+            
+    return active
+
 
 async def _run_phone_fetch_job(job_id: str) -> None:
-    job = PHONE_JOBS[job_id]
     client = IkmanClient(delay=1.0)
     
     try:
@@ -211,21 +261,19 @@ async def _run_phone_fetch_job(job_id: str) -> None:
                 Prospect.phone_number == None
             )
             prospects = db.execute(stmt).scalars().all()
-            
-            job["total_prospects"] = len(prospects)
-            
             if not prospects:
-                job["status"] = "completed"
-                job["progress"] = "No owners found missing phone numbers."
+                _update_job_status(job_id, "completed", "No owners found missing phone numbers.")
                 return
                 
             processed = 0
             found_phones = 0
             for prospect in prospects:
-                if job["status"] == "failed":
-                    break
+                with SessionLocal() as check_db:
+                    current_job = check_db.get(ScanJob, uuid.UUID(job_id))
+                    if not current_job or current_job.status == "failed":
+                        break
                     
-                job["progress"] = f"Fetching phone for {prospect.title} ({processed}/{len(prospects)})"
+                _update_job_status(job_id, "running", f"Fetching phone for {prospect.title} ({processed}/{len(prospects)})")
                 if prospect.ikman_slug:
                     detail = await client.fetch_ad_detail(prospect.ikman_slug)
                     if detail and detail.contactCard and detail.contactCard.phoneNumbers:
@@ -237,15 +285,12 @@ async def _run_phone_fetch_job(job_id: str) -> None:
                         db.commit()
                 
                 processed += 1
-                job["prospects_processed"] = processed
                 
-        job["status"] = "completed"
-        job["progress"] = f"Done. Found {found_phones} phone numbers out of {processed} prospects."
+        _update_job_status(job_id, "completed", f"Done. Found {found_phones} phone numbers out of {processed} prospects.")
         
     except Exception as e:
         logger.exception("phone_job_failed", error=str(e))
-        job["status"] = "failed"
-        job["error"] = str(e)
+        _update_job_status(job_id, "failed", f"Failed: {str(e)}", error=str(e))
     finally:
         await client.close()
 
@@ -253,16 +298,18 @@ async def _run_phone_fetch_job(job_id: str) -> None:
 @admin_router.post("/scan/phones")
 def start_bulk_phone_fetch(
     background_tasks: BackgroundTasks,
+    db: DbSession,
     _admin: CurrentStaffUser
 ) -> dict[str, str]:
     job_id = str(uuid.uuid4())
-    PHONE_JOBS[job_id] = {
-        "status": "running",
-        "progress": "Starting up...",
-        "prospects_processed": 0,
-        "total_prospects": 0,
-        "started_at": datetime.now(timezone.utc).isoformat()
-    }
+    new_job = ScanJob(
+        id=uuid.UUID(job_id),
+        job_type="phone_fetch",
+        status="running",
+        progress="Starting up..."
+    )
+    db.add(new_job)
+    db.commit()
     
     background_tasks.add_task(_run_phone_fetch_job, job_id)
     return {"job_id": job_id}
@@ -271,11 +318,16 @@ def start_bulk_phone_fetch(
 @admin_router.get("/scan/phones/{job_id}/status")
 def get_phone_fetch_status(
     job_id: str, 
+    db: DbSession,
     _admin: CurrentStaffUser
 ) -> dict[str, Any]:
-    if job_id not in PHONE_JOBS:
+    try:
+        job = db.get(ScanJob, uuid.UUID(job_id))
+        if not job or job.job_type != "phone_fetch":
+            return {"status": "not_found"}
+        return {"status": job.status, "progress": job.progress, "error": job.error}
+    except ValueError:
         return {"status": "not_found"}
-    return PHONE_JOBS[job_id]
 
 
 @admin_router.post("/{id}/fetch-phone", response_model=ProspectRead)
