@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock } from "lucide-react";
 
 import {
   Prospect,
@@ -48,6 +48,9 @@ export default function ProspectsPage() {
   const [phoneJobStatus, setPhoneJobStatus] = useState<{ status: string; progress: string; error?: string } | null>(null);
   const [fetchingPhoneId, setFetchingPhoneId] = useState<string | null>(null);
 
+  const [lastScanAt, setLastScanAt] = useState<string | null>(null);
+  const [lastPhoneFetchAt, setLastPhoneFetchAt] = useState<string | null>(null);
+
   const fetchProspects = async () => {
     setLoading(true);
     
@@ -81,6 +84,8 @@ export default function ProspectsPage() {
       getActiveJobs().then((active) => {
         if (active.scan) setActiveJobId(active.scan);
         if (active.phone_fetch) setActivePhoneJobId(active.phone_fetch);
+        if (active.last_scan_at) setLastScanAt(active.last_scan_at);
+        if (active.last_phone_fetch_at) setLastPhoneFetchAt(active.last_phone_fetch_at);
       }).catch(() => {}); // ignore if it fails
     });
   }, []);
@@ -198,23 +203,35 @@ export default function ProspectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Find Prospects</h1>
           <p className="mt-2 text-sm text-[#64736b]">Scrape property listings from ikman.lk to find new leads.</p>
         </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <button
-            onClick={handleStartBulkPhoneFetch}
-            disabled={activePhoneJobId !== null}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-white border border-[#cbd8d1] px-4 py-2 text-sm font-semibold text-[#19352b] shadow-sm hover:bg-[#f4f6f4] disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
-          >
-            <PhoneCall className="h-4 w-4" />
-            {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
-          </button>
-          <button
-            onClick={() => setIsScanModalOpen(true)}
-            disabled={activeJobId !== null}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#132820] disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
-          >
-            <Search className="h-4 w-4" />
-            {activeJobId ? "Scan Running..." : "New Scan"}
-          </button>
+        <div className="flex flex-col items-center sm:items-end gap-1.5 w-full sm:w-auto">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <button
+              onClick={handleStartBulkPhoneFetch}
+              disabled={activePhoneJobId !== null}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white border border-[#cbd8d1] px-4 py-2 text-sm font-semibold text-[#19352b] shadow-sm hover:bg-[#f4f6f4] disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
+            >
+              <PhoneCall className="h-4 w-4" />
+              {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
+            </button>
+            <button
+              onClick={() => setIsScanModalOpen(true)}
+              disabled={activeJobId !== null}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#132820] disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
+            >
+              <Search className="h-4 w-4" />
+              {activeJobId ? "Scan Running..." : "New Scan"}
+            </button>
+          </div>
+          {(lastScanAt || lastPhoneFetchAt) && (
+            <div className="flex items-center gap-1.5 text-[11px] text-[#64736b] pr-1 mt-1 sm:mt-0">
+              <Clock className="h-3 w-3 opacity-70" />
+              <span>
+                {lastScanAt && <span title={format(parseISO(lastScanAt), "PPP p")}>Scanned {formatDistanceToNow(parseISO(lastScanAt), { addSuffix: true })}</span>}
+                {lastScanAt && lastPhoneFetchAt && " • "}
+                {lastPhoneFetchAt && <span title={format(parseISO(lastPhoneFetchAt), "PPP p")}>Synced {formatDistanceToNow(parseISO(lastPhoneFetchAt), { addSuffix: true })}</span>}
+              </span>
+            </div>
+          )}
         </div>
       </div>
       
