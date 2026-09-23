@@ -31,7 +31,8 @@ export default function ProspectsPage() {
   
   // Filters & Pagination
   const [filterStatus, setFilterStatus] = useState<string>("");
-  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [transactionType, setTransactionType] = useState<"sale" | "rent">("sale");
+  const [propertyType, setPropertyType] = useState<string>("all");
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   
@@ -50,14 +51,8 @@ export default function ProspectsPage() {
   const fetchProspects = async () => {
     setLoading(true);
     
-    let property_type = undefined;
-    let listing_type = undefined;
-    if (filterCategory === "land-for-sale") { property_type = "land"; listing_type = "sale"; }
-    else if (filterCategory === "houses-for-sale") { property_type = "house"; listing_type = "sale"; }
-    else if (filterCategory === "apartments-for-sale") { property_type = "apartment"; listing_type = "sale"; }
-    else if (filterCategory === "house-rentals") { property_type = "house"; listing_type = "rent"; }
-    else if (filterCategory === "apartment-rentals") { property_type = "apartment"; listing_type = "rent"; }
-    else if (filterCategory === "room-annex-rentals") { property_type = "property"; listing_type = "rent"; }
+    let property_type = propertyType === "all" ? undefined : propertyType;
+    let listing_type = transactionType;
 
     try {
       const data = await getProspects({
@@ -78,7 +73,7 @@ export default function ProspectsPage() {
 
   useEffect(() => {
     fetchProspects();
-  }, [filterStatus, filterCategory, page]);
+  }, [filterStatus, transactionType, propertyType, page]);
 
   useEffect(() => {
     // Check for active jobs on mount
@@ -264,16 +259,86 @@ export default function ProspectsPage() {
           <option value="ignored">Ignored</option>
           <option value="converted">Converted</option>
         </select>
-        <select
-          value={filterCategory}
-          onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
-          className="cursor-pointer rounded-lg border border-[#cbd8d1] px-3 py-1.5 text-sm outline-none focus:border-[#28513f] w-full sm:w-auto"
-        >
-          <option value="">All Categories</option>
-          {CATEGORIES.map(cat => (
-            <option key={cat.id} value={cat.id}>{cat.label}</option>
-          ))}
-        </select>
+        {/* Segmented Control for Transaction Type */}
+        <div className="flex shrink-0 items-center rounded-lg bg-[#f4f6f4] p-1 w-full sm:w-auto">
+          <button
+            onClick={() => { setTransactionType("sale"); setPropertyType("all"); setPage(1); }}
+            className={`flex-1 sm:flex-none cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+              transactionType === "sale" 
+                ? "bg-white text-[#19352b] shadow-sm" 
+                : "text-[#64736b] hover:text-[#1a2923]"
+            }`}
+          >
+            Sales
+          </button>
+          <button
+            onClick={() => { setTransactionType("rent"); setPropertyType("all"); setPage(1); }}
+            className={`flex-1 sm:flex-none cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+              transactionType === "rent" 
+                ? "bg-white text-[#19352b] shadow-sm" 
+                : "text-[#64736b] hover:text-[#1a2923]"
+            }`}
+          >
+            Rentals
+          </button>
+        </div>
+
+        {/* Pill Buttons for Property Type */}
+        <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap w-full sm:w-auto pb-2 sm:pb-0 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+          <button
+            onClick={() => { setPropertyType("all"); setPage(1); }}
+            className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+              propertyType === "all"
+                ? "border-[#19352b] bg-[#19352b] text-white"
+                : "border-[#cbd8d1] bg-white text-[#64736b] hover:border-[#1a2923] hover:text-[#1a2923]"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => { setPropertyType("house"); setPage(1); }}
+            className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+              propertyType === "house"
+                ? "border-[#19352b] bg-[#19352b] text-white"
+                : "border-[#cbd8d1] bg-white text-[#64736b] hover:border-[#1a2923] hover:text-[#1a2923]"
+            }`}
+          >
+            Houses
+          </button>
+          <button
+            onClick={() => { setPropertyType("apartment"); setPage(1); }}
+            className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+              propertyType === "apartment"
+                ? "border-[#19352b] bg-[#19352b] text-white"
+                : "border-[#cbd8d1] bg-white text-[#64736b] hover:border-[#1a2923] hover:text-[#1a2923]"
+            }`}
+          >
+            Apartments
+          </button>
+          {transactionType === "sale" ? (
+            <button
+              onClick={() => { setPropertyType("land"); setPage(1); }}
+              className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                propertyType === "land"
+                  ? "border-[#19352b] bg-[#19352b] text-white"
+                  : "border-[#cbd8d1] bg-white text-[#64736b] hover:border-[#1a2923] hover:text-[#1a2923]"
+              }`}
+            >
+              Land
+            </button>
+          ) : (
+            <button
+              onClick={() => { setPropertyType("property"); setPage(1); }}
+              className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                propertyType === "property"
+                  ? "border-[#19352b] bg-[#19352b] text-white"
+                  : "border-[#cbd8d1] bg-white text-[#64736b] hover:border-[#1a2923] hover:text-[#1a2923]"
+              }`}
+            >
+              Rooms & Annexes
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 overflow-hidden rounded-xl border border-[#dce4df] bg-white shadow-sm">
@@ -479,21 +544,42 @@ export default function ProspectsPage() {
             <form onSubmit={handleStartScan} className="mt-6 space-y-5">
               <div>
                 <label className="block text-sm font-medium text-[#1a2923]">Categories</label>
-                <div className="mt-3 space-y-2">
-                  {CATEGORIES.map(cat => (
-                    <label key={cat.id} className="flex cursor-pointer items-center gap-2">
-                      <input 
-                        type="checkbox" 
-                        checked={scanCategories.includes(cat.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
-                          else setScanCategories(scanCategories.filter(c => c !== cat.id));
-                        }}
-                        className="cursor-pointer rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b]"
-                      />
-                      <span className="text-sm text-[#1a2923]">{cat.label}</span>
-                    </label>
-                  ))}
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 rounded-lg border border-[#dce4df] p-3 bg-[#f4f6f4]/50">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-[#718078] mb-3">Sales</div>
+                    {CATEGORIES.filter(c => c.id.includes('sale')).map(cat => (
+                      <label key={cat.id} className="flex cursor-pointer items-center gap-2">
+                        <input 
+                          type="checkbox" 
+                          checked={scanCategories.includes(cat.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
+                            else setScanCategories(scanCategories.filter(c => c !== cat.id));
+                          }}
+                          className="cursor-pointer rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b]"
+                        />
+                        <span className="text-sm text-[#1a2923]">{cat.label.replace(' for Sale', '')}</span>
+                      </label>
+                    ))}
+                  </div>
+                  
+                  <div className="space-y-2 rounded-lg border border-[#dce4df] p-3 bg-[#f4f6f4]/50">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-[#718078] mb-3">Rentals</div>
+                    {CATEGORIES.filter(c => c.id.includes('rental')).map(cat => (
+                      <label key={cat.id} className="flex cursor-pointer items-center gap-2">
+                        <input 
+                          type="checkbox" 
+                          checked={scanCategories.includes(cat.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
+                            else setScanCategories(scanCategories.filter(c => c !== cat.id));
+                          }}
+                          className="cursor-pointer rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b]"
+                        />
+                        <span className="text-sm text-[#1a2923]">{cat.label.replace(' Rentals', '')}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
               
