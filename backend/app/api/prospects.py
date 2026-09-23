@@ -209,7 +209,9 @@ def start_scan(
         id=uuid.UUID(job_id),
         job_type="scan",
         status="running",
-        progress="Starting up..."
+        progress="Starting up...",
+        created_by_id=_admin.id,
+        created_by_name=_admin.name
     )
     db.add(new_job)
     db.commit()
@@ -237,16 +239,45 @@ def get_scan_status(
 def get_active_jobs(
     db: DbSession,
     _admin: CurrentStaffUser
-) -> dict[str, str | None]:
+) -> dict[str, Any]:
     stmt = select(ScanJob).where(ScanJob.status == "running")
     running_jobs = db.execute(stmt).scalars().all()
     
-    active: dict[str, str | None] = {"scan": None, "phone_fetch": None}
+    active: dict[str, Any] = {
+        "scan": None, 
+        "phone_fetch": None,
+        "last_scan_at": None,
+        "last_phone_fetch_at": None
+    }
+    
     for job in running_jobs:
         if job.job_type == "scan":
             active["scan"] = str(job.id)
         elif job.job_type == "phone_fetch":
             active["phone_fetch"] = str(job.id)
+            
+    last_scan = db.execute(
+        select(ScanJob)
+        .where(ScanJob.job_type == "scan", ScanJob.status == "completed")
+        .order_by(ScanJob.updated_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    
+    last_phone = db.execute(
+        select(ScanJob)
+        .where(ScanJob.job_type == "phone_fetch", ScanJob.status == "completed")
+        .order_by(ScanJob.updated_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    
+    if last_scan:
+        active["last_scan_at"] = last_scan.updated_at.isoformat()
+        if _admin.role == "root":
+            active["last_scan_by"] = last_scan.created_by_name
+    if last_phone:
+        active["last_phone_fetch_at"] = last_phone.updated_at.isoformat()
+        if _admin.role == "root":
+            active["last_phone_fetch_by"] = last_phone.created_by_name
             
     return active
 
@@ -306,7 +337,9 @@ def start_bulk_phone_fetch(
         id=uuid.UUID(job_id),
         job_type="phone_fetch",
         status="running",
-        progress="Starting up..."
+        progress="Starting up...",
+        created_by_id=_admin.id,
+        created_by_name=_admin.name
     )
     db.add(new_job)
     db.commit()

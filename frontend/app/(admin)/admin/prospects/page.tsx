@@ -49,7 +49,9 @@ export default function ProspectsPage() {
   const [fetchingPhoneId, setFetchingPhoneId] = useState<string | null>(null);
 
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
+  const [lastScanBy, setLastScanBy] = useState<string | null>(null);
   const [lastPhoneFetchAt, setLastPhoneFetchAt] = useState<string | null>(null);
+  const [lastPhoneFetchBy, setLastPhoneFetchBy] = useState<string | null>(null);
   const [showExactTime, setShowExactTime] = useState(false);
 
   const fetchProspects = async () => {
@@ -79,16 +81,24 @@ export default function ProspectsPage() {
     fetchProspects();
   }, [filterStatus, transactionType, propertyType, page]);
 
+  const refreshActiveJobs = async () => {
+    try {
+      const { getActiveJobs } = await import("../../../../lib/api");
+      const active = await getActiveJobs();
+      if (active.scan) setActiveJobId(active.scan);
+      if (active.phone_fetch) setActivePhoneJobId(active.phone_fetch);
+      if (active.last_scan_at) setLastScanAt(active.last_scan_at);
+      if (active.last_scan_by) setLastScanBy(active.last_scan_by);
+      if (active.last_phone_fetch_at) setLastPhoneFetchAt(active.last_phone_fetch_at);
+      if (active.last_phone_fetch_by) setLastPhoneFetchBy(active.last_phone_fetch_by);
+    } catch (err) {
+      // ignore if it fails
+    }
+  };
+
   useEffect(() => {
     // Check for active jobs on mount
-    import("../../../../lib/api").then(({ getActiveJobs }) => {
-      getActiveJobs().then((active) => {
-        if (active.scan) setActiveJobId(active.scan);
-        if (active.phone_fetch) setActivePhoneJobId(active.phone_fetch);
-        if (active.last_scan_at) setLastScanAt(active.last_scan_at);
-        if (active.last_phone_fetch_at) setLastPhoneFetchAt(active.last_phone_fetch_at);
-      }).catch(() => {}); // ignore if it fails
-    });
+    refreshActiveJobs();
   }, []);
 
   // Polling for scan progress
@@ -102,6 +112,7 @@ export default function ProspectsPage() {
         if (status.status === "completed" || status.status === "failed") {
           setActiveJobId(null);
           fetchProspects();
+          refreshActiveJobs();
           if (status.status === "completed") {
             toast.success("Scan completed successfully");
           } else {
@@ -127,6 +138,7 @@ export default function ProspectsPage() {
         if (status.status === "completed" || status.status === "failed") {
           setActivePhoneJobId(null);
           fetchProspects();
+          refreshActiveJobs();
           if (status.status === "completed") {
             toast.success("Bulk phone fetch completed");
           } else {
@@ -233,12 +245,14 @@ export default function ProspectsPage() {
                 {lastScanAt && (
                   <span title={format(parseISO(lastScanAt), "PPP p")}>
                     Scanned {showExactTime ? format(parseISO(lastScanAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastScanAt), { addSuffix: true })}
+                    {lastScanBy && ` by ${lastScanBy}`}
                   </span>
                 )}
                 {lastScanAt && lastPhoneFetchAt && " • "}
                 {lastPhoneFetchAt && (
                   <span title={format(parseISO(lastPhoneFetchAt), "PPP p")}>
                     Synced {showExactTime ? format(parseISO(lastPhoneFetchAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastPhoneFetchAt), { addSuffix: true })}
+                    {lastPhoneFetchBy && ` by ${lastPhoneFetchBy}`}
                   </span>
                 )}
               </span>

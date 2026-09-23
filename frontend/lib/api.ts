@@ -873,14 +873,21 @@ export async function getScanStatus(jobId: string): Promise<{ status: string; pr
   return (await response.json()) as { status: string; progress: string; error?: string };
 }
 
-export async function getActiveJobs(): Promise<{ scan: string | null; phone_fetch: string | null }> {
+export async function getActiveJobs(): Promise<{ 
+  scan: string | null; 
+  phone_fetch: string | null;
+  last_scan_at: string | null;
+  last_scan_by?: string | null;
+  last_phone_fetch_at: string | null;
+  last_phone_fetch_by?: string | null;
+}> {
   const response = await fetch(`${baseUrl()}/admin/prospects/scan/active`, {
     method: "GET",
     credentials: "include",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Active jobs fetch failed (${response.status}).`, response.status);
-  return (await response.json()) as { scan: string | null; phone_fetch: string | null };
+  return (await response.json());
 }
 
 export async function fetchProspectPhone(id: string): Promise<Prospect> {
