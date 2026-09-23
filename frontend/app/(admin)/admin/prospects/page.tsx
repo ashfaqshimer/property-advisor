@@ -60,7 +60,7 @@ export default function ProspectsPage() {
         property_type,
         listing_type,
         page,
-        page_size: 50
+        page_size: 25
       });
       setProspects(data.items);
       setTotalPages(data.total_pages);
