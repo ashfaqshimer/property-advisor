@@ -50,6 +50,7 @@ export default function ProspectsPage() {
 
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
   const [lastPhoneFetchAt, setLastPhoneFetchAt] = useState<string | null>(null);
+  const [showExactTime, setShowExactTime] = useState(false);
 
   const fetchProspects = async () => {
     setLoading(true);
@@ -223,14 +224,25 @@ export default function ProspectsPage() {
             </button>
           </div>
           {(lastScanAt || lastPhoneFetchAt) && (
-            <div className="flex items-center gap-1.5 text-[11px] text-[#64736b] pr-1 mt-1 sm:mt-0">
+            <button 
+              onClick={() => setShowExactTime(prev => !prev)}
+              className="flex items-center gap-1.5 text-[11px] text-[#64736b] pr-1 mt-1 sm:mt-0 cursor-pointer hover:text-[#1a2923] transition-colors underline decoration-dotted underline-offset-2 decoration-[#cbd8d1]"
+            >
               <Clock className="h-3 w-3 opacity-70" />
               <span>
-                {lastScanAt && <span title={format(parseISO(lastScanAt), "PPP p")}>Scanned {formatDistanceToNow(parseISO(lastScanAt), { addSuffix: true })}</span>}
+                {lastScanAt && (
+                  <span title={format(parseISO(lastScanAt), "PPP p")}>
+                    Scanned {showExactTime ? format(parseISO(lastScanAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastScanAt), { addSuffix: true })}
+                  </span>
+                )}
                 {lastScanAt && lastPhoneFetchAt && " • "}
-                {lastPhoneFetchAt && <span title={format(parseISO(lastPhoneFetchAt), "PPP p")}>Synced {formatDistanceToNow(parseISO(lastPhoneFetchAt), { addSuffix: true })}</span>}
+                {lastPhoneFetchAt && (
+                  <span title={format(parseISO(lastPhoneFetchAt), "PPP p")}>
+                    Synced {showExactTime ? format(parseISO(lastPhoneFetchAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastPhoneFetchAt), { addSuffix: true })}
+                  </span>
+                )}
               </span>
-            </div>
+            </button>
           )}
         </div>
       </div>
