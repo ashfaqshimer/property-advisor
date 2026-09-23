@@ -851,7 +851,7 @@ export async function updateProspect(id: string, status: string): Promise<Prospe
   return (await response.json()) as Prospect;
 }
 
-export async function startProspectScan(payload: { categories: string[]; pages_per_category: number; phone_fetch_confidence_threshold: number }): Promise<{ job_id: string }> {
+export async function startProspectScan(payload: { categories: string[]; pages_per_category: number }): Promise<{ job_id: string }> {
   const response = await fetch(`${baseUrl()}/admin/prospects/scan`, {
     method: "POST",
     credentials: "include",
@@ -870,6 +870,36 @@ export async function getScanStatus(jobId: string): Promise<{ status: string; pr
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Scan status failed (${response.status}).`, response.status);
+  return (await response.json()) as { status: string; progress: string; error?: string };
+}
+
+export async function fetchProspectPhone(id: string): Promise<Prospect> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/${id}/fetch-phone`, {
+    method: "POST",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Phone fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as Prospect;
+}
+
+export async function startBulkPhoneFetch(): Promise<{ job_id: string }> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/scan/phones`, {
+    method: "POST",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Bulk phone fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as { job_id: string };
+}
+
+export async function getBulkPhoneFetchStatus(jobId: string): Promise<{ status: string; progress: string; error?: string }> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/scan/phones/${jobId}/status`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Bulk phone fetch status failed (${response.status}).`, response.status);
   return (await response.json()) as { status: string; progress: string; error?: string };
 }
 

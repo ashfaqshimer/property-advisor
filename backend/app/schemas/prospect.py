@@ -45,7 +45,6 @@ class ProspectRead(ProspectBase):
 class ScanRequest(BaseModel):
     categories: list[str] = Field(..., min_length=1)
     pages_per_category: int = Field(1, ge=1, le=50)
-    phone_fetch_confidence_threshold: int = Field(60, ge=0, le=100)
 
 
 class ProspectList(BaseModel):

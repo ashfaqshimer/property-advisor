@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall } from "lucide-react";
 
 import {
   Prospect,
@@ -11,6 +11,9 @@ import {
   updateProspect,
   startProspectScan,
   getScanStatus,
+  fetchProspectPhone,
+  startBulkPhoneFetch,
+  getBulkPhoneFetchStatus,
 } from "../../../../lib/api";
 
 const CATEGORIES = [
@@ -36,10 +39,13 @@ export default function ProspectsPage() {
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [scanCategories, setScanCategories] = useState<string[]>(["land-for-sale", "houses-for-sale", "apartments-for-sale"]);
   const [scanPages, setScanPages] = useState(3);
-  const [scanPhoneThreshold, setScanPhoneThreshold] = useState(60);
   
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [scanStatus, setScanStatus] = useState<{ status: string; progress: string; error?: string } | null>(null);
+
+  const [activePhoneJobId, setActivePhoneJobId] = useState<string | null>(null);
+  const [phoneJobStatus, setPhoneJobStatus] = useState<{ status: string; progress: string; error?: string } | null>(null);
+  const [fetchingPhoneId, setFetchingPhoneId] = useState<string | null>(null);
 
   const fetchProspects = async () => {
     setLoading(true);
@@ -99,6 +105,31 @@ export default function ProspectsPage() {
     return () => clearInterval(interval);
   }, [activeJobId]);
 
+  // Polling for bulk phone fetch progress
+  useEffect(() => {
+    if (!activePhoneJobId) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const status = await getBulkPhoneFetchStatus(activePhoneJobId);
+        setPhoneJobStatus(status);
+        if (status.status === "completed" || status.status === "failed") {
+          setActivePhoneJobId(null);
+          fetchProspects();
+          if (status.status === "completed") {
+            toast.success("Bulk phone fetch completed");
+          } else {
+            toast.error(`Bulk phone fetch failed: ${status.error}`);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [activePhoneJobId]);
+
   const handleStartScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (scanCategories.length === 0) {
@@ -110,7 +141,6 @@ export default function ProspectsPage() {
       const res = await startProspectScan({
         categories: scanCategories,
         pages_per_category: scanPages,
-        phone_fetch_confidence_threshold: scanPhoneThreshold,
       });
       setActiveJobId(res.job_id);
       setIsScanModalOpen(false);
@@ -131,6 +161,31 @@ export default function ProspectsPage() {
     }
   };
 
+  const handleStartBulkPhoneFetch = async () => {
+    try {
+      const res = await startBulkPhoneFetch();
+      setActivePhoneJobId(res.job_id);
+      setPhoneJobStatus({ status: "running", progress: "Starting..." });
+      toast.info("Bulk phone fetch started");
+    } catch (err) {
+      toast.error("Failed to start bulk phone fetch");
+    }
+  };
+
+  const handleFetchSinglePhone = async (id: string) => {
+    setFetchingPhoneId(id);
+    const loadingToast = toast.loading("Fetching phone number...");
+    try {
+      const updated = await fetchProspectPhone(id);
+      setProspects(prev => prev.map(p => p.id === id ? updated : p));
+      toast.success("Phone number fetched!", { id: loadingToast });
+    } catch (err) {
+      toast.error("Failed to fetch phone number", { id: loadingToast });
+    } finally {
+      setFetchingPhoneId(null);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -138,14 +193,24 @@ export default function ProspectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Find Prospects</h1>
           <p className="mt-2 text-sm text-[#64736b]">Scrape property listings from ikman.lk to find new leads.</p>
         </div>
-        <button
-          onClick={() => setIsScanModalOpen(true)}
-          disabled={activeJobId !== null}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#132820] disabled:opacity-50"
-        >
-          <Search className="h-4 w-4" />
-          {activeJobId ? "Scan Running..." : "New Scan"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleStartBulkPhoneFetch}
+            disabled={activePhoneJobId !== null}
+            className="inline-flex items-center gap-2 rounded-lg bg-white border border-[#cbd8d1] px-4 py-2 text-sm font-semibold text-[#19352b] shadow-sm hover:bg-[#f4f6f4] disabled:opacity-50"
+          >
+            <PhoneCall className="h-4 w-4" />
+            {activePhoneJobId ? "Fetching Phones..." : "Fetch Missing Phones"}
+          </button>
+          <button
+            onClick={() => setIsScanModalOpen(true)}
+            disabled={activeJobId !== null}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#19352b] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#132820] disabled:opacity-50"
+          >
+            <Search className="h-4 w-4" />
+            {activeJobId ? "Scan Running..." : "New Scan"}
+          </button>
+        </div>
       </div>
       
       {activeJobId && scanStatus && (
@@ -155,6 +220,18 @@ export default function ProspectsPage() {
             <div>
               <h3 className="text-sm font-medium text-blue-800">Scan in progress</h3>
               <p className="text-sm text-blue-600">{scanStatus.progress}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activePhoneJobId && phoneJobStatus && (
+        <div className="mt-6 rounded-lg border border-orange-200 bg-orange-50 p-4">
+          <div className="flex items-center gap-3">
+            <RefreshCw className="h-5 w-5 animate-spin text-orange-600" />
+            <div>
+              <h3 className="text-sm font-medium text-orange-800">Bulk Phone Fetch in progress</h3>
+              <p className="text-sm text-orange-600">{phoneJobStatus.progress}</p>
             </div>
           </div>
         </div>
@@ -233,7 +310,23 @@ export default function ProspectsPage() {
                       {prospect.price || "-"}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-[#1a2923]">{prospect.phone_number || <span className="text-gray-400 italic">Not fetched</span>}</div>
+                      {prospect.phone_number ? (
+                        <div className="font-medium text-[#1a2923]">{prospect.phone_number}</div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 italic">Not fetched</span>
+                          {prospect.classification === "owner" && (
+                            <button 
+                              onClick={() => handleFetchSinglePhone(prospect.id)}
+                              disabled={fetchingPhoneId === prospect.id}
+                              className="inline-flex items-center gap-1 rounded bg-[#f4f6f4] px-2 py-1 text-xs font-medium text-[#19352b] hover:bg-[#e0e7e3] disabled:opacity-50"
+                            >
+                              {fetchingPhoneId === prospect.id && <RefreshCw className="h-3 w-3 animate-spin" />}
+                              {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                       <div className="mt-1 text-xs text-[#64736b]">{prospect.poster_name || "-"}</div>
                     </td>
                     <td className="px-6 py-4">
@@ -320,19 +413,6 @@ export default function ProspectsPage() {
                   max="50"
                   value={scanPages}
                   onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
-                  className="mt-2 w-full rounded-lg border border-[#cbd8d1] px-3 py-2 text-sm outline-none focus:border-[#28513f]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#1a2923]">Phone Fetch Threshold (%)</label>
-                <p className="mt-1 text-xs text-[#64736b]">Only fetch phone numbers if owner confidence is &ge; this value.</p>
-                <input 
-                  type="number" 
-                  min="0" 
-                  max="100"
-                  value={scanPhoneThreshold}
-                  onChange={(e) => setScanPhoneThreshold(parseInt(e.target.value) || 0)}
                   className="mt-2 w-full rounded-lg border border-[#cbd8d1] px-3 py-2 text-sm outline-none focus:border-[#28513f]"
                 />
               </div>

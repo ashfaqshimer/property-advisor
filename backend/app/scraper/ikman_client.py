@@ -17,7 +17,7 @@ INITIAL_DATA_RE = re.compile(r"window\.initialData\s*=\s*(\{.*?\});", re.DOTALL)
 
 
 class IkmanClient:
-    def __init__(self, delay: float = 2.0):
+    def __init__(self, delay: float = 1.0):
         self.client = httpx.AsyncClient(
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

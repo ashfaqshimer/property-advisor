@@ -30,10 +30,11 @@ DbSession = Annotated[Session, Depends(get_db)]
 SCAN_JOBS: dict[str, dict[str, Any]] = {}
 
 
-def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int]:
-    """Synchronous function to save prospects to DB."""
+def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int, int]:
+    """Synchronous function to save prospects to DB. Returns (found, new_count, known_count)"""
     found = len(ads)
     new_count = 0
+    known_count = 0
     with SessionLocal() as db:
         for ad in ads:
             stmt = select(Prospect).where(Prospect.ikman_ad_id == ad.id)
@@ -41,6 +42,7 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             
             if existing:
                 existing.last_seen_at = datetime.now(timezone.utc)
+                known_count += 1
                 continue
                 
             new_count += 1
@@ -53,15 +55,13 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             phone_number = None
             poster_name = None
             
-            # Extract pre-fetched details from the mutated ad object
-            if (classification == "owner" and confidence >= request.phone_fetch_confidence_threshold) or (confidence >= request.phone_fetch_confidence_threshold):
-                if hasattr(ad, "contactCard") and ad.contactCard:
-                    poster_name = ad.contactCard.name
-                    if ad.contactCard.phoneNumbers:
-                        phone_number = str(ad.contactCard.phoneNumbers[0].get("number", ""))
+            # Note: Phone numbers are now fetched explicitly via the phone fetch API,
+            # not during the initial scan phase.
 
             prop_type = "property"
-            cat_slug = ad.category.slug if ad.category else ""
+            cat_slug = ""
+            if ad.category:
+                cat_slug = (ad.category.slug or ad.category.name or "").lower()
             if "land" in cat_slug: prop_type = "land"
             elif "apartments" in cat_slug: prop_type = "apartment"
             elif "houses" in cat_slug: prop_type = "house"
@@ -69,13 +69,19 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             listing_type = "sale"
             if "rentals" in cat_slug: listing_type = "rent"
 
+            loc_str = ""
+            if isinstance(ad.location, str):
+                loc_str = ad.location
+            elif ad.location and hasattr(ad.location, "name"):
+                loc_str = ad.location.name or ""
+
             new_prospect = Prospect(
                 ikman_ad_id=ad.id,
                 ikman_url=f"{IKMAN_BASE_URL}/en/ad/{ad.slug}" if ad.slug else "",
                 ikman_slug=ad.slug or "",
                 title=ad.title or "",
                 price=ad.price or "",
-                location=ad.location.name if ad.location else "",
+                location=loc_str,
                 property_type=prop_type,
                 listing_type=listing_type,
                 poster_name=poster_name,
@@ -93,51 +99,64 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             db.add(new_prospect)
             
         db.commit()
-    return found, new_count
+    return found, new_count, known_count
 
 
 async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
-    """Background task to run the scraper."""
+    """Background task to run the scraper with concurrency and early exit."""
     job = SCAN_JOBS[job_id]
-    client = IkmanClient(delay=2.0)
+    client = IkmanClient(delay=1.0)
     found_total = 0
     new_total = 0
     
+    semaphore = asyncio.Semaphore(3)
+    
+    async def _fetch_and_save(category: str, page: int) -> tuple[int, int, int]:
+        async with semaphore:
+            job["progress"] = f"Fetching {category} (page {page}/{request.pages_per_category})"
+            logger.info("scraping_page", category=category, page=page)
+            ads = await client.fetch_listing_page(category, page=page)
+            if not ads:
+                return 0, 0, 0
+            
+            # No detail fetching during the scan phase anymore!
+            # Just directly save to DB in a thread
+            return await asyncio.to_thread(_save_prospects_sync, ads, request)
+
     try:
         pages_processed = 0
         for category in request.categories:
-            for page in range(1, request.pages_per_category + 1):
+            chunk_size = 3
+            for chunk_start in range(1, request.pages_per_category + 1, chunk_size):
                 if job["status"] == "failed":
                     break
                     
-                job["progress"] = f"Fetching {category} (page {page}/{request.pages_per_category})"
-                logger.info("scraping_page", category=category, page=page)
+                chunk_end = min(chunk_start + chunk_size, request.pages_per_category + 1)
                 
-                ads = await client.fetch_listing_page(category, page=page)
+                tasks = []
+                for page in range(chunk_start, chunk_end):
+                    tasks.append(_fetch_and_save(category, page))
+                    
+                results = await asyncio.gather(*tasks)
                 
-                # To call fetch_detail inside the sync DB function, we need an async loop hook
-                # We will just fetch all required details asynchronously here, before the DB block
-                # to avoid mixing sync/async.
-                
-                # Pre-fetch details if needed
-                for i, ad in enumerate(ads):
-                    classification, confidence, _ = classify_listing_heuristics(ad)
-                    if (classification == "owner" and confidence >= request.phone_fetch_confidence_threshold) or (confidence >= request.phone_fetch_confidence_threshold):
-                        if ad.slug:
-                            job["progress"] = f"Fetching details for {ad.title}"
-                            detail = await client.fetch_ad_detail(ad.slug)
-                            if detail:
-                                if not detail.price:
-                                    detail.price = ad.price
-                                ads[i] = detail
-
-                # Now save to DB in a thread
-                found, new_c = await asyncio.to_thread(_save_prospects_sync, ads, request)
-                found_total += found
-                new_total += new_c
-                
-                pages_processed += 1
+                chunk_all_known = True
+                for (found, new_c, known_c) in results:
+                    found_total += found
+                    new_total += new_c
+                    pages_processed += 1
+                    
+                    if found > 0 and known_c < found:
+                        chunk_all_known = False
+                        
                 job["pages_processed"] = pages_processed
+                
+                # Early Exit logic
+                # If we processed ads in this chunk, but every single ad we saw was already in our DB,
+                # there's no need to continue deeper into the pagination for this category!
+                if chunk_all_known and any(found > 0 for (found, new_c, known_c) in results):
+                    logger.info("early_exit_triggered", category=category, at_page=chunk_end-1)
+                    job["progress"] = f"Early exit for {category}: all ads known up to page {chunk_end-1}."
+                    break
                 
         job["status"] = "completed"
         job["progress"] = f"Done. Found {found_total} listings, {new_total} new."
@@ -177,6 +196,115 @@ def get_scan_status(
     if job_id not in SCAN_JOBS:
         return {"status": "not_found"}
     return SCAN_JOBS[job_id]
+
+
+PHONE_JOBS: dict[str, dict[str, Any]] = {}
+
+async def _run_phone_fetch_job(job_id: str) -> None:
+    job = PHONE_JOBS[job_id]
+    client = IkmanClient(delay=1.0)
+    
+    try:
+        with SessionLocal() as db:
+            stmt = select(Prospect).where(
+                Prospect.classification == "owner",
+                Prospect.phone_number == None
+            )
+            prospects = db.execute(stmt).scalars().all()
+            
+            job["total_prospects"] = len(prospects)
+            
+            if not prospects:
+                job["status"] = "completed"
+                job["progress"] = "No owners found missing phone numbers."
+                return
+                
+            processed = 0
+            found_phones = 0
+            for prospect in prospects:
+                if job["status"] == "failed":
+                    break
+                    
+                job["progress"] = f"Fetching phone for {prospect.title} ({processed}/{len(prospects)})"
+                if prospect.ikman_slug:
+                    detail = await client.fetch_ad_detail(prospect.ikman_slug)
+                    if detail and detail.contactCard and detail.contactCard.phoneNumbers:
+                        prospect.poster_name = detail.contactCard.name
+                        prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+                        found_phones += 1
+                        
+                        # Commit incrementally
+                        db.commit()
+                
+                processed += 1
+                job["prospects_processed"] = processed
+                
+        job["status"] = "completed"
+        job["progress"] = f"Done. Found {found_phones} phone numbers out of {processed} prospects."
+        
+    except Exception as e:
+        logger.exception("phone_job_failed", error=str(e))
+        job["status"] = "failed"
+        job["error"] = str(e)
+    finally:
+        await client.close()
+
+
+@admin_router.post("/scan/phones")
+def start_bulk_phone_fetch(
+    background_tasks: BackgroundTasks,
+    _admin: CurrentStaffUser
+) -> dict[str, str]:
+    job_id = str(uuid.uuid4())
+    PHONE_JOBS[job_id] = {
+        "status": "running",
+        "progress": "Starting up...",
+        "prospects_processed": 0,
+        "total_prospects": 0,
+        "started_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    background_tasks.add_task(_run_phone_fetch_job, job_id)
+    return {"job_id": job_id}
+
+
+@admin_router.get("/scan/phones/{job_id}/status")
+def get_phone_fetch_status(
+    job_id: str, 
+    _admin: CurrentStaffUser
+) -> dict[str, Any]:
+    if job_id not in PHONE_JOBS:
+        return {"status": "not_found"}
+    return PHONE_JOBS[job_id]
+
+
+@admin_router.post("/{id}/fetch-phone", response_model=ProspectRead)
+async def fetch_single_prospect_phone(
+    id: uuid.UUID,
+    db: DbSession,
+    _admin: CurrentStaffUser
+) -> Any:
+    prospect = db.get(Prospect, id)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+        
+    if not prospect.ikman_slug:
+        raise HTTPException(status_code=400, detail="Prospect has no ikman slug to fetch")
+        
+    client = IkmanClient(delay=0) # Single manual fetch, no delay needed
+    try:
+        detail = await client.fetch_ad_detail(prospect.ikman_slug)
+        if detail and detail.contactCard and detail.contactCard.phoneNumbers:
+            prospect.poster_name = detail.contactCard.name
+            prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+            db.commit()
+            db.refresh(prospect)
+        else:
+            raise HTTPException(status_code=404, detail="Phone number not found on ikman")
+    finally:
+        await client.close()
+        
+    return prospect
 
 
 @admin_router.get("", response_model=ProspectList)
