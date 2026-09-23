@@ -250,11 +250,30 @@ def get_active_jobs(
         "last_phone_fetch_at": None
     }
     
+    timeout_threshold = datetime.now(timezone.utc) - timedelta(hours=1)
+    has_timeouts = False
+    
     for job in running_jobs:
+        # Check if job is stuck
+        job_time = job.updated_at if job.updated_at else job.created_at
+        # Assuming job_time is timezone aware. If naive, might need adjustment, but SQLA DateTime(timezone=True) usually returns aware.
+        if job_time.tzinfo is None:
+            job_time = job_time.replace(tzinfo=timezone.utc)
+            
+        if job_time < timeout_threshold:
+            job.status = "failed"
+            job.error = "Job timed out (running for >1 hour)"
+            job.progress = "Failed: Server crash or timeout."
+            has_timeouts = True
+            continue
+            
         if job.job_type == "scan":
             active["scan"] = str(job.id)
         elif job.job_type == "phone_fetch":
             active["phone_fetch"] = str(job.id)
+            
+    if has_timeouts:
+        db.commit()
             
     last_scan = db.execute(
         select(ScanJob)
