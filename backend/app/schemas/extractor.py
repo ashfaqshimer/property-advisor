@@ -28,6 +28,10 @@ class ExtractedPropertyDraft(BaseModel):
     furnishing_status: FurnishingStatus | None = None
     amenities: dict | None = None
     
+    has_maids_room: bool = False
+    has_maids_toilet: bool = False
+    is_gated_community: bool = False
+    
     # Contact info from Prospect
     contact_name: str | None = None
     contact_phone: str | None = None
@@ -57,6 +61,11 @@ class GeminiPropertyExtraction(BaseModel):
     build_year: int | None = Field(None, description="Year the property was built, if known.")
     road_access_ft: int | None = Field(None, description="Width of road access in feet, if known.")
     furnishing_status: FurnishingStatus | None = Field(None, description="Furnishing status of the property.")
+    
+    has_maids_room: bool = Field(False, description="True if a maid's room, servant's room, or storage room is explicitly mentioned.")
+    has_maids_toilet: bool = Field(False, description="True if a maid's toilet or servant's bathroom is explicitly mentioned.")
+    is_gated_community: bool = Field(False, description="True if the property is located in a gated community or complex.")
+    
     amenities: list[str] | None = Field(None, description="A list of amenities (e.g., ['ac', 'pool', 'hot_water']).")
     
     image_alt: str = Field(description="A short descriptive alt text for the main image (e.g., 'A two-story house with a garden').")

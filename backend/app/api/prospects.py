@@ -436,14 +436,18 @@ async def generate_property_draft(
         if not detail:
             raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
             
-        # If contact wasn't fetched previously, try to get it from the detail page
         updated_contact = False
         if detail.contactCard:
-            if not prospect.poster_name and detail.contactCard.name:
+            if detail.contactCard.name and prospect.poster_name != detail.contactCard.name:
                 prospect.poster_name = detail.contactCard.name
                 updated_contact = True
-            if not prospect.phone_number and detail.contactCard.phoneNumbers:
-                prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+            
+            new_phone = None
+            if detail.contactCard.phoneNumbers:
+                new_phone = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+            
+            if new_phone and prospect.phone_number != new_phone:
+                prospect.phone_number = new_phone
                 updated_contact = True
                 
         if updated_contact:
@@ -467,10 +471,11 @@ async def generate_property_draft(
     3. The price should be extracted as a clean float (e.g., 150000.0). Ignore currencies, just the number.
     4. Determine if the price is per perch (usually indicated by 'per perch' or 'pp').
     5. Determine the property_type (house, apartment, land, commercial) and listing_type (sale, rent).
-    6. Extract beds, baths, land size (perches), floor area (sqft), year built, road access width, etc.
+    6. Extract beds, baths, land size (perches), floor area (sqft), year built, parking spaces, road access width.
     7. Determine furnishing status (unfurnished, semi_furnished, fully_furnished) if applicable.
-    8. Extract a list of amenities if mentioned (e.g., ["ac", "hot_water"]).
-    9. Provide a short alt text for the main image based on the property type.
+    8. Check for specific features: maid's room/storage, maid's toilet, and whether it's a gated community.
+    9. Extract a list of amenities if mentioned (e.g., ["ac", "hot_water"]).
+    10. Provide a short alt text for the main image based on the property type.
     """
     
     extractor = get_gemini_extractor_client()
@@ -487,6 +492,11 @@ async def generate_property_draft(
         draft_dict["contact_name"] = prospect.poster_name
         draft_dict["contact_phone"] = prospect.phone_number
         draft_dict["contact_type"] = prospect.classification
+        
+        draft_dict["source_platform"] = "ikman.lk"
+        draft_dict["source_url"] = prospect.ikman_url
+        draft_dict["source_id"] = prospect.ikman_ad_id
+        draft_dict["prospect_id"] = prospect.id
         
         return ExtractedPropertyDraft(**draft_dict)
     except Exception as e:

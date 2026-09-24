@@ -55,6 +55,15 @@ class PropertyRead(BaseModel):
     property_contact_id: UUID | None
     property_contact: PropertyContactRead | None
 
+    source_platform: str | None = None
+    source_url: str | None = None
+    source_id: str | None = None
+    prospect_id: UUID | None = None
+
+    has_maids_room: bool
+    has_maids_toilet: bool
+    is_gated_community: bool
+
     @field_serializer("price", "land_size_perches")
     def _decimal_as_number(self, value: Decimal | None) -> float | None:
         """Pydantic v2 serializes Decimal to a JSON *string* ("185000000.00") by
@@ -85,6 +94,16 @@ class PropertyCreate(BaseModel):
     image_urls: list[str] = Field(default_factory=list)
     image_alt: str = ""
     status: PropertyStatus = PropertyStatus.AVAILABLE
+    property_contact_id: UUID | None = None
+
+    source_platform: str | None = None
+    source_url: str | None = None
+    source_id: str | None = None
+    prospect_id: UUID | None = None
+
+    has_maids_room: bool = False
+    has_maids_toilet: bool = False
+    is_gated_community: bool = False
 
 
 class PropertyUpdate(BaseModel):
@@ -109,3 +128,12 @@ class PropertyUpdate(BaseModel):
     image_alt: str | None = None
     status: PropertyStatus | None = None
     property_contact_id: UUID | None = None
+
+    source_platform: str | None = None
+    source_url: str | None = None
+    source_id: str | None = None
+    prospect_id: UUID | None = None
+
+    has_maids_room: bool | None = None
+    has_maids_toilet: bool | None = None
+    is_gated_community: bool | None = None

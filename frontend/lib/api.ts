@@ -152,6 +152,13 @@ export type CreatePropertyPayload = {
   image_alt: string;
   status: "available" | "under_offer" | "sold";
   is_featured?: boolean;
+  source_platform?: string | null;
+  source_url?: string | null;
+  source_id?: string | null;
+  prospect_id?: string | null;
+  has_maids_room?: boolean;
+  has_maids_toilet?: boolean;
+  is_gated_community?: boolean;
 };
 
 export type AdminPropertyUpdatePayload = Partial<CreatePropertyPayload> & {

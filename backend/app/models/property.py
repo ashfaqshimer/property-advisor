@@ -133,5 +133,22 @@ class Property(Base):
         lazy="select",
     )
 
+    # Origin & Source Tracking
+    source_platform: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    prospect_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("prospects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Sri Lanka Specifics
+    has_maids_room: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    has_maids_toilet: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    is_gated_community: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+
+
     def __repr__(self) -> str:
         return f"<Property {self.title!r} {self.location!r}>"

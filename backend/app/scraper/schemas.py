@@ -35,6 +35,7 @@ class IkmanAdDetail(IkmanAd):
     description: str | None = None
     contactCard: IkmanContactCard | None = None
     money: dict[str, Any] | None = None
+    properties: list[dict[str, Any]] | None = None
 
     @model_validator(mode="before")
     @classmethod

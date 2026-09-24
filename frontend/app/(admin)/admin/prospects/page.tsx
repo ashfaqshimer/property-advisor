@@ -776,13 +776,41 @@ export default function ProspectsPage() {
                   </select>
                 </div>
               </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Land Size (Perches)</label>
+                  <input type="number" className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.land_size_perches || ""} onChange={(e) => setDraftModalData({...draftModalData, land_size_perches: Number(e.target.value)})} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Parking Spaces</label>
+                  <input type="number" className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.parking_spaces || ""} onChange={(e) => setDraftModalData({...draftModalData, parking_spaces: Number(e.target.value)})} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Build Year</label>
+                  <input type="number" className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.build_year || ""} onChange={(e) => setDraftModalData({...draftModalData, build_year: Number(e.target.value)})} />
+                </div>
+              </div>
+              <div className="flex gap-6 py-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={draftModalData.has_maids_room || false} onChange={(e) => setDraftModalData({...draftModalData, has_maids_room: e.target.checked})} className="rounded border-[#cbd8d1] text-[#19352b]" />
+                  <span className="text-xs font-medium text-[#1a2923]">Maid's Room</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={draftModalData.has_maids_toilet || false} onChange={(e) => setDraftModalData({...draftModalData, has_maids_toilet: e.target.checked})} className="rounded border-[#cbd8d1] text-[#19352b]" />
+                  <span className="text-xs font-medium text-[#1a2923]">Maid's Toilet</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={draftModalData.is_gated_community || false} onChange={(e) => setDraftModalData({...draftModalData, is_gated_community: e.target.checked})} className="rounded border-[#cbd8d1] text-[#19352b]" />
+                  <span className="text-xs font-medium text-[#1a2923]">Gated Community</span>
+                </label>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#64736b]">Description</label>
                 <textarea className="h-32 w-full rounded border border-[#dce4df] p-2" value={draftModalData.description} onChange={(e) => setDraftModalData({...draftModalData, description: e.target.value})} />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setDraftModalData(null)} className="cursor-pointer rounded px-4 py-2 text-sm font-medium hover:bg-gray-100">Cancel</button>
+              <button onClick={() => { setDraftModalData(null); fetchProspects(); }} className="cursor-pointer rounded px-4 py-2 text-sm font-medium hover:bg-gray-100">Cancel</button>
               <button onClick={handlePublishDraft} className="cursor-pointer rounded bg-[#19352b] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a4d40]">Approve & Publish</button>
             </div>
           </div>
