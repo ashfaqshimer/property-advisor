@@ -14,6 +14,10 @@ import {
   fetchProspectPhone,
   startBulkPhoneFetch,
   getBulkPhoneFetchStatus,
+  generatePropertyDraft,
+  createProperty,
+  getCurrentUser,
+  AuthUser,
 } from "../../../../lib/api";
 
 const CATEGORIES = [
@@ -52,6 +56,47 @@ export default function ProspectsPage() {
   const [lastPhoneFetchAt, setLastPhoneFetchAt] = useState<string | null>(null);
   const [lastPhoneFetchBy, setLastPhoneFetchBy] = useState<string | null>(null);
   const [showExactTime, setShowExactTime] = useState(false);
+
+  const [user, setUser] = useState<AuthUser | null>(null);
+  useEffect(() => {
+    getCurrentUser().then(setUser).catch(() => {});
+  }, []);
+
+  const [draftLoading, setDraftLoading] = useState<string | null>(null);
+  const [draftModalData, setDraftModalData] = useState<any>(null);
+  const [draftProspectId, setDraftProspectId] = useState<string | null>(null);
+
+  const handleGenerateDraft = async (prospect: Prospect) => {
+    setDraftLoading(prospect.id);
+    try {
+      const draft = await generatePropertyDraft(prospect.id);
+      setDraftModalData(draft);
+      setDraftProspectId(prospect.id);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate draft");
+    } finally {
+      setDraftLoading(null);
+    }
+  };
+
+  const handlePublishDraft = async () => {
+    if (!draftModalData || !draftProspectId) return;
+    try {
+      await createProperty({
+        ...draftModalData,
+        status: "available",
+        image_urls: [],
+        image_alt: draftModalData.image_alt || "Property",
+      });
+      await updateProspect(draftProspectId, "converted");
+      toast.success("Property created successfully!");
+      setDraftModalData(null);
+      setDraftProspectId(null);
+      fetchProspects();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create property");
+    }
+  };
 
   const fetchProspects = async () => {
     setLoading(true);
@@ -464,6 +509,7 @@ export default function ProspectsPage() {
                 <th className="px-6 py-4">Price</th>
                 <th className="px-6 py-4">Contact Info</th>
                 <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#dce4df]">
@@ -533,6 +579,17 @@ export default function ProspectsPage() {
                         <option value="ignored">Ignored</option>
                         <option value="converted">Converted</option>
                       </select>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {user?.role === "root" && prospect.status !== "converted" && (
+                        <button
+                          onClick={() => handleGenerateDraft(prospect)}
+                          disabled={draftLoading === prospect.id}
+                          className="inline-flex items-center gap-1 rounded bg-[#19352b] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#2a4d40] disabled:opacity-50 cursor-pointer disabled:cursor-default"
+                        >
+                          {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -642,6 +699,58 @@ export default function ProspectsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Draft Modal */}
+      {draftModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl">
+            <h2 className="mb-4 text-lg font-bold text-[#1a2923]">Review Property Draft</h2>
+            <div className="max-h-[60vh] overflow-y-auto space-y-4 text-sm text-[#1a2923]">
+              <div>
+                <label className="block text-xs font-medium text-[#64736b]">Title</label>
+                <input className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.title} onChange={(e) => setDraftModalData({...draftModalData, title: e.target.value})} />
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Price (Numeric)</label>
+                  <input type="number" className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.price} onChange={(e) => setDraftModalData({...draftModalData, price: Number(e.target.value)})} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Location</label>
+                  <input className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.location || ""} onChange={(e) => setDraftModalData({...draftModalData, location: e.target.value})} />
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Bedrooms</label>
+                  <input type="number" className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.bedrooms || ""} onChange={(e) => setDraftModalData({...draftModalData, bedrooms: Number(e.target.value)})} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Bathrooms</label>
+                  <input type="number" className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.bathrooms || ""} onChange={(e) => setDraftModalData({...draftModalData, bathrooms: Number(e.target.value)})} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Property Type</label>
+                  <select className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.property_type || "house"} onChange={(e) => setDraftModalData({...draftModalData, property_type: e.target.value})}>
+                    <option value="house">House</option>
+                    <option value="apartment">Apartment</option>
+                    <option value="land">Land</option>
+                    <option value="commercial">Commercial</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#64736b]">Description</label>
+                <textarea className="h-32 w-full rounded border border-[#dce4df] p-2" value={draftModalData.description} onChange={(e) => setDraftModalData({...draftModalData, description: e.target.value})} />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setDraftModalData(null)} className="cursor-pointer rounded px-4 py-2 text-sm font-medium hover:bg-gray-100">Cancel</button>
+              <button onClick={handlePublishDraft} className="cursor-pointer rounded bg-[#19352b] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a4d40]">Approve & Publish</button>
+            </div>
           </div>
         </div>
       )}

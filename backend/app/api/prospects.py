@@ -22,6 +22,9 @@ from app.schemas.prospect import (
 )
 from app.scraper.classifier import classify_listing_heuristics
 from app.scraper.ikman_client import IkmanClient, IKMAN_BASE_URL
+from app.agent.client import get_gemini_extractor_client
+from app.schemas.extractor import ExtractedPropertyDraft, GeminiPropertyExtraction
+import json
 
 logger = structlog.get_logger(__name__)
 
@@ -409,6 +412,69 @@ async def fetch_single_prospect_phone(
         await client.close()
         
     return prospect
+
+
+@admin_router.post("/{id}/convert-draft", response_model=ExtractedPropertyDraft)
+async def generate_property_draft(
+    id: uuid.UUID,
+    db: DbSession,
+    _admin: CurrentStaffUser
+) -> Any:
+    if _admin.role != "root":
+        raise HTTPException(status_code=403, detail="Only root users can extract properties")
+
+    prospect = db.get(Prospect, id)
+    if not prospect:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+        
+    if not prospect.ikman_slug:
+        raise HTTPException(status_code=400, detail="Prospect has no ikman slug to fetch")
+        
+    client = IkmanClient(delay=0)
+    try:
+        detail = await client.fetch_ad_detail(prospect.ikman_slug)
+        if not detail:
+            raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
+    finally:
+        await client.close()
+        
+    # Serialize the detail payload to JSON string
+    raw_data = detail.model_dump_json(exclude_none=True)
+    
+    prompt = f"""
+    Extract a structured real estate property listing from this raw data.
+    The data is scraped from an online classifieds site.
+    
+    Raw Data:
+    {raw_data}
+    
+    Instructions:
+    1. Provide a professional, clean title.
+    2. Write a clear, grammatically correct description. Remove boilerplate terms like "No brokers", "Price negotiable", "Contact for details".
+    3. The price should be extracted as a clean float (e.g., 150000.0). Ignore currencies, just the number.
+    4. Determine if the price is per perch (usually indicated by 'per perch' or 'pp').
+    5. Determine the property_type (house, apartment, land, commercial) and listing_type (sale, rent).
+    6. Extract beds, baths, land size (perches), floor area (sqft), year built, road access width, etc.
+    7. Determine furnishing status (unfurnished, semi_furnished, fully_furnished) if applicable.
+    8. Extract a list of amenities if mentioned (e.g., ["ac", "hot_water"]).
+    9. Provide a short alt text for the main image based on the property type.
+    """
+    
+    extractor = get_gemini_extractor_client()
+    try:
+        raw_draft = extractor.generate_structured(prompt=prompt, schema=GeminiPropertyExtraction)
+        
+        amenities_dict = None
+        if raw_draft.amenities:
+            amenities_dict = {a: True for a in raw_draft.amenities}
+            
+        draft_dict = raw_draft.model_dump()
+        draft_dict["amenities"] = amenities_dict
+        
+        return ExtractedPropertyDraft(**draft_dict)
+    except Exception as e:
+        logger.exception("property_extraction_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"LLM extraction failed: {str(e)}")
 
 
 @admin_router.get("", response_model=ProspectList)

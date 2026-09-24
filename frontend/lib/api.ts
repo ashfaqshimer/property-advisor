@@ -967,3 +967,20 @@ export function wakeBackend(): void {
     // baseUrl() threw: there is nothing to wake.
   }
 }
+
+export async function generatePropertyDraft(id: string): Promise<any> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/${id}/convert-draft`, {
+    method: "POST",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    let detail = `Draft generation failed (${response.status}).`;
+    try {
+      const payload = await response.json();
+      if (payload.detail) detail = payload.detail;
+    } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return await response.json();
+}

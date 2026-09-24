@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     # Agent settings are required so deployment configuration, rather than source code,
     # chooses the model.
     gemini_api_key: str = ""
+    gemini_extractor_api_key: str = ""
     gemini_model: str
     google_maps_api_key: str = ""
     location_search_radius_km: float = 5.0

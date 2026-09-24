@@ -84,6 +84,21 @@ class GeminiClient:
             ),
         )
 
+    def generate_structured(
+        self,
+        prompt: str,
+        schema: Any,
+    ) -> Any:
+        response = self._client.models.generate_content(
+            model=self._model,
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=schema,
+            ),
+        )
+        return response.parsed
+
 
 @lru_cache
 def get_gemini_client() -> GeminiClient:
@@ -94,3 +109,12 @@ def get_gemini_client() -> GeminiClient:
     """
     settings = get_settings()
     return GeminiClient(api_key=settings.gemini_api_key, model=settings.gemini_model)
+
+
+@lru_cache
+def get_gemini_extractor_client() -> GeminiClient:
+    """Separate client specifically for data extraction if a different key is configured."""
+    settings = get_settings()
+    # Fallback to the main key if extractor key is not set
+    key = settings.gemini_extractor_api_key or settings.gemini_api_key
+    return GeminiClient(api_key=key, model=settings.gemini_model)
