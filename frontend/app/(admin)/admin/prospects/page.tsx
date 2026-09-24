@@ -22,7 +22,6 @@ const CATEGORIES = [
   { id: "apartments-for-sale", label: "Apartments for Sale" },
   { id: "house-rentals", label: "House Rentals" },
   { id: "apartment-rentals", label: "Apartment Rentals" },
-  { id: "room-annex-rentals", label: "Room & Annex Rentals" },
 ];
 
 export default function ProspectsPage() {
@@ -358,7 +357,7 @@ export default function ProspectsPage() {
           >
             Apartments
           </button>
-          {transactionType === "sale" ? (
+          {transactionType === "sale" && (
             <button
               onClick={() => { setPropertyType("land"); setPage(1); }}
               className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -368,17 +367,6 @@ export default function ProspectsPage() {
               }`}
             >
               Land
-            </button>
-          ) : (
-            <button
-              onClick={() => { setPropertyType("property"); setPage(1); }}
-              className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                propertyType === "property"
-                  ? "border-[#19352b] bg-[#19352b] text-white"
-                  : "border-[#cbd8d1] bg-white text-[#64736b] hover:border-[#1a2923] hover:text-[#1a2923]"
-              }`}
-            >
-              Rooms & Annexes
             </button>
           )}
         </div>
