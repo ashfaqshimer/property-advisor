@@ -28,6 +28,11 @@ class ExtractedPropertyDraft(BaseModel):
     furnishing_status: FurnishingStatus | None = None
     amenities: dict | None = None
     
+    # Contact info from Prospect
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    contact_type: str | None = None
+    
     image_alt: str
 
 

@@ -16,8 +16,8 @@ import {
   getBulkPhoneFetchStatus,
   generatePropertyDraft,
   createProperty,
-  getCurrentUser,
   AuthUser,
+  createPropertyContact,
 } from "../../../../lib/api";
 
 const CATEGORIES = [
@@ -82,11 +82,28 @@ export default function ProspectsPage() {
   const handlePublishDraft = async () => {
     if (!draftModalData || !draftProspectId) return;
     try {
+      let contactId = null;
+      if (draftModalData.contact_name && draftModalData.contact_phone) {
+        try {
+          const contact = await createPropertyContact({
+            full_name: draftModalData.contact_name,
+            contact_type: draftModalData.contact_type === "broker" ? "broker" : "owner",
+            phones: [{ phone: draftModalData.contact_phone }],
+            notes: "Auto-created from prospect conversion.",
+          });
+          contactId = contact.id;
+        } catch (err: any) {
+          toast.error("Failed to create property contact, but continuing with property creation...");
+          console.error(err);
+        }
+      }
+
       await createProperty({
         ...draftModalData,
         status: "available",
         image_urls: [],
         image_alt: draftModalData.image_alt || "Property",
+        property_contact_id: contactId,
       });
       await updateProspect(draftProspectId, "converted");
       toast.success("Property created successfully!");
@@ -739,6 +756,23 @@ export default function ProspectsPage() {
                     <option value="apartment">Apartment</option>
                     <option value="land">Land</option>
                     <option value="commercial">Commercial</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Contact Name</label>
+                  <input className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.contact_name || ""} onChange={(e) => setDraftModalData({...draftModalData, contact_name: e.target.value})} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Contact Phone</label>
+                  <input className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.contact_phone || ""} onChange={(e) => setDraftModalData({...draftModalData, contact_phone: e.target.value})} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#64736b]">Contact Type</label>
+                  <select className="w-full rounded border border-[#dce4df] p-2" value={draftModalData.contact_type || "owner"} onChange={(e) => setDraftModalData({...draftModalData, contact_type: e.target.value})}>
+                    <option value="owner">Owner</option>
+                    <option value="broker">Broker</option>
                   </select>
                 </div>
               </div>

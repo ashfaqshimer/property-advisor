@@ -435,9 +435,22 @@ async def generate_property_draft(
         detail = await client.fetch_ad_detail(prospect.ikman_slug)
         if not detail:
             raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
+            
+        # If contact wasn't fetched previously, try to get it from the detail page
+        updated_contact = False
+        if detail.contactCard:
+            if not prospect.poster_name and detail.contactCard.name:
+                prospect.poster_name = detail.contactCard.name
+                updated_contact = True
+            if not prospect.phone_number and detail.contactCard.phoneNumbers:
+                prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+                updated_contact = True
+                
+        if updated_contact:
+            db.commit()
+            
     finally:
         await client.close()
-        
     # Serialize the detail payload to JSON string
     raw_data = detail.model_dump_json(exclude_none=True)
     
@@ -470,6 +483,10 @@ async def generate_property_draft(
             
         draft_dict = raw_draft.model_dump()
         draft_dict["amenities"] = amenities_dict
+        
+        draft_dict["contact_name"] = prospect.poster_name
+        draft_dict["contact_phone"] = prospect.phone_number
+        draft_dict["contact_type"] = prospect.classification
         
         return ExtractedPropertyDraft(**draft_dict)
     except Exception as e:
