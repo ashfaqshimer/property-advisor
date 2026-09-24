@@ -33,3 +33,4 @@ htmlcov/
 # Worktrees created by Claude Code — checkouts of this same repo, never content.
 .claude/worktrees/
 .mcp.json
+.agents/mcp_config.json
