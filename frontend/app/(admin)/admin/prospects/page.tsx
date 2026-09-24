@@ -18,6 +18,7 @@ import {
   createProperty,
   AuthUser,
   createPropertyContact,
+  getCurrentUser,
 } from "../../../../lib/api";
 
 const CATEGORIES = [
@@ -65,6 +66,8 @@ export default function ProspectsPage() {
   const [draftLoading, setDraftLoading] = useState<string | null>(null);
   const [draftModalData, setDraftModalData] = useState<any>(null);
   const [draftProspectId, setDraftProspectId] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
   const handleGenerateDraft = async (prospect: Prospect) => {
     setDraftLoading(prospect.id);
@@ -81,6 +84,7 @@ export default function ProspectsPage() {
 
   const handlePublishDraft = async () => {
     if (!draftModalData || !draftProspectId) return;
+    setIsPublishing(true);
     try {
       let contactId = null;
       if (draftModalData.contact_name && draftModalData.contact_phone) {
@@ -112,6 +116,8 @@ export default function ProspectsPage() {
       fetchProspects();
     } catch (err: any) {
       toast.error(err.message || "Failed to create property");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -236,12 +242,15 @@ export default function ProspectsPage() {
   };
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
+    setUpdatingStatusId(id);
     try {
       const updated = await updateProspect(id, newStatus);
       setProspects(prev => prev.map(p => p.id === id ? updated : p));
       toast.success("Status updated");
     } catch (err) {
       toast.error("Failed to update status");
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -451,8 +460,9 @@ export default function ProspectsPage() {
                   </span>
                   <select
                     value={prospect.status}
+                    disabled={updatingStatusId === prospect.id}
                     onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
-                    className={`cursor-pointer rounded-md border-0 py-1 pl-2 pr-6 text-xs font-medium focus:ring-2 focus:ring-[#19352b] ${
+                    className={`cursor-pointer rounded-md border-0 py-1 pl-2 pr-6 text-xs font-medium focus:ring-2 focus:ring-[#19352b] disabled:opacity-50 ${
                       prospect.status === 'new' ? 'bg-yellow-50 text-yellow-700' :
                       prospect.status === 'contacted' ? 'bg-blue-50 text-blue-700' :
                       prospect.status === 'ignored' ? 'bg-gray-100 text-gray-500' :
@@ -583,8 +593,9 @@ export default function ProspectsPage() {
                     <td className="px-6 py-4">
                       <select
                         value={prospect.status}
+                        disabled={updatingStatusId === prospect.id}
                         onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
-                        className={`cursor-pointer rounded-md border-0 py-1 pl-2 pr-6 text-xs font-medium focus:ring-2 focus:ring-[#19352b] ${
+                        className={`cursor-pointer rounded-md border-0 py-1 pl-2 pr-6 text-xs font-medium focus:ring-2 focus:ring-[#19352b] disabled:opacity-50 ${
                           prospect.status === 'new' ? 'bg-yellow-50 text-yellow-700' :
                           prospect.status === 'contacted' ? 'bg-blue-50 text-blue-700' :
                           prospect.status === 'ignored' ? 'bg-gray-100 text-gray-500' :
@@ -810,8 +821,10 @@ export default function ProspectsPage() {
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => { setDraftModalData(null); fetchProspects(); }} className="cursor-pointer rounded px-4 py-2 text-sm font-medium hover:bg-gray-100">Cancel</button>
-              <button onClick={handlePublishDraft} className="cursor-pointer rounded bg-[#19352b] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a4d40]">Approve & Publish</button>
+              <button onClick={() => { setDraftModalData(null); fetchProspects(); }} disabled={isPublishing} className="cursor-pointer rounded px-4 py-2 text-sm font-medium hover:bg-gray-100 disabled:opacity-50">Cancel</button>
+              <button onClick={handlePublishDraft} disabled={isPublishing} className="cursor-pointer rounded bg-[#19352b] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a4d40] disabled:cursor-wait disabled:opacity-70">
+                {isPublishing ? "Publishing..." : "Approve & Publish"}
+              </button>
             </div>
           </div>
         </div>
