@@ -795,6 +795,8 @@ export async function createPropertyContact(
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
+  if (!response.ok) throw new ChatError("unexpected", `Contact creation failed (${response.status}).`, response.status);
+  return (await response.json()) as PropertyContact;
 }
 
 export type Prospect = {
