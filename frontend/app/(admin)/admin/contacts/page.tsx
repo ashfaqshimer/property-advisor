@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
+import { Pencil, Trash2 } from 'lucide-react';
 import {
 	createPropertyContact,
 	deletePropertyContact,
@@ -168,24 +169,26 @@ export default function AdminContactsPage() {
 												<button
 													type='button'
 													onClick={() => setExpandedId(expandedId === contact.id ? null : contact.id)}
-													className='text-xs font-semibold text-[#65736b] dark:text-zinc-300 hover:text-[#1a2923] dark:text-zinc-200'
+													className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#65736b] dark:text-zinc-300 transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer'
 												>
 													{expandedId === contact.id ? 'Less' : 'Notes'}
 												</button>
 												<button
 													type='button'
 													onClick={() => { setEditingContact(contact); setShowCreate(false); }}
-													className='text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline'
+													className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#35664f] dark:text-emerald-400 transition-colors hover:bg-[#e0f1e7] dark:hover:bg-emerald-950 cursor-pointer'
 												>
+													<Pencil className="h-3.5 w-3.5" />
 													Edit
 												</button>
 												<button
 													type='button'
 													disabled={deletingId === contact.id}
 													onClick={() => handleDelete(contact.id)}
-													className='text-xs font-semibold text-[#a34d4d] dark:text-red-400 hover:underline disabled:opacity-50'
+													className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer disabled:opacity-50'
 												>
-													{deletingId === contact.id ? <Spinner className='inline h-3 w-3' /> : 'Delete'}
+													{deletingId === contact.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
+													Delete
 												</button>
 											</div>
 										</div>

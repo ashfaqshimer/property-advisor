@@ -95,7 +95,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={updatingName}
-            className="mt-6 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 disabled:cursor-wait disabled:opacity-60"
+            className="mt-6 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#132820] dark:hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
           >
             {updatingName ? "Saving..." : "Save changes"}
           </button>
@@ -170,7 +170,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-6 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 disabled:cursor-wait disabled:opacity-60"
+            className="mt-6 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#132820] dark:hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
           >
             {submitting ? "Updating..." : "Update password"}
           </button>

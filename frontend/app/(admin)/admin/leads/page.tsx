@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createAdminLead, getAdminLeads, updateAdminLead, type AdminLead, type LeadInterest } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
+import { Pencil } from "lucide-react";
 
 const intentStyles = {
   buy: "bg-[#e0f1e7] dark:bg-green-950 text-[#28704b] dark:text-green-300",
@@ -145,7 +146,7 @@ export default function AdminLeadsPage() {
         <label className="min-w-40 flex-1 text-sm font-medium text-[#526158]">Budget max<input type="number" min="0" value={budgetMax} onChange={(event) => setBudgetMax(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] dark:border-zinc-800 px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
         <label className="min-w-64 flex-[2] text-sm font-medium text-[#526158]">Requirements<input value={requirements} onChange={(event) => setRequirements(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] dark:border-zinc-800 px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
         <label className="min-w-64 flex-[2] text-sm font-medium text-[#526158]">Remarks<input value={remarks} onChange={(event) => setRemarks(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] dark:border-zinc-800 px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
-        <button type="submit" disabled={creating} className="rounded-lg bg-[#28513f] dark:bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 disabled:opacity-60">{creating ? "Adding..." : "Add new lead"}</button>
+        <button type="submit" disabled={creating} className="rounded-lg bg-[#28513f] dark:bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#1e4031] dark:hover:bg-emerald-600 disabled:opacity-60">{creating ? "Adding..." : "Add new lead"}</button>
         {formError && <p className="basis-full text-sm text-[#a34d4d] dark:text-red-400">{formError}</p>}
       </form>
       {editingLead && <form onSubmit={handleUpdate} className="mb-6 flex flex-col items-stretch gap-4 rounded-xl border border-[#cbded2] bg-[#f5faf6] p-5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
@@ -158,7 +159,7 @@ export default function AdminLeadsPage() {
         <label className="min-w-56 flex-1 text-sm font-medium text-[#526158]">Looking for<select value={editInterest} onChange={(event) => setEditInterest(event.target.value as LeadInterest | "")} className="mt-2 w-full rounded-lg border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 font-normal outline-none focus:border-[#28513f]"><option value="">Not specified</option>{Object.entries(interestLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label className="min-w-64 flex-[2] text-sm font-medium text-[#526158]">Requirements<input value={editRequirements} onChange={(event) => setEditRequirements(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
         <label className="min-w-64 flex-[2] text-sm font-medium text-[#526158]">Remarks<input value={editRemarks} onChange={(event) => setEditRemarks(event.target.value)} className="mt-2 w-full rounded-lg border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 font-normal outline-none focus:border-[#28513f]" /></label>
-        <button type="submit" disabled={updating} className="rounded-lg bg-[#28513f] dark:bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 disabled:opacity-60">{updating ? "Saving..." : "Save changes"}</button>
+        <button type="submit" disabled={updating} className="rounded-lg bg-[#28513f] dark:bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#1e4031] dark:hover:bg-emerald-600 disabled:opacity-60">{updating ? "Saving..." : "Save changes"}</button>
       </form>}
       {error && <p className="mb-3 text-right text-sm text-[#a34d4d] dark:text-red-400">{error}</p>}
       <div className="overflow-hidden rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-[0_8px_24px_rgba(25,53,43,0.04)] dark:shadow-none">
@@ -190,7 +191,7 @@ export default function AdminLeadsPage() {
                     <td className="max-w-sm px-4 py-4 text-[#65736b] dark:text-zinc-300">{lead.remarks ?? "No remarks"}</td>
                     <td className="px-4 py-4 text-[#65736b] dark:text-zinc-300">{lead.edited_by ? lead.edited_by.name : "Not edited"}</td>
                     <td className="px-5 py-4 text-right text-[#65736b] dark:text-zinc-300">{new Date(lead.created_at).toLocaleDateString()}</td>
-                    <td className="px-5 py-4 text-right"><button type="button" onClick={() => startEditing(lead)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline">Edit</button></td>
+                    <td className="px-5 py-4 text-right"><button type="button" onClick={() => startEditing(lead)} className="inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#35664f] dark:text-emerald-400 transition-colors hover:bg-[#e0f1e7] dark:hover:bg-emerald-950 cursor-pointer"><Pencil className="h-3.5 w-3.5" />Edit</button></td>
                   </tr>)}
                 </tbody>
               </table>
@@ -223,7 +224,7 @@ export default function AdminLeadsPage() {
                   )}
                   <div className="mt-2 flex items-center justify-between border-t border-[#edf0ee] pt-4">
                     <span className="text-xs text-[#8a968f] dark:text-zinc-400">{new Date(lead.created_at).toLocaleDateString()} &middot; {lead.source ? sourceLabels[lead.source] : "Unknown"}</span>
-                    <button type="button" onClick={() => startEditing(lead)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline">Edit</button>
+                    <button type="button" onClick={() => startEditing(lead)} className="inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#35664f] dark:text-emerald-400 transition-colors hover:bg-[#e0f1e7] dark:hover:bg-emerald-950 cursor-pointer"><Pencil className="h-3.5 w-3.5" />Edit</button>
                   </div>
                 </div>
               ))}

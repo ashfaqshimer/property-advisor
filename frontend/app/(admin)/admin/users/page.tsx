@@ -65,7 +65,7 @@ export default function AdminUsersPage() {
             </button>
           </div>
         </div>
-        <button type="submit" disabled={saving} className="rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200 disabled:opacity-60">{saving ? <Spinner className="mx-auto h-4 w-4" /> : 'Create agent'}</button>
+        <button type="submit" disabled={saving} className="rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#1e4031] dark:hover:bg-emerald-600 disabled:opacity-60 cursor-pointer">{saving ? <Spinner className="mx-auto h-4 w-4" /> : 'Create agent'}</button>
       </form>
       <div className="overflow-hidden rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
         {loading ? <div className="flex min-h-32 items-center justify-center"><Spinner className="h-5 w-5 text-[#28513f]" /></div> : (
@@ -76,7 +76,7 @@ export default function AdminUsersPage() {
                   <tr><th className="px-5 py-4">Name</th><th className="px-4 py-4">Email</th><th className="px-4 py-4">Role</th><th className="px-4 py-4">Status</th><th className="px-5 py-4 text-right">Actions</th></tr>
                 </thead>
                 <tbody className="divide-y divide-[#edf0ee] dark:divide-zinc-800">
-                  {users.map((user) => <tr key={user.id}><td className="px-5 py-4 font-medium">{user.name}</td><td className="px-4 py-4">{user.email}</td><td className="px-4 py-4">{user.role}</td><td className="px-4 py-4">{user.is_active ? 'Active' : 'Inactive'}</td><td className="px-5 py-4 text-right">{user.role === 'agent' && <button type="button" onClick={() => toggleActive(user)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline">{user.is_active ? 'Disable' : 'Enable'}</button>}</td></tr>)}
+                  {users.map((user) => <tr key={user.id}><td className="px-5 py-4 font-medium">{user.name}</td><td className="px-4 py-4">{user.email}</td><td className="px-4 py-4">{user.role}</td><td className="px-4 py-4">{user.is_active ? 'Active' : 'Inactive'}</td><td className="px-5 py-4 text-right">{user.role === 'agent' && <button type="button" onClick={() => toggleActive(user)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline cursor-pointer">{user.is_active ? 'Disable' : 'Enable'}</button>}</td></tr>)}
                 </tbody>
               </table>
             </div>
@@ -91,7 +91,7 @@ export default function AdminUsersPage() {
                   <div className="mt-2 flex items-center justify-between border-t border-[#edf0ee] pt-4">
                     <span className="text-xs font-semibold uppercase tracking-wider text-[#8a968f] dark:text-zinc-400">{user.role}</span>
                     {user.role === 'agent' && (
-                      <button type="button" onClick={() => toggleActive(user)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline">
+                      <button type="button" onClick={() => toggleActive(user)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline cursor-pointer">
                         {user.is_active ? 'Disable' : 'Enable'}
                       </button>
                     )}
