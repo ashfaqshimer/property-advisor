@@ -177,27 +177,27 @@ export default function NewPropertyPage() {
 	}
 	if (success)
 		return (
-			<div className='mx-auto max-w-2xl rounded-xl border border-[#cfe3d6] bg-white p-10 text-center shadow-sm'>
-				<div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#e0f1e7] text-xl text-[#28704b]'>
+			<div className='mx-auto max-w-2xl rounded-xl border border-[#cfe3d6] bg-white dark:bg-zinc-950 p-10 text-center shadow-sm'>
+				<div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#e0f1e7] dark:bg-green-950 text-xl text-[#28704b] dark:text-green-300'>
 					✓
 				</div>
 				<h2 className='mt-5 text-2xl font-semibold'>Property saved</h2>
-				<p className='mt-2 text-sm text-[#718078]'>
+				<p className='mt-2 text-sm text-[#718078] dark:text-zinc-400'>
 					Your listing and images have been added to the catalog.
 				</p>
 				<Link
 					href='/admin'
-					className='mt-7 inline-flex rounded-lg bg-[#28513f] px-5 py-3 text-sm font-semibold text-white'
+					className='mt-7 inline-flex rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200'
 				>
 					Return to properties
 				</Link>
 			</div>
 		);
 	const fieldClass =
-		'mt-2 w-full rounded-lg border border-[#d7e0da] bg-white px-3.5 py-3 text-sm text-[#243a2e] outline-none transition placeholder:text-[#a2ada7] focus:border-[#5e8c73] focus:ring-2 focus:ring-[#dcebe1]';
+		'mt-2 w-full rounded-lg border border-[#d7e0da] bg-white dark:bg-zinc-950 px-3.5 py-3 text-sm text-[#243a2e] outline-none transition placeholder:text-[#a2ada7] focus:border-[#5e8c73] focus:ring-2 focus:ring-[#dcebe1]';
 	const errorText = (field: string) =>
 		errors[field] ? (
-			<p className='mt-1 text-xs text-[#a34d4d]'>{errors[field]}</p>
+			<p className='mt-1 text-xs text-[#a34d4d] dark:text-red-400'>{errors[field]}</p>
 		) : null;
 	return (
 		<section className='mx-auto max-w-4xl'>
@@ -211,12 +211,12 @@ export default function NewPropertyPage() {
 				<h2 className='mt-5 text-3xl font-semibold tracking-tight'>
 					Add property
 				</h2>
-				<p className='mt-2 text-sm text-[#75847c]'>
+				<p className='mt-2 text-sm text-[#75847c] dark:text-zinc-400'>
 					Create a listing for the Property Advisor catalog.
 				</p>
 			</div>
 			<form onSubmit={submit} className='space-y-6'>
-				<div className='rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm sm:p-8'>
+				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Basic information</h3>
 					<div className='mt-6 grid gap-5 sm:grid-cols-2'>
 						<label className='text-sm font-medium sm:col-span-2'>
@@ -263,7 +263,7 @@ export default function NewPropertyPage() {
 								onChange={(e) => updateField('price', e.target.value)}
 								placeholder='50000000'
 							/>
-							<label className='mt-2 flex items-center gap-2 text-xs font-normal text-[#65736b]'>
+							<label className='mt-2 flex items-center gap-2 text-xs font-normal text-[#65736b] dark:text-zinc-300'>
 								<input
 									type='checkbox'
 									checked={form.pricePerPerch}
@@ -291,13 +291,13 @@ export default function NewPropertyPage() {
 								<button
 									type='button'
 									onClick={() => setShowContactForm((s) => !s)}
-									className='text-xs font-semibold text-[#35664f] hover:underline'
+									className='text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline'
 								>
 									{showContactForm ? 'Cancel new contact' : '+ Add new contact'}
 								</button>
 							</div>
 							{showContactForm ? (
-								<div className='mt-2 rounded-xl border border-[#dce4df] bg-[#f9fbf9] p-4 shadow-sm'>
+								<div className='mt-2 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-[#f9fbf9] p-4 shadow-sm'>
 									<ContactForm
 										onSave={handleCreateContact}
 										onCancel={() => setShowContactForm(false)}
@@ -321,7 +321,7 @@ export default function NewPropertyPage() {
 						</div>
 					</div>
 				</div>
-				<div className='rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm sm:p-8'>
+				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Specifications</h3>
 					<div className='mt-6 grid gap-5 sm:grid-cols-3'>
 						<label className='text-sm font-medium'>
@@ -407,12 +407,12 @@ export default function NewPropertyPage() {
 						</label>
 					</div>
 					{form.propertyType === 'land' && (
-						<p className='mt-4 text-xs text-[#75847c]'>
+						<p className='mt-4 text-xs text-[#75847c] dark:text-zinc-400'>
 							Bedrooms and bathrooms are not applicable to land listings.
 						</p>
 					)}
 				</div>
-				<div className='rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm sm:p-8'>
+				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Description</h3>
 					<textarea
 						className={`${fieldClass} min-h-32 resize-y`}
@@ -434,7 +434,7 @@ export default function NewPropertyPage() {
 						</span>
 					</label>
 				</div>
-				<div className='rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm sm:p-8'>
+				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Status & visibility</h3>
 					<div className='mt-6 flex flex-col gap-5 sm:flex-row sm:items-end'>
 						<label className='text-sm font-medium sm:w-64'>
@@ -474,7 +474,7 @@ export default function NewPropertyPage() {
 						</label>
 					</div>
 				</div>
-				<div className='rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm sm:p-8'>
+				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Images</h3>
 					<label className='mt-5 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-[#cbd9d0] bg-[#f9fbf9] px-5 text-center transition hover:border-[#6c9a7d]'>
 						<span className='text-sm font-semibold text-[#416b55]'>
@@ -506,7 +506,7 @@ export default function NewPropertyPage() {
 									<button
 										type='button'
 										onClick={() => removeImage(image.url)}
-										className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white'
+										className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white dark:text-zinc-200'
 										aria-label={`Remove ${image.file.name}`}
 									>
 										×
@@ -517,19 +517,19 @@ export default function NewPropertyPage() {
 					)}
 				</div>
 				{errors.form && (
-					<p className='text-right text-sm text-[#a34d4d]'>{errors.form}</p>
+					<p className='text-right text-sm text-[#a34d4d] dark:text-red-400'>{errors.form}</p>
 				)}
 				<div className='flex justify-end gap-3 pb-8'>
 					<Link
 						href='/admin'
-						className='rounded-lg border border-[#d2ddd5] bg-white px-5 py-3 text-sm font-semibold text-[#53655b]'
+						className='rounded-lg border border-[#d2ddd5] bg-white dark:bg-zinc-950 px-5 py-3 text-sm font-semibold text-[#53655b]'
 					>
 						Cancel
 					</Link>
 					<button
 						type='submit'
 						disabled={saving}
-						className='rounded-lg bg-[#28513f] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1e4031] disabled:cursor-wait disabled:opacity-60'
+						className='rounded-lg bg-[#28513f] dark:bg-emerald-700 px-6 py-3 text-sm font-semibold text-white dark:text-zinc-200 transition hover:bg-[#1e4031] dark:hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60'
 					>
 						{saving ? (
 							<>

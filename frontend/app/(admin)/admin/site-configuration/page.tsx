@@ -39,12 +39,12 @@ function ConfigField({
         aria-checked={show ?? true}
         onClick={() => onShowChange(!(show ?? true))}
         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#19352b] focus:ring-offset-2 ${
-          (show ?? true) ? 'bg-[#19352b]' : 'bg-gray-200'
+          (show ?? true) ? 'bg-[#19352b] dark:bg-zinc-950' : 'bg-gray-200'
         }`}
       >
         <span
           aria-hidden="true"
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-zinc-950 shadow ring-0 transition duration-200 ease-in-out ${
             (show ?? true) ? 'translate-x-4' : 'translate-x-0'
           }`}
         />
@@ -148,7 +148,7 @@ export default function SiteConfigurationPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Site Configuration</h1>
       <p className="mt-2 text-sm text-[#64736b]">Manage global settings and contact information.</p>
 
-      <div className="mt-8 rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm">
+      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
         <h2 className="text-lg font-medium">Contact & Socials</h2>
         <form onSubmit={handleUpdateSiteConfig} className="mt-6 max-w-md">
           
@@ -252,7 +252,7 @@ export default function SiteConfigurationPage() {
           <button
             type="submit"
             disabled={updatingSiteConfig}
-            className="mt-4 rounded-lg bg-[#19352b] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+            className="mt-4 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 disabled:cursor-wait disabled:opacity-60"
           >
             {updatingSiteConfig ? "Saving..." : "Save configuration"}
           </button>

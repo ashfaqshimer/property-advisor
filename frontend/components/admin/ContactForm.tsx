@@ -59,8 +59,8 @@ export function ContactForm({
 		});
 	}
 
-	const inputCls = 'w-full rounded-lg border border-[#d0dbd4] bg-white px-3 py-2 text-sm text-[#1a2923] placeholder:text-[#9aab9e] focus:border-[#35664f] focus:outline-none';
-	const labelCls = 'block text-xs font-semibold text-[#65736b] mb-1';
+	const inputCls = 'w-full rounded-lg border border-[#d0dbd4] dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-[#1a2923] dark:text-zinc-200 placeholder:text-[#9aab9e] focus:border-[#35664f] focus:outline-none';
+	const labelCls = 'block text-xs font-semibold text-[#65736b] dark:text-zinc-300 mb-1';
 
 	return (
 		<form onSubmit={handleSubmit} className='space-y-4'>
@@ -92,7 +92,7 @@ export function ContactForm({
 			<div>
 				<div className='flex items-center justify-between mb-2'>
 					<span className={labelCls + ' mb-0'}>Phone numbers</span>
-					<button type='button' onClick={addPhone} className='text-xs font-semibold text-[#35664f] hover:underline'>
+					<button type='button' onClick={addPhone} className='text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline'>
 						+ Add number
 					</button>
 				</div>
@@ -111,7 +111,7 @@ export function ContactForm({
 								className={inputCls + ' w-24'}
 								placeholder='Label'
 							/>
-							<label className='flex items-center gap-1 text-xs text-[#65736b] shrink-0 cursor-pointer select-none'>
+							<label className='flex items-center gap-1 text-xs text-[#65736b] dark:text-zinc-300 shrink-0 cursor-pointer select-none'>
 								<input
 									type='checkbox'
 									checked={p.is_whatsapp}
@@ -121,7 +121,7 @@ export function ContactForm({
 								WA
 							</label>
 							{phones.length > 1 && (
-								<button type='button' onClick={() => removePhone(i)} className='text-[#a34d4d] text-lg leading-none hover:opacity-70'>
+								<button type='button' onClick={() => removePhone(i)} className='text-[#a34d4d] dark:text-red-400 text-lg leading-none hover:opacity-70'>
 									×
 								</button>
 							)}
@@ -139,7 +139,7 @@ export function ContactForm({
 				<button type='button' onClick={onCancel} className='rounded-lg border border-[#cbd9d0] px-4 py-2 text-sm font-semibold text-[#28513f] hover:bg-[#f4f8f5]'>
 					Cancel
 				</button>
-				<button type='submit' disabled={saving} className='inline-flex items-center gap-2 rounded-lg bg-[#28513f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e4031] disabled:opacity-60'>
+				<button type='submit' disabled={saving} className='inline-flex items-center gap-2 rounded-lg bg-[#28513f] dark:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white dark:text-zinc-200 hover:bg-[#1e4031] dark:hover:bg-emerald-600 disabled:opacity-60'>
 					{saving && <Spinner className='h-4 w-4' />}
 					{initial ? 'Save changes' : 'Add contact'}
 				</button>

@@ -27,9 +27,9 @@ type Property = {
 };
 
 const statusStyles: Record<PropertyStatus, string> = {
-	available: 'bg-[#e0f1e7] text-[#28704b]',
-	under_offer: 'bg-[#fff0d5] text-[#9a6415]',
-	sold: 'bg-[#e9e9ea] text-[#62666b]',
+	available: 'bg-[#e0f1e7] dark:bg-green-950 text-[#28704b] dark:text-green-300',
+	under_offer: 'bg-[#fff0d5] dark:bg-yellow-950 text-[#9a6415] dark:text-yellow-300',
+	sold: 'bg-[#e9e9ea] dark:bg-zinc-800 text-[#62666b] dark:text-zinc-300',
 };
 
 export default function AdminPropertiesPage() {
@@ -130,44 +130,44 @@ export default function AdminPropertiesPage() {
 		<section className='mx-auto max-w-[1380px]'>
 			<div className='mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end'>
 				<div>
-					<p className='text-sm font-medium text-[#75847c]'>
+					<p className='text-sm font-medium text-[#75847c] dark:text-zinc-400'>
 						Catalog management
 					</p>
 					<h2 className='mt-1 text-3xl font-semibold tracking-tight'>
 						Properties
 					</h2>
-					<p className='mt-2 text-sm text-[#75847c]'>
+					<p className='mt-2 text-sm text-[#75847c] dark:text-zinc-400'>
 						Manage listings, visibility, and featured placements.
 					</p>
 				</div>
 				<div className='flex flex-wrap items-center gap-3'>
 					<Link
 						href='/'
-						className='inline-flex items-center justify-center rounded-lg border border-[#cbd9d0] bg-white px-5 py-3 text-sm font-semibold text-[#28513f] transition hover:bg-[#f4f8f5]'
+						className='inline-flex items-center justify-center rounded-lg border border-[#cbd9d0] bg-white dark:bg-zinc-950 px-5 py-3 text-sm font-semibold text-[#28513f] transition hover:bg-[#f4f8f5]'
 					>
 						View customer site
 					</Link>
 					<Link
 						href='/admin/properties/new'
-						className='inline-flex items-center justify-center rounded-lg bg-[#28513f] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1e4031]'
+						className='inline-flex items-center justify-center rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm transition hover:bg-[#1e4031] dark:hover:bg-emerald-600'
 					>
 						<span className='mr-2 text-lg leading-none'>+</span> Add Property
 					</Link>
 				</div>
 			</div>
-			<div className='overflow-hidden rounded-xl border border-[#dce4df] bg-white shadow-[0_8px_24px_rgba(25,53,43,0.04)]'>
-				<div className='flex items-center justify-between border-b border-[#e6ebe8] px-5 py-4'>
+			<div className='overflow-hidden rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-[0_8px_24px_rgba(25,53,43,0.04)] dark:shadow-none'>
+				<div className='flex items-center justify-between border-b border-[#e6ebe8] dark:border-zinc-800 px-5 py-4'>
 					<p className='text-sm font-semibold'>
 						All properties{' '}
-						<span className='ml-1 font-normal text-[#8a968f]'>
+						<span className='ml-1 font-normal text-[#8a968f] dark:text-zinc-400'>
 							({properties.length})
 						</span>
 					</p>
-					<span className='text-xs text-[#8a968f]'>Live data</span>
+					<span className='text-xs text-[#8a968f] dark:text-zinc-400'>Live data</span>
 				</div>
 				<div className='hidden sm:block overflow-x-auto'>
 					<table className='w-full min-w-[900px] text-left text-sm'>
-						<thead className='bg-[#f8faf8] text-xs uppercase tracking-[0.12em] text-[#7a8780]'>
+						<thead className='bg-[#f8faf8] dark:bg-zinc-900 text-xs uppercase tracking-[0.12em] text-[#7a8780] dark:text-zinc-400'>
 							<tr>
 								<th className='px-5 py-4 font-semibold'>Property</th>
 								<th className='px-4 py-4 font-semibold'>Type</th>
@@ -179,7 +179,7 @@ export default function AdminPropertiesPage() {
 								<th className='px-5 py-4 text-right font-semibold'>Actions</th>
 							</tr>
 						</thead>
-						<tbody className='divide-y divide-[#edf0ee]'>
+						<tbody className='divide-y divide-[#edf0ee] dark:divide-zinc-800'>
 							{loading ? (
 								<tr>
 									<td className='px-5 py-12 text-center' colSpan={7}>
@@ -188,17 +188,17 @@ export default function AdminPropertiesPage() {
 									</td>
 								</tr>
 							) : properties.map((property) => (
-								<tr key={property.id} className='transition hover:bg-[#fbfcfb]'>
+								<tr key={property.id} className='transition hover:bg-[#fbfcfb] dark:hover:bg-zinc-900'>
 									<td className='px-5 py-4'>
-										<span className='font-semibold text-[#253a30]'>
+										<span className='font-semibold text-[#253a30] dark:text-zinc-200'>
 											{property.title}
 										</span>
 									</td>
-									<td className='px-4 py-4 text-[#65736b]'>{property.type}</td>
-									<td className='px-4 py-4 text-[#65736b]'>
+									<td className='px-4 py-4 text-[#65736b] dark:text-zinc-300'>{property.type}</td>
+									<td className='px-4 py-4 text-[#65736b] dark:text-zinc-300'>
 										{property.location}
 									</td>
-									<td className='px-4 py-4 font-medium text-[#344b3f]'>
+									<td className='px-4 py-4 font-medium text-[#344b3f] dark:text-zinc-200'>
 										{property.price.replace('LKR ', '')}
 									</td>
 									<td className='px-4 py-4'>
@@ -215,7 +215,7 @@ export default function AdminPropertiesPage() {
 											<select
 												value={property.contactId ?? ''}
 												onChange={(e) => assignContact(property.id, e.target.value || null)}
-												className='max-w-[160px] truncate rounded border border-[#d0dbd4] bg-white px-2 py-1 text-xs text-[#1a2923] focus:border-[#35664f] focus:outline-none'
+												className='max-w-[160px] truncate rounded border border-[#d0dbd4] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs text-[#1a2923] dark:text-zinc-200 focus:border-[#35664f] focus:outline-none'
 											>
 												<option value=''>— none —</option>
 												{contacts.map((c) => (
@@ -233,7 +233,7 @@ export default function AdminPropertiesPage() {
 											onClick={() =>
 												toggleFeatured(property.id, property.featured)
 											}
-											className={`text-2xl leading-none transition ${property.featured ? 'text-[#d99b2b]' : 'text-[#c8d0ca] hover:text-[#d99b2b]'}`}
+											className={`text-2xl leading-none transition ${property.featured ? 'text-[#d99b2b]' : 'text-[#c8d0ca] dark:text-zinc-700 hover:text-[#d99b2b]'}`}
 										>
 											{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
 										</button>
@@ -243,14 +243,14 @@ export default function AdminPropertiesPage() {
 											type='button'
 											disabled={busyProperty === property.id}
 											onClick={() => console.log('Edit property', property)}
-											className='mr-4 text-xs font-semibold text-[#35664f] hover:underline'
+											className='mr-4 text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline'
 										>
 											Edit
 										</button>}
 										<button
 											type='button'
 											onClick={() => deleteProperty(property.id)}
-											className='text-xs font-semibold text-[#a34d4d] hover:underline'
+											className='text-xs font-semibold text-[#a34d4d] dark:text-red-400 hover:underline'
 										>
 											{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : 'Delete'}
 										</button>
@@ -260,7 +260,7 @@ export default function AdminPropertiesPage() {
 						</tbody>
 					</table>
 				</div>
-				<div className='flex flex-col divide-y divide-[#edf0ee] sm:hidden'>
+				<div className='flex flex-col divide-y divide-[#edf0ee] dark:divide-zinc-800 sm:hidden'>
 					{loading ? (
 						<div className='flex justify-center py-12'>
 							<Spinner className='h-5 w-5 text-[#28513f]' />
@@ -268,22 +268,22 @@ export default function AdminPropertiesPage() {
 					) : properties.map((property) => (
 						<div key={property.id} className='flex flex-col gap-3 p-5'>
 							<div className='flex items-start justify-between gap-4'>
-								<span className='font-semibold text-[#253a30] leading-tight'>
+								<span className='font-semibold text-[#253a30] dark:text-zinc-200 leading-tight'>
 									{property.title}
 								</span>
 								<span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wide font-semibold ${statusStyles[property.status]}`}>
 									{property.status.replace('_', ' ')}
 								</span>
 							</div>
-							<div className='flex items-center justify-between text-sm text-[#65736b]'>
+							<div className='flex items-center justify-between text-sm text-[#65736b] dark:text-zinc-300'>
 								<span>{property.type}</span>
-								<span className='font-semibold text-[#344b3f]'>{property.price}</span>
+								<span className='font-semibold text-[#344b3f] dark:text-zinc-200'>{property.price}</span>
 							</div>
-							<div className='text-sm text-[#65736b]'>
+							<div className='text-sm text-[#65736b] dark:text-zinc-300'>
 								📍 {property.location}
 							</div>
 							{/* Contact assign on mobile */}
-							<div className='flex items-center gap-2 text-xs text-[#65736b]'>
+							<div className='flex items-center gap-2 text-xs text-[#65736b] dark:text-zinc-300'>
 								<span className='shrink-0'>Contact:</span>
 								{assigningId === property.id ? (
 									<Spinner className='h-3.5 w-3.5 text-[#28513f]' />
@@ -291,7 +291,7 @@ export default function AdminPropertiesPage() {
 									<select
 										value={property.contactId ?? ''}
 										onChange={(e) => assignContact(property.id, e.target.value || null)}
-										className='flex-1 rounded border border-[#d0dbd4] bg-white px-2 py-1 text-xs text-[#1a2923] focus:border-[#35664f] focus:outline-none'
+										className='flex-1 rounded border border-[#d0dbd4] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs text-[#1a2923] dark:text-zinc-200 focus:border-[#35664f] focus:outline-none'
 									>
 										<option value=''>— none —</option>
 										{contacts.map((c) => (
@@ -305,7 +305,7 @@ export default function AdminPropertiesPage() {
 									type='button'
 									disabled={busyProperty === property.id}
 									onClick={() => toggleFeatured(property.id, property.featured)}
-									className={`text-2xl leading-none transition ${property.featured ? 'text-[#d99b2b]' : 'text-[#c8d0ca] hover:text-[#d99b2b]'}`}
+									className={`text-2xl leading-none transition ${property.featured ? 'text-[#d99b2b]' : 'text-[#c8d0ca] dark:text-zinc-700 hover:text-[#d99b2b]'}`}
 								>
 									{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
 								</button>
@@ -315,7 +315,7 @@ export default function AdminPropertiesPage() {
 											type='button'
 											disabled={busyProperty === property.id}
 											onClick={() => console.log('Edit property', property)}
-											className='text-xs font-semibold text-[#35664f] hover:underline'
+											className='text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline'
 										>
 											Edit
 										</button>
@@ -323,7 +323,7 @@ export default function AdminPropertiesPage() {
 									<button
 										type='button'
 										onClick={() => deleteProperty(property.id)}
-										className='text-xs font-semibold text-[#a34d4d] hover:underline'
+										className='text-xs font-semibold text-[#a34d4d] dark:text-red-400 hover:underline'
 									>
 										{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : 'Delete'}
 									</button>

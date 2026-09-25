@@ -78,7 +78,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <p className="mt-2 text-sm text-[#64736b]">Manage your account settings and preferences.</p>
 
-      <div className="mt-8 rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm">
+      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
         <h2 className="text-lg font-medium">Profile Details</h2>
         <form onSubmit={handleUpdateName} className="mt-6 max-w-md">
           <label className="block text-sm font-medium" htmlFor="name">Full Name</label>
@@ -95,14 +95,14 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={updatingName}
-            className="mt-6 rounded-lg bg-[#19352b] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+            className="mt-6 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 disabled:cursor-wait disabled:opacity-60"
           >
             {updatingName ? "Saving..." : "Save changes"}
           </button>
         </form>
       </div>
 
-      <div className="mt-8 rounded-xl border border-[#dce4df] bg-white p-6 shadow-sm">
+      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
         <h2 className="text-lg font-medium">Change Password</h2>
         <form onSubmit={handleSubmit} className="mt-6 max-w-md">
           <label className="block text-sm font-medium" htmlFor="currentPassword">Current Password</label>
@@ -118,7 +118,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] hover:text-[#1a2923] focus:outline-none"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:text-zinc-200 focus:outline-none"
               aria-label={showCurrentPassword ? "Hide password" : "Show password"}
             >
               {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -138,7 +138,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setShowNewPassword(!showNewPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] hover:text-[#1a2923] focus:outline-none"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:text-zinc-200 focus:outline-none"
               aria-label={showNewPassword ? "Hide password" : "Show password"}
             >
               {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -158,7 +158,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] hover:text-[#1a2923] focus:outline-none"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:text-zinc-200 focus:outline-none"
               aria-label={showConfirmPassword ? "Hide password" : "Show password"}
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -170,7 +170,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-6 rounded-lg bg-[#19352b] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+            className="mt-6 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 disabled:cursor-wait disabled:opacity-60"
           >
             {submitting ? "Updating..." : "Update password"}
           </button>
