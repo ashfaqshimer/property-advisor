@@ -81,7 +81,15 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
             </>
           )}
         </nav>
-        <div className="mt-auto border-t border-white/10 px-7 py-6 text-xs text-[#a8c0b4] dark:text-zinc-400">Internal tools only</div>
+        <div className="mt-auto flex flex-col gap-5 border-t border-white/10 px-7 py-6">
+          <Link href="/" className="flex items-center gap-2 text-sm font-medium text-[#b6c9c0] hover:text-white transition group">
+            <svg className="h-4 w-4 text-[#a8c0b4] group-hover:text-white transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            View Public Site
+          </Link>
+          <div className="text-xs text-[#a8c0b4] dark:text-zinc-500">Internal tools only</div>
+        </div>
       </aside>
       <div className="lg:pl-64">
         <header className="flex h-20 items-center justify-between border-b border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-5 sm:px-8">

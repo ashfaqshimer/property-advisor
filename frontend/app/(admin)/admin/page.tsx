@@ -144,12 +144,6 @@ export default function AdminPropertiesPage() {
 				</div>
 				<div className='flex flex-wrap items-center gap-3'>
 					<Link
-						href='/'
-						className='inline-flex items-center justify-center rounded-lg border border-[#cbd9d0] bg-white dark:bg-zinc-950 px-5 py-3 text-sm font-semibold text-[#28513f] transition hover:bg-[#f4f8f5]'
-					>
-						View customer site
-					</Link>
-					<Link
 						href='/admin/properties/new'
 						className='inline-flex items-center justify-center rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm transition hover:bg-[#1e4031] dark:hover:bg-emerald-600'
 					>
