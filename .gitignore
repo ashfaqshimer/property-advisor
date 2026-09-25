@@ -34,3 +34,10 @@ htmlcov/
 .claude/worktrees/
 .mcp.json
 .agents/mcp_config.json
+
+# Playwright
+.playwright-mcp/
+
+# SQLite Databases
+*.db
+*.sqlite3
