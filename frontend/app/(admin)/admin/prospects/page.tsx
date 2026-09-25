@@ -291,7 +291,7 @@ export default function ProspectsPage() {
             <button
               onClick={handleStartBulkPhoneFetch}
               disabled={activePhoneJobId !== null}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-4 py-2 text-sm font-semibold text-[#19352b] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-4 py-2 text-sm font-semibold text-[#19352b] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
             >
               <PhoneCall className="h-4 w-4" />
               {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
@@ -332,24 +332,24 @@ export default function ProspectsPage() {
       </div>
       
       {activeJobId && scanStatus && (
-        <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="mt-6 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20 p-4">
           <div className="flex items-center gap-3">
-            <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
+            <RefreshCw className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
             <div>
-              <h3 className="text-sm font-medium text-blue-800">Scan in progress</h3>
-              <p className="text-sm text-blue-600">{scanStatus.progress}</p>
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">Scan in progress</h3>
+              <p className="text-sm text-blue-600 dark:text-blue-400">{scanStatus.progress}</p>
             </div>
           </div>
         </div>
       )}
 
       {activePhoneJobId && phoneJobStatus && (
-        <div className="mt-6 rounded-lg border border-orange-200 bg-orange-50 p-4">
+        <div className="mt-6 rounded-lg border border-orange-200 dark:border-orange-900/50 bg-orange-50 dark:bg-orange-900/20 p-4">
           <div className="flex items-center gap-3">
-            <RefreshCw className="h-5 w-5 animate-spin text-orange-600" />
+            <RefreshCw className="h-5 w-5 animate-spin text-orange-600 dark:text-orange-400" />
             <div>
-              <h3 className="text-sm font-medium text-orange-800">Bulk Phone Fetch in progress</h3>
-              <p className="text-sm text-orange-600">{phoneJobStatus.progress}</p>
+              <h3 className="text-sm font-medium text-orange-800 dark:text-orange-300">Bulk Phone Fetch in progress</h3>
+              <p className="text-sm text-orange-600 dark:text-orange-400">{phoneJobStatus.progress}</p>
             </div>
           </div>
         </div>
@@ -507,7 +507,7 @@ export default function ProspectsPage() {
                         <button 
                           onClick={() => handleFetchSinglePhone(prospect.id)}
                           disabled={fetchingPhoneId === prospect.id}
-                          className="flex w-full items-center justify-center gap-2 rounded bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-3 py-2 text-sm font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] disabled:opacity-50 cursor-pointer disabled:cursor-default"
+                          className="flex w-full items-center justify-center gap-2 rounded bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-3 py-2 text-sm font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer disabled:cursor-default"
                         >
                           {fetchingPhoneId === prospect.id && <RefreshCw className="h-4 w-4 animate-spin" />}
                           {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch Phone Number"}
@@ -575,7 +575,7 @@ export default function ProspectsPage() {
                             <button 
                               onClick={() => handleFetchSinglePhone(prospect.id)}
                               disabled={fetchingPhoneId === prospect.id}
-                              className="inline-flex items-center gap-1 rounded bg-[#f4f6f4] dark:bg-zinc-900 dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] disabled:opacity-50 cursor-pointer disabled:cursor-default"
+                              className="inline-flex items-center gap-1 rounded bg-[#f4f6f4] dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer disabled:cursor-default"
                             >
                               {fetchingPhoneId === prospect.id && <RefreshCw className="h-3 w-3 animate-spin" />}
                               {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}
@@ -651,7 +651,7 @@ export default function ProspectsPage() {
               <div>
                 <label className="block text-sm font-medium text-[#1a2923] dark:text-zinc-200">Categories</label>
                 <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2 rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900 dark:bg-zinc-900/50">
+                  <div className="space-y-2 rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900/50">
                     <div className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">Sales</div>
                     {CATEGORIES.filter(c => c.id.includes('sale')).map(cat => (
                       <label key={cat.id} className="flex cursor-pointer items-center gap-2">
@@ -669,7 +669,7 @@ export default function ProspectsPage() {
                     ))}
                   </div>
                   
-                  <div className="space-y-2 rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900 dark:bg-zinc-900/50">
+                  <div className="space-y-2 rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900/50">
                     <div className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">Rentals</div>
                     {CATEGORIES.filter(c => c.id.includes('rental')).map(cat => (
                       <label key={cat.id} className="flex cursor-pointer items-center gap-2">
@@ -697,7 +697,7 @@ export default function ProspectsPage() {
                   max="50"
                   value={scanPages}
                   onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
-                  className="mt-2 w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-700 px-3 py-2 text-sm outline-none focus:border-[#28513f]"
+                  className="mt-2 w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
                 />
               </div>
               
@@ -729,30 +729,30 @@ export default function ProspectsPage() {
             <div className="max-h-[60vh] overflow-y-auto space-y-4 text-sm text-[#1a2923] dark:text-zinc-200">
               <div>
                 <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Title</label>
-                <input className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.title} onChange={(e) => setDraftModalData({...draftModalData, title: e.target.value})} />
+                <input className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.title} onChange={(e) => setDraftModalData({...draftModalData, title: e.target.value})} />
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Price (Numeric)</label>
-                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.price} onChange={(e) => setDraftModalData({...draftModalData, price: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.price} onChange={(e) => setDraftModalData({...draftModalData, price: Number(e.target.value)})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Location</label>
-                  <input className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.location || ""} onChange={(e) => setDraftModalData({...draftModalData, location: e.target.value})} />
+                  <input className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.location || ""} onChange={(e) => setDraftModalData({...draftModalData, location: e.target.value})} />
                 </div>
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Bedrooms</label>
-                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.bedrooms || ""} onChange={(e) => setDraftModalData({...draftModalData, bedrooms: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.bedrooms || ""} onChange={(e) => setDraftModalData({...draftModalData, bedrooms: Number(e.target.value)})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Bathrooms</label>
-                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.bathrooms || ""} onChange={(e) => setDraftModalData({...draftModalData, bathrooms: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.bathrooms || ""} onChange={(e) => setDraftModalData({...draftModalData, bathrooms: Number(e.target.value)})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Property Type</label>
-                  <select className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.property_type || "house"} onChange={(e) => setDraftModalData({...draftModalData, property_type: e.target.value})}>
+                  <select className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.property_type || "house"} onChange={(e) => setDraftModalData({...draftModalData, property_type: e.target.value})}>
                     <option value="house">House</option>
                     <option value="apartment">Apartment</option>
                     <option value="land">Land</option>
@@ -763,15 +763,15 @@ export default function ProspectsPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Contact Name</label>
-                  <input className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.contact_name || ""} onChange={(e) => setDraftModalData({...draftModalData, contact_name: e.target.value})} />
+                  <input className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.contact_name || ""} onChange={(e) => setDraftModalData({...draftModalData, contact_name: e.target.value})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Contact Phone</label>
-                  <input className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.contact_phone || ""} onChange={(e) => setDraftModalData({...draftModalData, contact_phone: e.target.value})} />
+                  <input className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.contact_phone || ""} onChange={(e) => setDraftModalData({...draftModalData, contact_phone: e.target.value})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Contact Type</label>
-                  <select className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.contact_type || "owner"} onChange={(e) => setDraftModalData({...draftModalData, contact_type: e.target.value})}>
+                  <select className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.contact_type || "owner"} onChange={(e) => setDraftModalData({...draftModalData, contact_type: e.target.value})}>
                     <option value="owner">Owner</option>
                     <option value="broker">Broker</option>
                   </select>
@@ -780,15 +780,15 @@ export default function ProspectsPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Land Size (Perches)</label>
-                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.land_size_perches || ""} onChange={(e) => setDraftModalData({...draftModalData, land_size_perches: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.land_size_perches || ""} onChange={(e) => setDraftModalData({...draftModalData, land_size_perches: Number(e.target.value)})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Parking Spaces</label>
-                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.parking_spaces || ""} onChange={(e) => setDraftModalData({...draftModalData, parking_spaces: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.parking_spaces || ""} onChange={(e) => setDraftModalData({...draftModalData, parking_spaces: Number(e.target.value)})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Build Year</label>
-                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.build_year || ""} onChange={(e) => setDraftModalData({...draftModalData, build_year: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.build_year || ""} onChange={(e) => setDraftModalData({...draftModalData, build_year: Number(e.target.value)})} />
                 </div>
               </div>
               <div className="flex gap-6 py-2">
@@ -807,12 +807,12 @@ export default function ProspectsPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Description</label>
-                <textarea className="h-32 w-full rounded border border-[#dce4df] dark:border-zinc-800 p-2" value={draftModalData.description} onChange={(e) => setDraftModalData({...draftModalData, description: e.target.value})} />
+                <textarea className="h-32 w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600" value={draftModalData.description} onChange={(e) => setDraftModalData({...draftModalData, description: e.target.value})} />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => { setDraftModalData(null); fetchProspects(); }} disabled={isPublishing} className="cursor-pointer rounded px-4 py-2 text-sm font-medium hover:bg-gray-100 disabled:opacity-50">Cancel</button>
-              <button onClick={handlePublishDraft} disabled={isPublishing} className="cursor-pointer rounded bg-[#19352b] dark:bg-zinc-950 px-4 py-2 text-sm font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] disabled:cursor-wait disabled:opacity-70">
+              <button onClick={() => { setDraftModalData(null); fetchProspects(); }} disabled={isPublishing} className="cursor-pointer rounded px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-50">Cancel</button>
+              <button onClick={handlePublishDraft} disabled={isPublishing} className="cursor-pointer rounded bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-sm font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-70">
                 {isPublishing ? "Publishing..." : "Approve & Publish"}
               </button>
             </div>
