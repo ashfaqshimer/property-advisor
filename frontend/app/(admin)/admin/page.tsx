@@ -40,6 +40,7 @@ export default function AdminPropertiesPage() {
 	const [busyProperty, setBusyProperty] = useState<string | null>(null);
 	const [canDelete, setCanDelete] = useState(false);
 	const [assigningId, setAssigningId] = useState<string | null>(null);
+	const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 	useEffect(() => {
 		getCurrentUser().then((user) => setCanDelete(user?.role === 'root')).catch(() => {});
 		getPropertyContacts().then(setContacts).catch(() => {});
@@ -252,7 +253,7 @@ export default function AdminPropertiesPage() {
 											</button>}
 											<button
 												type='button'
-												onClick={() => deleteProperty(property.id)}
+												onClick={() => setDeleteConfirmId(property.id)}
 												className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer'
 											>
 												{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
@@ -328,7 +329,7 @@ export default function AdminPropertiesPage() {
 									)}
 									<button
 										type='button'
-										onClick={() => deleteProperty(property.id)}
+										onClick={() => setDeleteConfirmId(property.id)}
 										className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer'
 									>
 										{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
@@ -340,6 +341,37 @@ export default function AdminPropertiesPage() {
 					))}
 				</div>
 			</div>
+			{deleteConfirmId && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+					<div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl w-full max-w-sm p-6 transform transition-all">
+						<h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100">
+							Delete Property
+						</h3>
+						<p className="mt-2 text-sm text-gray-500 dark:text-zinc-400">
+							Are you sure you want to delete this property? This action cannot be undone.
+						</p>
+						<div className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setDeleteConfirmId(null)}
+								className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded-md hover:bg-gray-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#35664f] transition-colors cursor-pointer"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									deleteProperty(deleteConfirmId);
+									setDeleteConfirmId(null);
+								}}
+								className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors cursor-pointer"
+							>
+								Delete
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 		</section>
 	);
 }
