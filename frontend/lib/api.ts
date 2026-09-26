@@ -589,17 +589,27 @@ export async function sendChatMessage({
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      if (chunk) {
-        fullReply += chunk;
-        if (onChunk) {
-          onChunk(chunk);
+      if (value) {
+        const chunk = decoder.decode(value, { stream: !done });
+        if (chunk) {
+          fullReply += chunk;
+          if (onChunk) onChunk(chunk);
+        }
+      } else if (done) {
+        const chunk = decoder.decode();
+        if (chunk) {
+          fullReply += chunk;
+          if (onChunk) onChunk(chunk);
         }
       }
+      if (done) break;
     }
   } catch (error) {
     throw classifyTransportFailure(error, signal);
+  }
+
+  if (!fullReply.trim()) {
+    throw new ChatError("unexpected", "The backend returned an empty response.");
   }
 
   return { reply: fullReply, session_id: sessionId };

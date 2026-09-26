@@ -97,12 +97,25 @@ def _run_turn_handling_session_race(
     needs two concurrent transactions, which the SQLite-backed suite can't stage, so the
     test supplies a runner that fails once. Injection beats patching a module global.
     """
+    iterator = runner(db, payload.session_id, payload.message, client=client)
     try:
-        return runner(db, payload.session_id, payload.message, client=client)
+        first_chunk = next(iterator)
+    except StopIteration:
+        return iter([])
     except IntegrityError:
         logger.warning(
             "Conversation creation raced for chat session %s; retrying turn",
             payload.session_id,
         )
         db.rollback()
-        return runner(db, payload.session_id, payload.message, client=client)
+        iterator = runner(db, payload.session_id, payload.message, client=client)
+        try:
+            first_chunk = next(iterator)
+        except StopIteration:
+            return iter([])
+
+    def stream() -> Iterator[str]:
+        yield first_chunk
+        yield from iterator
+
+    return stream()

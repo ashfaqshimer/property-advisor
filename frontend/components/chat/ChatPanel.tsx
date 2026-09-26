@@ -174,7 +174,7 @@ export default function ChatPanel() {
     const agentMessageId = nextId("agent");
 
     try {
-      await sendChatMessage({
+      const { reply } = await sendChatMessage({
         sessionId: sessionId(),
         message: text,
         signal: controller.signal,
@@ -196,10 +196,16 @@ export default function ChatPanel() {
         }
       });
       
-      // If the response completed but we never got an onChunk (e.g. empty response)
-      // or if we did, the final state is already in `messages`. We just ensure 
-      // the empty fallback case is handled (sendChatMessage will return the text anyway,
-      // but onChunk would have fired).
+      // Ensure the final state is in `messages` just in case onChunk missed something
+      setMessages((current) => {
+        const exists = current.some((m) => m.id === agentMessageId);
+        if (exists) {
+          return current.map((m) =>
+            m.id === agentMessageId ? { ...m, text: reply } : m
+          );
+        }
+        return [...current, { id: agentMessageId, role: "agent", text: reply }];
+      });
       
     } catch (error) {
       // Our own abort — the panel unmounted mid-request. There is nobody left to tell.

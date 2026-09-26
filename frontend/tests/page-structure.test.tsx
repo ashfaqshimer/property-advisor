@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 import Home from "@/app/page";
 import { metadata } from "@/app/layout";
 
+vi.mock("@/components/layout/Footer", () => ({
+  default: () => <footer id="contact" role="contentinfo">Footer</footer>
+}));
+
 /**
  * Structural tests for the layout shell.
  *
