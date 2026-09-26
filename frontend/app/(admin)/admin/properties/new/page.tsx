@@ -22,13 +22,15 @@ type FormValues = {
 	buildYear: string;
 	roadAccessFt: string;
 	furnishingStatus: string;
-	amenities: string;
+	amenities: string[];
 	description: string;
 	status: string;
 	isFeatured: boolean;
 	propertyContactId: string;
 };
 type ImagePreview = { file: File; url: string };
+const PREDEFINED_AMENITIES = ['Pool', 'Garden', 'A/C', 'Gym', 'Generator', 'Maid Room', 'Security'];
+
 const emptyForm: FormValues = {
 	title: '',
 	propertyType: 'house',
@@ -44,7 +46,7 @@ const emptyForm: FormValues = {
 	buildYear: '',
 	roadAccessFt: '',
 	furnishingStatus: '',
-	amenities: '',
+	amenities: [],
 	description: '',
 	status: 'available',
 	isFeatured: false,
@@ -61,6 +63,7 @@ export default function NewPropertyPage() {
 	const [contacts, setContacts] = useState<PropertyContact[]>([]);
 	const [showContactForm, setShowContactForm] = useState(false);
 	const [creatingContact, setCreatingContact] = useState(false);
+	const [isDragging, setIsDragging] = useState(false);
 	useEffect(() => {
 		getPropertyContacts().then(setContacts).catch(() => {});
 		return () =>
@@ -89,6 +92,26 @@ export default function NewPropertyPage() {
 		const files = Array.from(event.target.files ?? []).filter((file) =>
 			file.type.startsWith('image/'),
 		);
+		addFiles(files);
+		event.target.value = '';
+	}
+	function handleDragOver(event: React.DragEvent) {
+		event.preventDefault();
+		setIsDragging(true);
+	}
+	function handleDragLeave(event: React.DragEvent) {
+		event.preventDefault();
+		setIsDragging(false);
+	}
+	function handleDrop(event: React.DragEvent) {
+		event.preventDefault();
+		setIsDragging(false);
+		const files = Array.from(event.dataTransfer.files).filter((file) =>
+			file.type.startsWith('image/'),
+		);
+		addFiles(files);
+	}
+	function addFiles(files: File[]) {
 		setImages((current) => {
 			const next = [
 				...current,
@@ -97,7 +120,6 @@ export default function NewPropertyPage() {
 			imagesRef.current = next;
 			return next;
 		});
-		event.target.value = '';
 	}
 	function removeImage(url: string) {
 		const image = images.find((item) => item.url === url);
@@ -128,10 +150,7 @@ export default function NewPropertyPage() {
 			const imageUrls = images.length
 				? await uploadPropertyImages(images.map((image) => image.file))
 				: [];
-			const amenityNames = form.amenities
-				.split(',')
-				.map((amenity) => amenity.trim())
-				.filter(Boolean);
+			const amenityNames = form.amenities.filter(Boolean);
 			await createProperty({
 				title: form.title.trim(),
 				description: form.description.trim(),
@@ -254,7 +273,7 @@ export default function NewPropertyPage() {
 							</select>
 						</label>
 						<label className='text-sm font-medium'>
-							Price in LKR
+							{form.pricePerPerch ? 'Price per perch (LKR)' : 'Total Price (LKR)'}
 							<input
 								className={fieldClass}
 								type='number'
@@ -290,33 +309,35 @@ export default function NewPropertyPage() {
 								<label className='text-sm font-medium'>Contact (Owner / Broker)</label>
 								<button
 									type='button'
-									onClick={() => setShowContactForm((s) => !s)}
+									onClick={() => setShowContactForm(true)}
 									className='text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline'
 								>
-									{showContactForm ? 'Cancel new contact' : '+ Add new contact'}
+									+ Add new contact
 								</button>
 							</div>
-							{showContactForm ? (
-								<div className='mt-2 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-[#f9fbf9] p-4 shadow-sm'>
-									<ContactForm
-										onSave={handleCreateContact}
-										onCancel={() => setShowContactForm(false)}
-										saving={creatingContact}
-									/>
+							<select
+								className={fieldClass}
+								value={form.propertyContactId}
+								onChange={(e) => updateField('propertyContactId', e.target.value)}
+							>
+								<option value=''>— None —</option>
+								{contacts.map((c) => (
+									<option key={c.id} value={c.id}>
+										{c.full_name} {c.company_name ? `(${c.company_name})` : ''}
+									</option>
+								))}
+							</select>
+							{showContactForm && (
+								<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+									<div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-2xl">
+										<h3 className="mb-4 text-lg font-semibold">Add new contact</h3>
+										<ContactForm
+											onSave={handleCreateContact}
+											onCancel={() => setShowContactForm(false)}
+											saving={creatingContact}
+										/>
+									</div>
 								</div>
-							) : (
-								<select
-									className={fieldClass}
-									value={form.propertyContactId}
-									onChange={(e) => updateField('propertyContactId', e.target.value)}
-								>
-									<option value=''>— None —</option>
-									{contacts.map((c) => (
-										<option key={c.id} value={c.id}>
-											{c.full_name} {c.company_name ? `(${c.company_name})` : ''}
-										</option>
-									))}
-								</select>
 							)}
 						</div>
 					</div>
@@ -324,30 +345,32 @@ export default function NewPropertyPage() {
 				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Specifications</h3>
 					<div className='mt-6 grid gap-5 sm:grid-cols-3'>
-						<label className='text-sm font-medium'>
-							Bedrooms
-							<input
-								className={fieldClass}
-								type='number'
-								min='0'
-								disabled={form.propertyType === 'land'}
-								value={form.bedrooms}
-								onChange={(e) => updateField('bedrooms', e.target.value)}
-								placeholder='3'
-							/>
-						</label>
-						<label className='text-sm font-medium'>
-							Bathrooms
-							<input
-								className={fieldClass}
-								type='number'
-								min='0'
-								disabled={form.propertyType === 'land'}
-								value={form.bathrooms}
-								onChange={(e) => updateField('bathrooms', e.target.value)}
-								placeholder='2'
-							/>
-						</label>
+						{form.propertyType !== 'land' && (
+							<>
+								<label className='text-sm font-medium'>
+									Bedrooms
+									<input
+										className={fieldClass}
+										type='number'
+										min='0'
+										value={form.bedrooms}
+										onChange={(e) => updateField('bedrooms', e.target.value)}
+										placeholder='3'
+									/>
+								</label>
+								<label className='text-sm font-medium'>
+									Bathrooms
+									<input
+										className={fieldClass}
+										type='number'
+										min='0'
+										value={form.bathrooms}
+										onChange={(e) => updateField('bathrooms', e.target.value)}
+										placeholder='2'
+									/>
+								</label>
+							</>
+						)}
 						<label className='text-sm font-medium'>
 							Land size (perches)
 							<input
@@ -360,17 +383,19 @@ export default function NewPropertyPage() {
 								placeholder='10.5'
 							/>
 						</label>
-						<label className='text-sm font-medium'>
-							Sqft
-							<input
-								className={fieldClass}
-								type='number'
-								min='0'
-								value={form.sqft}
-								onChange={(e) => updateField('sqft', e.target.value)}
-								placeholder='1800'
-							/>
-						</label>
+						{form.propertyType !== 'land' && (
+							<label className='text-sm font-medium'>
+								Sqft
+								<input
+									className={fieldClass}
+									type='number'
+									min='0'
+									value={form.sqft}
+									onChange={(e) => updateField('sqft', e.target.value)}
+									placeholder='1800'
+								/>
+							</label>
+						)}
 						<label className='text-sm font-medium'>
 							Parking spaces
 							<input
@@ -382,18 +407,20 @@ export default function NewPropertyPage() {
 								placeholder='2'
 							/>
 						</label>
-						<label className='text-sm font-medium'>
-							Build year
-							<input
-								className={fieldClass}
-								type='number'
-								min='1800'
-								max={new Date().getFullYear() + 1}
-								value={form.buildYear}
-								onChange={(e) => updateField('buildYear', e.target.value)}
-								placeholder='2020'
-							/>
-						</label>
+						{form.propertyType !== 'land' && (
+							<label className='text-sm font-medium'>
+								Build year
+								<input
+									className={fieldClass}
+									type='number'
+									min='1800'
+									max={new Date().getFullYear() + 1}
+									value={form.buildYear}
+									onChange={(e) => updateField('buildYear', e.target.value)}
+									placeholder='2020'
+								/>
+							</label>
+						)}
 						<label className='text-sm font-medium'>
 							Road access (ft)
 							<input
@@ -406,11 +433,6 @@ export default function NewPropertyPage() {
 							/>
 						</label>
 					</div>
-					{form.propertyType === 'land' && (
-						<p className='mt-4 text-xs text-[#75847c] dark:text-zinc-400'>
-							Bedrooms and bathrooms are not applicable to land listings.
-						</p>
-					)}
 				</div>
 				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Description</h3>
@@ -421,18 +443,35 @@ export default function NewPropertyPage() {
 						placeholder='Describe the property, its surroundings, and notable features.'
 					/>
 					{errorText('description')}
-					<label className='mt-5 block text-sm font-medium'>
-						Amenities
-						<input
-							className={fieldClass}
-							value={form.amenities}
-							onChange={(e) => updateField('amenities', e.target.value)}
-							placeholder='Pool, Garden, Generator'
-						/>
-						<span className='mt-1 block text-xs font-normal text-[#829088]'>
-							Separate amenities with commas.
-						</span>
-					</label>
+					<div className='mt-5'>
+						<label className='block text-sm font-medium mb-3'>Amenities</label>
+						<div className='flex flex-wrap gap-3'>
+							{PREDEFINED_AMENITIES.map((amenity) => (
+								<label
+									key={amenity}
+									className={`flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+										form.amenities.includes(amenity)
+											? 'border-[#35664f] bg-[#e0f1e7] text-[#28513f] dark:border-emerald-600 dark:bg-emerald-950 dark:text-emerald-200'
+											: 'border-[#dce4df] bg-white text-[#65736b] hover:bg-[#f4f8f5] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900'
+									}`}
+								>
+									<input
+										type='checkbox'
+										className='hidden'
+										checked={form.amenities.includes(amenity)}
+										onChange={(e) => {
+											if (e.target.checked) {
+												updateField('amenities', [...form.amenities, amenity]);
+											} else {
+												updateField('amenities', form.amenities.filter((a) => a !== amenity));
+											}
+										}}
+									/>
+									{amenity}
+								</label>
+							))}
+						</div>
+					</div>
 				</div>
 				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Status & visibility</h3>
@@ -449,21 +488,23 @@ export default function NewPropertyPage() {
 								<option value='sold'>Sold</option>
 							</select>
 						</label>
-						<label className='text-sm font-medium sm:w-64'>
-							Furnishing
-							<select
-								className={fieldClass}
-								value={form.furnishingStatus}
-								onChange={(e) =>
-									updateField('furnishingStatus', e.target.value)
-								}
-							>
-								<option value=''>Not specified</option>
-								<option value='unfurnished'>Unfurnished</option>
-								<option value='semi_furnished'>Semi-furnished</option>
-								<option value='fully_furnished'>Fully furnished</option>
-							</select>
-						</label>
+						{form.propertyType !== 'land' && (
+							<label className='text-sm font-medium sm:w-64'>
+								Furnishing
+								<select
+									className={fieldClass}
+									value={form.furnishingStatus}
+									onChange={(e) =>
+										updateField('furnishingStatus', e.target.value)
+									}
+								>
+									<option value=''>Not specified</option>
+									<option value='unfurnished'>Unfurnished</option>
+									<option value='semi_furnished'>Semi-furnished</option>
+									<option value='fully_furnished'>Fully furnished</option>
+								</select>
+							</label>
+						)}
 						<label className='flex items-center gap-2 pb-3 text-sm font-medium'>
 							<input
 								type='checkbox'
@@ -476,11 +517,20 @@ export default function NewPropertyPage() {
 				</div>
 				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Images</h3>
-					<label className='mt-5 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-[#cbd9d0] bg-[#f9fbf9] px-5 text-center transition hover:border-[#6c9a7d]'>
-						<span className='text-sm font-semibold text-[#416b55]'>
-							Choose image files
+					<label
+						onDragOver={handleDragOver}
+						onDragLeave={handleDragLeave}
+						onDrop={handleDrop}
+						className={`mt-5 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-5 text-center transition ${
+							isDragging
+								? 'border-[#35664f] bg-[#e0f1e7] dark:bg-emerald-950/30'
+								: 'border-[#cbd9d0] bg-[#f9fbf9] dark:border-zinc-700 dark:bg-zinc-900/50 hover:border-[#6c9a7d]'
+						}`}
+					>
+						<span className='text-sm font-semibold text-[#416b55] dark:text-emerald-400'>
+							Choose image files or drag them here
 						</span>
-						<span className='mt-1 text-xs text-[#829088]'>
+						<span className='mt-1 text-xs text-[#829088] dark:text-zinc-400'>
 							PNG, JPG, or WEBP
 						</span>
 						<input
