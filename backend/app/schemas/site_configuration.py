@@ -8,9 +8,21 @@ class StringConfigField(BaseModel):
     value: str | None = None
     show: bool = True
 
+from datetime import datetime
+
 class ListConfigField(BaseModel):
     values: list[str] = Field(default_factory=list)
     show: bool = True
+
+
+class ScannerSettingsConfigField(BaseModel):
+    enabled: bool = False
+    frequency_hours: int = Field(default=24, description="Must be 6, 12, 18, or 24")
+    pages_to_scan: int = Field(default=5, ge=1, le=50)
+    property_types: list[str] = Field(default_factory=lambda: ["house", "apartment"])
+    last_run_at: datetime | None = None
+    last_run_status: str | None = None
+
 
 class SiteConfigurationBase(BaseModel):
     phone_numbers: ListConfigField = Field(default_factory=ListConfigField)
@@ -21,6 +33,7 @@ class SiteConfigurationBase(BaseModel):
     x_link: StringConfigField = Field(default_factory=StringConfigField)
     tiktok_link: StringConfigField = Field(default_factory=StringConfigField)
     city: StringConfigField = Field(default_factory=StringConfigField)
+    scanner_settings: ScannerSettingsConfigField = Field(default_factory=ScannerSettingsConfigField)
     extra_settings: dict[str, Any] | None = Field(default_factory=dict)
     prospect_retention_days: int = Field(default=30)
 
@@ -38,6 +51,7 @@ class SiteConfigurationUpdate(BaseModel):
     x_link: StringConfigField | None = None
     tiktok_link: StringConfigField | None = None
     city: StringConfigField | None = None
+    scanner_settings: ScannerSettingsConfigField | None = None
     extra_settings: dict[str, Any] | None = None
     prospect_retention_days: int | None = None
 

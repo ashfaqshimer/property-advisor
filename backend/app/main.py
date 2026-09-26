@@ -17,9 +17,20 @@ structlog.configure(
 )
 logger = structlog.get_logger()
 
+from contextlib import asynccontextmanager
+from app.services.scanner_scheduler import init_scheduler, shutdown_scheduler
+
 settings = get_settings()
 
-app = FastAPI(title="Property Advisor API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize the apscheduler background tasks
+    init_scheduler()
+    yield
+    # Shutdown the scheduler on exit
+    shutdown_scheduler()
+
+app = FastAPI(title="Property Advisor API", lifespan=lifespan)
 
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):

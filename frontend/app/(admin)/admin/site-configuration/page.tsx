@@ -66,7 +66,7 @@ function ConfigField({
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 outline-none focus:border-[#28513f]"
+          className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-transparent dark:bg-zinc-950 px-3 py-2.5 outline-none focus:border-[#28513f] dark:focus:border-[#28513f] dark:text-zinc-200"
           placeholder={placeholder}
         />
         <div className="hidden shrink-0 items-center space-x-2 sm:flex">
@@ -128,6 +128,8 @@ export default function SiteConfigurationPage() {
         facebook_link: siteConfig.facebook_link,
         x_link: siteConfig.x_link,
         tiktok_link: siteConfig.tiktok_link,
+        scanner_settings: siteConfig.scanner_settings,
+        prospect_retention_days: siteConfig.prospect_retention_days,
       });
       setSiteConfig(updated);
       setPhoneInput(updated.phone_numbers?.values?.join(", ") || "");
@@ -245,7 +247,7 @@ export default function SiteConfigurationPage() {
               min="1"
               value={siteConfig.prospect_retention_days || 30}
               onChange={(e) => setSiteConfig(s => ({ ...s, prospect_retention_days: parseInt(e.target.value) || 30 }))}
-              className="mt-2 w-full sm:w-32 rounded-lg border border-[#cbd8d1] px-3 py-2.5 outline-none focus:border-[#28513f]"
+              className="mt-2 w-full sm:w-32 rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-transparent dark:bg-zinc-950 px-3 py-2.5 outline-none focus:border-[#28513f] dark:focus:border-[#28513f] dark:text-zinc-200"
             />
           </div>
 
@@ -257,6 +259,100 @@ export default function SiteConfigurationPage() {
             {updatingSiteConfig ? "Saving..." : "Save configuration"}
           </button>
         </form>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
+        <h2 className="text-lg font-medium">Property Scanner Settings</h2>
+        <div className="mt-6 max-w-md space-y-6">
+          <div className="flex items-center space-x-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={siteConfig.scanner_settings?.enabled ?? false}
+              onClick={() => setSiteConfig(s => ({ ...s, scanner_settings: { ...(s.scanner_settings || { frequency_hours: 24, pages_to_scan: 5, property_types: ['house', 'apartment'] }), enabled: !(s.scanner_settings?.enabled ?? false) } }))}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#19352b] focus:ring-offset-2 ${
+                (siteConfig.scanner_settings?.enabled ?? false) ? 'bg-[#19352b] dark:bg-[#28513f]' : 'bg-gray-200 dark:bg-zinc-700'
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  (siteConfig.scanner_settings?.enabled ?? false) ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className="text-sm font-medium">Enable Background Scanner</span>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Run Frequency</label>
+            <select
+              value={siteConfig.scanner_settings?.frequency_hours ?? 24}
+              onChange={(e) => setSiteConfig(s => ({ ...s, scanner_settings: { ...(s.scanner_settings || { enabled: false, pages_to_scan: 5, property_types: ['house', 'apartment'] }), frequency_hours: parseInt(e.target.value) } }))}
+              className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-transparent dark:bg-zinc-950 px-3 py-2.5 outline-none focus:border-[#28513f] dark:focus:border-[#28513f] dark:text-zinc-200"
+            >
+              <option value={6}>Every 6 Hours</option>
+              <option value={12}>Every 12 Hours</option>
+              <option value={18}>Every 18 Hours</option>
+              <option value={24}>Every 24 Hours</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Pages to Scan</label>
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={siteConfig.scanner_settings?.pages_to_scan ?? 5}
+              onChange={(e) => setSiteConfig(s => ({ ...s, scanner_settings: { ...(s.scanner_settings || { enabled: false, frequency_hours: 24, property_types: ['house', 'apartment'] }), pages_to_scan: parseInt(e.target.value) || 1 } }))}
+              className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-transparent dark:bg-zinc-950 px-3 py-2.5 outline-none focus:border-[#28513f] dark:focus:border-[#28513f] dark:text-zinc-200"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-3">Property Types</label>
+            <div className="space-y-3">
+              {['house', 'apartment', 'land', 'commercial'].map(type => {
+                const isChecked = (siteConfig.scanner_settings?.property_types ?? ['house', 'apartment']).includes(type);
+                return (
+                  <label key={type} className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        const current = siteConfig.scanner_settings?.property_types ?? ['house', 'apartment'];
+                        const next = e.target.checked ? [...current, type] : current.filter(t => t !== type);
+                        setSiteConfig(s => ({ ...s, scanner_settings: { ...(s.scanner_settings || { enabled: false, frequency_hours: 24, pages_to_scan: 5 }), property_types: next } }));
+                      }}
+                      className="h-4 w-4 rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b] cursor-pointer"
+                    />
+                    <span className="text-sm capitalize">{type}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          
+          {siteConfig.scanner_settings?.last_run_at && (
+            <div className="rounded-lg bg-gray-50 dark:bg-zinc-900 p-4 border border-gray-100 dark:border-zinc-800">
+              <h3 className="text-sm font-medium mb-2">Last Scan Report</h3>
+              <div className="text-sm text-[#64736b] dark:text-zinc-400 space-y-1">
+                <p><span className="font-medium text-black dark:text-zinc-200">Time:</span> {new Date(siteConfig.scanner_settings.last_run_at).toLocaleString()}</p>
+                <p><span className="font-medium text-black dark:text-zinc-200">Status:</span> {siteConfig.scanner_settings.last_run_status || "Completed"}</p>
+              </div>
+            </div>
+          )}
+          
+          <button
+            type="button"
+            onClick={(e) => handleUpdateSiteConfig(e as any)}
+            disabled={updatingSiteConfig}
+            className="mt-4 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#132820] dark:hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+          >
+            {updatingSiteConfig ? "Saving..." : "Save scanner configuration"}
+          </button>
+        </div>
       </div>
     </div>
   );

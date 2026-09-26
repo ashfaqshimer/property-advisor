@@ -10,6 +10,7 @@ from app.auth import RootStaffUser
 from app.db.session import get_db
 from app.models.site_configuration import SiteConfiguration
 from app.schemas.site_configuration import SiteConfigurationResponse, SiteConfigurationUpdate
+from app.services.scanner_scheduler import scheduler, run_property_scanner
 
 router = APIRouter(prefix="/site-configuration", tags=["site-configuration"])
 admin_router = APIRouter(prefix="/admin/site-configuration", tags=["admin-site-configuration"])
@@ -48,4 +49,21 @@ def update_site_configuration(
             
     db.commit()
     db.refresh(config)
+
+    if payload.scanner_settings is not None:
+        settings = payload.scanner_settings.model_dump()
+        job_id = 'property_scanner_job'
+        if settings.get("enabled"):
+            freq = settings.get("frequency_hours", 24)
+            scheduler.add_job(
+                run_property_scanner,
+                'interval',
+                hours=freq,
+                id=job_id,
+                replace_existing=True
+            )
+        else:
+            if scheduler.get_job(job_id):
+                scheduler.remove_job(job_id)
+
     return config

@@ -214,6 +214,15 @@ export type AdminLead = {
 export type StringConfigField = { value: string | null; show: boolean };
 export type ListConfigField = { values: string[]; show: boolean };
 
+export type ScannerSettingsConfigField = {
+  enabled: boolean;
+  frequency_hours: number;
+  pages_to_scan: number;
+  property_types: string[];
+  last_run_at?: string | null;
+  last_run_status?: string | null;
+};
+
 export type SiteConfiguration = {
   id: string;
   phone_numbers: ListConfigField;
@@ -224,6 +233,7 @@ export type SiteConfiguration = {
   x_link: StringConfigField;
   tiktok_link: StringConfigField;
   city: StringConfigField;
+  scanner_settings: ScannerSettingsConfigField;
   extra_settings: Record<string, unknown> | null;
   prospect_retention_days: number;
 };

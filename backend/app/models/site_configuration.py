@@ -30,6 +30,7 @@ class SiteConfiguration(Base):
     x_link: Mapped[dict[str, Any]] = mapped_column(JSON(), nullable=False, server_default=sa.text("'{\"value\": null, \"show\": true}'"))
     tiktok_link: Mapped[dict[str, Any]] = mapped_column(JSON(), nullable=False, server_default=sa.text("'{\"value\": null, \"show\": true}'"))
     city: Mapped[dict[str, Any]] = mapped_column(JSON(), nullable=False, server_default=sa.text("'{\"value\": null, \"show\": true}'"))
+    scanner_settings: Mapped[dict[str, Any]] = mapped_column(JSON(), nullable=False, server_default=sa.text("'{\"enabled\": false, \"frequency_hours\": 24, \"pages_to_scan\": 5, \"property_types\": [\"house\", \"apartment\"]}'"))
 
     extra_settings: Mapped[dict[str, Any] | None] = mapped_column(JSON(), nullable=True, default=dict)
     prospect_retention_days: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default=sa.text("30"))
