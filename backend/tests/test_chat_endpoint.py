@@ -258,8 +258,8 @@ def test_gemini_api_error_is_502(chat_client) -> None:
 
     response = _post(client, "Hi")
 
-    assert response.status_code == 200
-    assert "[Error:" in response.text
+    assert response.status_code == 502
+    assert "unavailable right now" in response.text
     # The upstream message is not forwarded — the client gets something it can show a user.
     assert "overloaded" not in response.text
 
@@ -270,7 +270,7 @@ def test_a_failed_turn_persists_nothing(chat_client, seeded: Session) -> None:
     poison every later turn, since history is replayed from `messages`."""
     client = chat_client(FailingGemini())
 
-    assert _post(client, "Hi").status_code == 200
+    assert _post(client, "Hi").status_code == 502
 
     # Rolling back stands in for what production does at the end of the request: `get_db`
     # closes the session, and SQLAlchemy rolls back the open transaction. The suite's

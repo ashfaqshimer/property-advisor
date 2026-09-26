@@ -62,7 +62,7 @@ export const PENDING_LABEL = "Amaya is typing…";
  * than one that stays vague.
  */
 export const SLOW_PENDING_LABEL =
-  "Waiting for the next available agent…";
+  "This is taking a little longer than usual…";
 
 /** Spec calls for roughly 8–10s: long enough that a warm turn (4–11s) usually never shows it. */
 export const SLOW_PENDING_AFTER_MS = 9_000;
