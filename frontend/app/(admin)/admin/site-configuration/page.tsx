@@ -239,22 +239,12 @@ export default function SiteConfigurationPage() {
             onShowChange={(v) => updateStringShow("tiktok_link", v)}
           />
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium" htmlFor="retention_days">Data Retention: Old Prospects Auto-purge (days)</label>
-            <input
-              id="retention_days"
-              type="number"
-              min="1"
-              value={siteConfig.prospect_retention_days || 30}
-              onChange={(e) => setSiteConfig(s => ({ ...s, prospect_retention_days: parseInt(e.target.value) || 30 }))}
-              className="mt-2 w-full sm:w-32 rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-transparent dark:bg-zinc-950 px-3 py-2.5 outline-none focus:border-[#28513f] dark:focus:border-[#28513f] dark:text-zinc-200"
-            />
-          </div>
+
 
           <button
             type="submit"
             disabled={updatingSiteConfig}
-            className="mt-4 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#132820] dark:hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+            className="mt-4 rounded-lg bg-[#19352b] dark:bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#132820] dark:hover:bg-[#1f4233] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
           >
             {updatingSiteConfig ? "Saving..." : "Save configuration"}
           </button>
@@ -348,9 +338,34 @@ export default function SiteConfigurationPage() {
             type="button"
             onClick={(e) => handleUpdateSiteConfig(e as any)}
             disabled={updatingSiteConfig}
-            className="mt-4 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#132820] dark:hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+            className="mt-4 rounded-lg bg-[#19352b] dark:bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#132820] dark:hover:bg-[#1f4233] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
           >
             {updatingSiteConfig ? "Saving..." : "Save scanner configuration"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
+        <h2 className="text-lg font-medium">Data Retention Settings</h2>
+        <div className="mt-6 max-w-md">
+          <div className="mb-4">
+            <label className="block text-sm font-medium" htmlFor="retention_days">Old Prospects Auto-purge (days)</label>
+            <input
+              id="retention_days"
+              type="number"
+              min="1"
+              value={siteConfig.prospect_retention_days || 30}
+              onChange={(e) => setSiteConfig(s => ({ ...s, prospect_retention_days: parseInt(e.target.value) || 30 }))}
+              className="mt-2 w-full sm:w-32 rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-transparent dark:bg-zinc-950 px-3 py-2.5 outline-none focus:border-[#28513f] dark:focus:border-[#28513f] dark:text-zinc-200"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={(e) => handleUpdateSiteConfig(e as any)}
+            disabled={updatingSiteConfig}
+            className="mt-4 rounded-lg bg-[#19352b] dark:bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#132820] dark:hover:bg-[#1f4233] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+          >
+            {updatingSiteConfig ? "Saving..." : "Save retention configuration"}
           </button>
         </div>
       </div>
