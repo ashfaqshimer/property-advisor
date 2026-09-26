@@ -42,7 +42,7 @@ export default function AdminPropertiesPage() {
 	const [assigningId, setAssigningId] = useState<string | null>(null);
 	const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 	useEffect(() => {
-		getCurrentUser().then((user) => setCanDelete(user?.role === 'root')).catch(() => {});
+		getCurrentUser().then((user) => setCanDelete(user?.role === 'root' || user?.role === 'admin')).catch(() => {});
 		getPropertyContacts().then(setContacts).catch(() => {});
 		getAdminProperties()
 			.then((records) =>

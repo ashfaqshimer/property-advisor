@@ -12,6 +12,7 @@ import structlog
 from app.auth import CurrentStaffUser
 from app.db.session import SessionLocal, get_db
 from app.models.prospect import Prospect
+from app.schemas.auth import StaffRole
 from app.models.scan_job import ScanJob
 from app.models.site_configuration import SiteConfiguration
 from app.schemas.prospect import (
@@ -294,11 +295,11 @@ def get_active_jobs(
     
     if last_scan:
         active["last_scan_at"] = last_scan.updated_at.isoformat()
-        if _admin.role == "root":
+        if _admin.role in (StaffRole.ROOT, StaffRole.ADMIN):
             active["last_scan_by"] = last_scan.created_by_name
     if last_phone:
         active["last_phone_fetch_at"] = last_phone.updated_at.isoformat()
-        if _admin.role == "root":
+        if _admin.role in (StaffRole.ROOT, StaffRole.ADMIN):
             active["last_phone_fetch_by"] = last_phone.created_by_name
             
     return active
@@ -420,8 +421,8 @@ async def generate_property_draft(
     db: DbSession,
     _admin: CurrentStaffUser
 ) -> Any:
-    if _admin.role != "root":
-        raise HTTPException(status_code=403, detail="Only root users can extract properties")
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Only root and admin users can extract properties")
 
     prospect = db.get(Prospect, id)
     if not prospect:

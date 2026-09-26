@@ -266,7 +266,7 @@ export type AuthUser = {
   id: string;
   name: string;
   email: string;
-  role: "root" | "agent";
+  role: "root" | "admin" | "agent";
   created_at: string;
 };
 
@@ -374,12 +374,12 @@ export async function getStaffUsers(): Promise<StaffUser[]> {
   return result as StaffUser[];
 }
 
-export async function createAgent(name: string, email: string, password: string): Promise<StaffUser> {
+export async function createAgent(name: string, email: string, password: string, role: "admin" | "agent" = "agent"): Promise<StaffUser> {
   const response = await fetch(`${baseUrl()}/admin/users`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, password, role }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Agent creation failed (${response.status}).`, response.status);

@@ -104,6 +104,22 @@ class UserManager(UUIDIDMixin, BaseUserManager[StaffUser, uuid.UUID]):
     async def on_after_register(self, user: StaffUser, request: Optional[Request] = None):
         pass
 
+    async def delete(self, user: StaffUser, request: Optional[Request] = None) -> None:
+        if user.role == StaffRole.ROOT:
+            from fastapi import HTTPException, status
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Cannot delete root user.")
+        await super().delete(user, request)
+
+    async def update(self, user_update: dict[str, Any] | Any, user: StaffUser, request: Optional[Request] = None, safe: bool = False) -> StaffUser:
+        if user.role == StaffRole.ROOT:
+            # We allow root to update their own profile (name, password) via /auth/me.
+            # fastapi_users get_users_router passes safe=True for /me, and safe=False for /{id}.
+            # If safe=False, it's a superuser modifying via /{id}, which we want to block for root.
+            if not safe:
+                from fastapi import HTTPException, status
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "Cannot edit root user via ID endpoint.")
+        return await super().update(user_update, user, request, safe)
+
 
 def get_user_db(session: DbSession):
     yield SyncUserDatabase(session)

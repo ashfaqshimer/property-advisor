@@ -46,14 +46,15 @@ def get_staff_users(db: DbSession, _user: RootStaffUser) -> list[StaffUser]:
 
 
 @admin_router.post("", response_model=StaffUserRead, status_code=status.HTTP_201_CREATED)
-def create_agent(payload: StaffUserCreate, db: DbSession, _user: RootStaffUser) -> StaffUser:
+def create_staff_user(payload: StaffUserCreate, db: DbSession, _user: RootStaffUser) -> StaffUser:
+    role = payload.role if payload.role in (StaffRole.AGENT, StaffRole.ADMIN) else StaffRole.AGENT
     agent = StaffUser(
         name=payload.name,
         email=payload.email.lower(),
         hashed_password=password_hasher.hash(payload.password),
-        role=StaffRole.AGENT,
+        role=role,
         is_active=True,
-        is_superuser=False,
+        is_superuser=(role == StaffRole.ADMIN),
         is_verified=True,
     )
     db.add(agent)
@@ -67,13 +68,16 @@ def create_agent(payload: StaffUserCreate, db: DbSession, _user: RootStaffUser) 
 
 
 @admin_router.patch("/{user_id}", response_model=StaffUserRead)
-def update_agent(
+def update_staff_user(
     user_id: UUID, payload: StaffUserUpdate, db: DbSession, _user: RootStaffUser
 ) -> StaffUser:
     agent = db.get(StaffUser, user_id)
-    if agent is None or agent.role != StaffRole.AGENT:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
+    if agent is None or agent.role not in (StaffRole.AGENT, StaffRole.ADMIN):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     changes = payload.model_dump(exclude_unset=True)
+    if "role" in changes and changes["role"] in (StaffRole.AGENT, StaffRole.ADMIN):
+        agent.role = changes["role"]
+        agent.is_superuser = (agent.role == StaffRole.ADMIN)
     if "email" in changes:
         agent.email = changes["email"].lower()
     if "password" in changes and changes["password"] is not None:

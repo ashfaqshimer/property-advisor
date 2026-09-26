@@ -10,6 +10,7 @@ export default function AdminUsersPage() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'agent' | 'admin'>('agent');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -24,11 +25,12 @@ export default function AdminUsersPage() {
     setSaving(true);
     setError('');
     try {
-      const user = await createAgent(name, email, password);
+      const user = await createAgent(name, email, password, role);
       setUsers((current) => [...current, user]);
       setEmail('');
       setName('');
       setPassword('');
+      setRole('agent');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not create agent.');
     } finally {
@@ -56,6 +58,7 @@ export default function AdminUsersPage() {
       <form onSubmit={submit} className="mb-8 flex flex-col items-stretch gap-4 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:flex-row sm:flex-wrap sm:items-end">
         <label className="flex-1 min-w-48 text-sm font-medium">Agent name<input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm" /></label>
         <label className="flex-1 min-w-48 text-sm font-medium">Agent email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm" /></label>
+        <label className="flex-1 min-w-32 text-sm font-medium">Role<select value={role} onChange={(event) => setRole(event.target.value as 'agent' | 'admin')} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm bg-transparent"><option value="agent">Agent</option><option value="admin">Admin</option></select></label>
         <div className="flex-1 min-w-48">
           <label className="text-sm font-medium">Temporary password</label>
           <div className="relative mt-2">
@@ -76,7 +79,7 @@ export default function AdminUsersPage() {
                   <tr><th className="px-5 py-4">Name</th><th className="px-4 py-4">Email</th><th className="px-4 py-4">Role</th><th className="px-4 py-4">Status</th><th className="px-5 py-4 text-right">Actions</th></tr>
                 </thead>
                 <tbody className="divide-y divide-[#edf0ee] dark:divide-zinc-800">
-                  {users.map((user) => <tr key={user.id}><td className="px-5 py-4 font-medium">{user.name}</td><td className="px-4 py-4">{user.email}</td><td className="px-4 py-4">{user.role}</td><td className="px-4 py-4">{user.is_active ? 'Active' : 'Inactive'}</td><td className="px-5 py-4 text-right">{user.role === 'agent' && <button type="button" onClick={() => toggleActive(user)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline cursor-pointer">{user.is_active ? 'Disable' : 'Enable'}</button>}</td></tr>)}
+                  {users.map((user) => <tr key={user.id}><td className="px-5 py-4 font-medium">{user.name}</td><td className="px-4 py-4">{user.email}</td><td className="px-4 py-4">{user.role}</td><td className="px-4 py-4">{user.is_active ? 'Active' : 'Inactive'}</td><td className="px-5 py-4 text-right">{user.role !== 'root' && <button type="button" onClick={() => toggleActive(user)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline cursor-pointer">{user.is_active ? 'Disable' : 'Enable'}</button>}</td></tr>)}
                 </tbody>
               </table>
             </div>
@@ -90,7 +93,7 @@ export default function AdminUsersPage() {
                   <div className="text-sm text-[#65736b] dark:text-zinc-300">{user.email}</div>
                   <div className="mt-2 flex items-center justify-between border-t border-[#edf0ee] pt-4">
                     <span className="text-xs font-semibold uppercase tracking-wider text-[#8a968f] dark:text-zinc-400">{user.role}</span>
-                    {user.role === 'agent' && (
+                    {user.role !== 'root' && (
                       <button type="button" onClick={() => toggleActive(user)} className="text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline cursor-pointer">
                         {user.is_active ? 'Disable' : 'Enable'}
                       </button>

@@ -100,7 +100,7 @@ export default function SiteConfigurationPage() {
 
   useEffect(() => {
     getCurrentUser().then((user) => {
-      if (!user || user.role !== "root") {
+      if (!user || !["root", "admin"].includes(user.role)) {
         router.replace("/admin");
         return;
       }

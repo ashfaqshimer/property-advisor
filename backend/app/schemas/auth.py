@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class StaffRole:
     ROOT = "root"
+    ADMIN = "admin"
     AGENT = "agent"
 
 
@@ -20,6 +21,7 @@ class StaffUserRead(schemas.BaseUser[UUID]):
 
 class StaffUserCreate(schemas.BaseUserCreate):
     name: str = Field(min_length=1, max_length=120)
+    role: str | None = Field(default=None, min_length=1, max_length=20)
 
 
 class StaffUserUpdate(schemas.BaseUserUpdate):

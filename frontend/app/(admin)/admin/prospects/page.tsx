@@ -599,7 +599,7 @@ export default function ProspectsPage() {
                       </select>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {user?.role === "root" && prospect.status !== "converted" && (
+                      {["root", "admin"].includes(user?.role ?? "") && prospect.status !== "converted" && (
                         <button
                           onClick={() => handleGenerateDraft(prospect)}
                           disabled={draftLoading === prospect.id}
