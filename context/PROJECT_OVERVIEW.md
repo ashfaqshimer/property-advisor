@@ -41,6 +41,10 @@ property-advisor/
 │   │       ├── page.tsx       # Properties table
 │   │       ├── leads/         # Leads table
 │   │       ├── properties/    # Property detail/edit
+│   │       ├── contacts/      # Contact management
+│   │       ├── prospects/     # Scraped prospects management
+│   │       ├── settings/      # General settings
+│   │       ├── site-configuration/ # Site-wide config
 │   │       └── users/         # User management (root role only)
 │   ├── components/
 │   │   ├── admin/             # AdminUserMenu, data table layouts
@@ -52,11 +56,16 @@ property-advisor/
 ├── backend/                   # FastAPI app
 │   ├── app/
 │   │   ├── main.py            # FastAPI entrypoint, structlog middleware, CORS
+│   │   ├── config.py          # App configuration and settings
+│   │   ├── geocoding.py       # Geocoding utilities
 │   │   ├── api/
 │   │   │   ├── auth.py        # POST /auth/login, POST /auth/logout, GET /auth/me
 │   │   │   ├── chat.py        # POST /chat endpoint
 │   │   │   ├── leads.py       # GET /leads (public + auth-protected admin)
-│   │   │   └── properties.py  # GET /properties/featured + admin CRUD
+│   │   │   ├── properties.py  # GET /properties/featured + admin CRUD
+│   │   │   ├── property_contacts.py # Property contacts API
+│   │   │   ├── prospects.py   # GET /prospects, manage scan jobs
+│   │   │   └── site_configuration.py # GET/PUT site configuration
 │   │   ├── agent/
 │   │   │   ├── loop.py        # Manual tool-calling loop (run_turn)
 │   │   │   ├── tools.py       # Tool definitions + implementations
@@ -66,9 +75,11 @@ property-advisor/
 │   │   │   ├── prompt_builder.py # Assembles system prompt from the three modules
 │   │   │   ├── prompts.py     # Legacy shim — do not add new prompt logic here
 │   │   │   └── client.py      # Gemini API wrapper
-│   │   ├── models/            # SQLAlchemy models (property, conversation, message, lead, auth)
+│   │   ├── models/            # SQLAlchemy models (property, conversation, message, lead, auth, prospect, scan_job)
 │   │   ├── db/                # Session, engine, Alembic config, queries, seed
-│   │   └── schemas/           # Pydantic request/response models
+│   │   ├── schemas/           # Pydantic request/response models
+│   │   ├── scraper/           # Web scraping logic for gathering property data
+│   │   └── services/          # Background services (e.g., scanner_scheduler.py)
 │   ├── alembic/
 │   └── pyproject.toml         # uv-managed; no requirements.txt
 └── README.md
@@ -194,6 +205,43 @@ property-advisor/
 | city | JSON | |
 | extra_settings | JSON | nullable |
 
+### `prospects`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| ikman_ad_id | string(64) | UNIQUE, indexed; external identifier |
+| ikman_url | text | |
+| ikman_slug | string(256) | |
+| title | text | |
+| price | string(128) | |
+| location | string(128) | |
+| property_type | string(64) | land, house, apartment |
+| listing_type | string(32) | for_sale, for_rent |
+| poster_name | string(128) | nullable |
+| phone_number | string(32) | nullable |
+| classification | string(16) | owner, broker |
+| confidence | smallint | 0-100 score |
+| classification_reasons | array[text] | SQLite JSON variant |
+| classification_method | string(16) | heuristic, llm, hybrid |
+| status | string(32) | new, contacted, ignored, converted |
+| first_seen_at | timestamp | |
+| last_seen_at | timestamp | |
+| is_member / is_auth_dealer | bool | ikman metadata |
+| membership_level | string(16) | ikman metadata |
+| shop_name | string(256) | nullable; ikman metadata |
+
+### `scan_jobs`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| job_type | string(32) | e.g. 'scan', 'phone_fetch' |
+| status | string(32) | running, completed, failed |
+| progress | text | |
+| error | text | nullable |
+| created_by_id | FK → staff_users.id | nullable |
+| created_by_name | string(120) | nullable |
+| created_at / updated_at | timestamp | |
+
 ---
 
 ## 5. Agent Design
@@ -245,6 +293,8 @@ property-advisor/
 | GET | `/users/me` | Staff session | Return the current authenticated staff user via FastAPI Users |
 | GET/POST/PUT/DEL | `/property-contacts` | Staff session | Manage property owners and brokers |
 | GET/PUT | `/site-configuration` | Staff session (PUT) | Retrieve and update site-wide settings |
+| GET/POST/PUT | `/prospects` | Staff session | View and update scraped prospects |
+| POST | `/prospects/scan` | Staff session | Trigger a new web scraping job |
 
 ---
 
@@ -277,9 +327,10 @@ NEXT_PUBLIC_API_URL=https://your-backend.onrender.com
 **Completed:**
 - **Backend foundation & Auth:** FastAPI project structure, SQLAlchemy models, Alembic migrations, database seeding. Fully migrated to **FastAPI Users** for authentication and session management. Added Business Contact (`property_contacts`) and Site Configuration schemas.
 - **Agent core:** Gemini API client wrapper using `google-genai` SDK, `search_properties` and `capture_lead` tools, manual tool-calling loop, persistent conversations.
-- **API endpoints:** `/chat`, `/properties`, `/leads`, `/property-contacts`, `/site-configuration`, and FastAPI Users `/auth` routes are fully wired and functional.
+- **API endpoints:** `/chat`, `/properties`, `/leads`, `/property-contacts`, `/site-configuration`, `/prospects` and FastAPI Users `/auth` routes are fully wired and functional.
 - **Frontend integration:** Next.js UI integrated with backend APIs, ChatPanel wired, property grid and admin dashboard operational. Added conditional rendering of contact details and site configuration settings management.
-- **Data Models:** Added linking of property owner models.
+- **Data Models:** Added linking of property owner models, prospects, and scan jobs.
+- **Scraper System:** Added web scraping architecture (`scraper/`), background scan jobs, and automatic heuristic/LLM-based classification of leads as 'owner' or 'broker'. Includes a geocoding service.
 
 **Pending / Next Steps:**
 - Polish and refine UI/UX (error handling, empty states).

@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from app.db.session import SessionLocal
 from app.models.site_configuration import SiteConfiguration
 from app.models.scan_job import ScanJob
+from sqlalchemy.exc import OperationalError
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 import uuid
 import asyncio
 from app.api.prospects import _run_scan_job
@@ -84,11 +86,23 @@ def run_property_scanner():
         session.commit()
 
 
-def init_scheduler():
-    """Initializes the scheduler based on current DB config."""
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_fixed(2),
+    retry=retry_if_exception_type(OperationalError)
+)
+def _get_config_with_retry():
     with SessionLocal() as session:
         result = session.execute(select(SiteConfiguration).limit(1))
-        config = result.scalar_one_or_none()
+        return result.scalar_one_or_none()
+
+def init_scheduler():
+    """Initializes the scheduler based on current DB config."""
+    try:
+        config = _get_config_with_retry()
+    except Exception as e:
+        logger.error("init_scheduler.db_failed", error=str(e))
+        config = None
     
     if config and config.scanner_settings:
         settings = config.scanner_settings
