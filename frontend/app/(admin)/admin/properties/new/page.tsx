@@ -69,7 +69,7 @@ export default function NewPropertyPage() {
 		return () =>
 			imagesRef.current.forEach((image) => URL.revokeObjectURL(image.url));
 	}, []);
-	function updateField(field: keyof FormValues, value: string | boolean) {
+	function updateField(field: keyof FormValues, value: string | boolean | string[]) {
 		setForm((current) => ({ ...current, [field]: value }));
 		setErrors((current) => ({ ...current, [field]: '' }));
 	}

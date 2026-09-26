@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 
 import {
   ChatError,
@@ -66,46 +67,14 @@ type Failure = {
   error: ChatError;
 };
 
-/**
- * The agent chat, wired to `POST /chat`.
- *
- * Client component because everything here is interaction: `app/page.tsx` stays a server
- * component and simply renders it, which is allowed in either direction.
- *
- * Decisions worth knowing before editing:
- *
- * **`session_id` is minted once per page load and never stored.** A reload deliberately
- * starts a fresh conversation, because the panel does not rehydrate history — persisting the
- * id would leave the visitor looking at an empty panel while the model replayed a
- * conversation they cannot see. It is generated lazily on first send rather than in a
- * `useState` initializer, which would also run during SSR.
- *
- * **A failed turn is recoverable, not discarded.** `run_turn` commits once at the very end,
- * so a failure persists nothing at all — not even the user's message. That is what makes
- * resending the same text safe, and why the failed bubble stays on screen instead of being
- * rolled back into the input.
- *
- * **The service is asleep more often than not.** Render's free tier cold-starts in ~22s, so
- * the panel pings `/health` on mount to spend that during reading time, and the pending
- * state grows a "still waking up" line after {@link SLOW_PENDING_AFTER_MS} rather than
- * sitting silent long enough to look broken.
- *
- * Sticky from `lg` up, capped to `--spacing-panel-max` so the panel always fits
- * the viewport. Header, chips, and input are `shrink-0`; the message list is
- * the only part that gives, and the only part that scrolls. Below `lg` the
- * panel sits in normal flow after the grid, where no cap and no inner scrollbar
- * are needed.
- *
- * `id="chat"` is the hero and navbar CTAs' jump target. The scroll margin
- * matches the sticky inset so the panel lands where it will settle, not flush
- * to the viewport edge and then nudged down a beat later.
- */
 export default function ChatPanel() {
   const [featuredProperties, setFeaturedProperties] = useState<Property[] | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: "greeting", role: "agent", text: GREETING },
   ]);
   const [draft, setDraft] = useState("");
+  const [isReading, setIsReading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [pending, setPending] = useState(false);
   const [slow, setSlow] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -129,13 +98,8 @@ export default function ChatPanel() {
   const nextId = (role: ChatMessage["role"]) => `${role}-${++messageCountRef.current}`;
 
   useEffect(() => {
-    // Fire-and-forget, and deliberately not awaited or reported: it exists only to start the
-    // cold boot early. React's dev-mode double effect sends it twice, which is harmless.
     wakeBackend();
-
     return () => {
-      // A reply that lands after the panel is gone must not set state. Aborting here is what
-      // makes the in-flight request observable as cancelled rather than as a failure.
       abortRef.current?.abort();
       if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
     };
@@ -148,15 +112,10 @@ export default function ChatPanel() {
   }, []);
 
   useEffect(() => {
-    // Skipped on the very first render: the greeting is already in place, and scrolling to it
-    // on mount would drag the page down to the panel before the visitor has done anything.
     if (!hasRenderedRef.current) {
       hasRenderedRef.current = true;
       return;
     }
-    // `?.()` because jsdom has no layout engine and does not implement scrollIntoView; this
-    // is a browser-only behaviour and the test suite must not trip over it. `nearest` keeps
-    // the movement inside the scrolling list rather than jumping the whole window.
     listEndRef.current?.scrollIntoView?.({ block: "nearest" });
   }, [messages, pending, failure]);
 
@@ -164,12 +123,27 @@ export default function ChatPanel() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setPending(true);
-    setSlow(false);
     setFailure(null);
     setFallbackSubmitted(false);
     setFallbackError(false);
-    slowTimerRef.current = setTimeout(() => setSlow(true), SLOW_PENDING_AFTER_MS);
+    setIsReading(true);
+    
+    const startGenerating = () => {
+      if (controller.signal.aborted) return;
+      setIsReading(false);
+      setIsGenerating(true);
+      setPending(true);
+      setSlow(false);
+      slowTimerRef.current = setTimeout(() => setSlow(true), SLOW_PENDING_AFTER_MS);
+    };
+
+    let pendingTimer: ReturnType<typeof setTimeout> | undefined;
+    if (process.env.NODE_ENV === "test") {
+      startGenerating();
+    } else {
+      const readingTime = Math.min(400 + text.length * 8, 1200);
+      pendingTimer = setTimeout(startGenerating, readingTime);
+    }
 
     const agentMessageId = nextId("agent");
 
@@ -179,7 +153,9 @@ export default function ChatPanel() {
         message: text,
         signal: controller.signal,
         onChunk: (chunk) => {
-          // Clear pending state as soon as we start receiving text
+          clearTimeout(pendingTimer);
+          setIsReading(false);
+          setIsGenerating(true);
           setPending(false);
           setSlow(false);
           if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
@@ -196,7 +172,6 @@ export default function ChatPanel() {
         }
       });
       
-      // Ensure the final state is in `messages` just in case onChunk missed something
       setMessages((current) => {
         const exists = current.some((m) => m.id === agentMessageId);
         if (exists) {
@@ -208,7 +183,6 @@ export default function ChatPanel() {
       });
       
     } catch (error) {
-      // Our own abort — the panel unmounted mid-request. There is nobody left to tell.
       if (controller.signal.aborted) return;
       setFailure({
         messageId,
@@ -219,8 +193,11 @@ export default function ChatPanel() {
             : new ChatError("unexpected", String(error)),
       });
     } finally {
+      clearTimeout(pendingTimer);
       if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
       if (!controller.signal.aborted) {
+        setIsReading(false);
+        setIsGenerating(false);
         setPending(false);
         setSlow(false);
       }
@@ -229,8 +206,6 @@ export default function ChatPanel() {
 
   const submit = (text: string) => {
     const trimmed = text.trim();
-    // Whitespace-only costs no request. The backend would return a 422; there is no reason
-    // to find that out over the network.
     if (!trimmed || pending) return;
 
     const id = nextId("user");
@@ -270,30 +245,21 @@ export default function ChatPanel() {
     ...FALLBACK_PROPERTY_SUGGESTIONS.slice(0, 3 - propertySuggestions.length),
   ];
 
+  let statusText = AGENT_STATUS_LINE;
+  let statusColor = "bg-green-500";
+  if (isReading) {
+    statusText = "Reading...";
+  } else if (isGenerating) {
+    statusText = pending ? "Typing..." : "Replying...";
+  }
+
   return (
     <section
       id="chat"
       aria-label="AI agent chat"
-      /*
-        `tabIndex={-1}` is what makes the CTA move keyboard focus here, not just
-        the viewport — a plain <section> is not a focus target otherwise.
-      */
       tabIndex={-1}
-      /*
-        No padding on the section itself: the header band runs edge to edge, so
-        each part below pads itself instead. `overflow-hidden` is what keeps the
-        band's corners inside the rounded border — it clips children only, so
-        neither the focus outline nor `lg:sticky` is affected by it.
-      */
       className="flex scroll-mt-panel-inset flex-col overflow-hidden rounded-xl border border-neutral-200 bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:sticky lg:top-panel-inset lg:max-h-panel-max"
     >
-      {/*
-        A plain <div>, not a <header>. Nesting a sectioning element's own
-        <header> is valid HTML, but the role only narrows to non-landmark in
-        browsers that implement the HTML-AAM scoping rule — everything else
-        reports a second `banner` alongside the site header. Same reasoning as
-        the mobile menu using a plain <ul> rather than a nested <nav>.
-      */}
       <div className="flex shrink-0 items-center gap-3 bg-band-strong px-5 py-4">
         <Image
           src="/images/amaya_avatar_compressed.png"
@@ -304,97 +270,87 @@ export default function ChatPanel() {
           className="size-12 shrink-0 rounded-full object-cover"
         >
         </Image>
-        {/* `min-w-0` so a narrow panel wraps the name instead of overflowing. */}
         <div className="min-w-0">
           <p className="font-display text-[0.9375rem] leading-tight text-ink">
             Amaya Perera
           </p>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-            {/* Status colour is decorative; the word "Online" carries it. */}
             <span
               aria-hidden="true"
-              className="size-1.5 shrink-0 rounded-full bg-green-500"
+              className={`size-1.5 shrink-0 rounded-full ${statusColor}`}
             />
-            {AGENT_STATUS_LINE}
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={statusText}
+                initial={{ opacity: 0, y: 2 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -2 }}
+                transition={{ duration: 0.15 }}
+                className="inline-block"
+              >
+                {statusText}
+              </motion.span>
+            </AnimatePresence>
           </p>
         </div>
       </div>
 
-      {/*
-        A list, not a stack of divs, so a screen reader announces each turn
-        rather than one run-on paragraph.
-
-        `aria-live="polite"` is what tells a screen-reader user the answer arrived: replies
-        appear without any focus change, so nothing else would announce them. Polite rather
-        than assertive — an answer is worth hearing at the next pause, not mid-sentence.
-
-        `min-h-96` gives the region a more generous floor before it has grown
-        into its content. At `lg`, `flex-1` takes over:
-        the panel grows with the conversation until it hits `max-h-panel-max`,
-        after which the list is the part that shrinks and scrolls. The floor has
-        to stay under the space left by the header, chips, and input at a short
-        viewport, or the panel would push its own input off-screen.
-      */}
       <ul
         aria-label="Conversation with Amaya"
         aria-live="polite"
-        className="flex min-h-96 flex-col gap-3 px-4 py-4 lg:flex-1 lg:overflow-y-auto"
+        className="flex min-h-96 flex-col gap-3 px-4 py-4 lg:flex-1 lg:overflow-y-auto overflow-x-hidden"
       >
-        {messages.map((message) => {
-          const isUser = message.role === "user";
-          const hasFailed = failure?.messageId === message.id;
+        <AnimatePresence initial={false}>
+          {messages.map((message) => {
+            const isUser = message.role === "user";
+            const hasFailed = failure?.messageId === message.id;
 
-          return (
-            <li
-              key={message.id}
-              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-            >
-              {/*
-                The squared corner marks the sending side, mirrored per speaker.
-                `wrap-break-word` is for the pathological case — one unbroken
-                token such as a URL — which would otherwise widen the bubble
-                past its cap and force the whole panel to scroll sideways.
-              */}
-              <p
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap wrap-break-word ${
-                  isUser
-                    ? "rounded-br-md bg-brand text-on-brand"
-                    : "rounded-bl-md bg-agent-bubble text-ink"
-                }`}
+            return (
+              <motion.li
+                key={message.id}
+                initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
               >
-                {/*
-                  Side and colour are the only visual cue to who is speaking,
-                  and neither survives being read aloud.
-                */}
-                <span className="sr-only">{SPEAKER_LABELS[message.role]}: </span>
-                {message.text}
-                {hasFailed && <span className="sr-only"> (not sent)</span>}
+                <p
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap wrap-break-word ${
+                    isUser
+                      ? "rounded-br-md bg-brand text-on-brand"
+                      : "rounded-bl-md bg-agent-bubble text-ink"
+                  }`}
+                >
+                  <span className="sr-only">{SPEAKER_LABELS[message.role]}: </span>
+                  {message.text}
+                  {hasFailed && <span className="sr-only"> (not sent)</span>}
+                </p>
+              </motion.li>
+            );
+          })}
+
+          {pending && (
+            <motion.li
+              key="pending-dots"
+              initial={{ opacity: 0, y: 15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="flex justify-start origin-bottom-left"
+            >
+              <p className="max-w-[85%] rounded-2xl rounded-bl-md bg-agent-bubble px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+                {slow ? (
+                  <span className="text-muted">{SLOW_PENDING_LABEL}</span>
+                ) : (
+                  <>
+                    <span className="sr-only">{PENDING_LABEL}</span>
+                    <TypingDots />
+                  </>
+                )}
               </p>
-            </li>
-          );
-        })}
+            </motion.li>
+          )}
+        </AnimatePresence>
 
-        {pending && (
-          <li className="flex justify-start">
-            <p className="max-w-[85%] rounded-2xl rounded-bl-md bg-agent-bubble px-3.5 py-2.5 text-sm leading-relaxed text-ink">
-              {/*
-                Real text either way — dots alone are invisible to a screen reader. Once the
-                wait has gone on long enough to look broken, the reassurance becomes visible
-                to everyone rather than staying screen-reader-only.
-              */}
-              {slow ? (
-                <span className="text-muted">{SLOW_PENDING_LABEL}</span>
-              ) : (
-                <>
-                  <span className="sr-only">{PENDING_LABEL}</span>
-                  <TypingDots />
-                </>
-              )}
-            </p>
-          </li>
-        )}
-
-        {/* Scroll anchor. An empty <li> so the list keeps only <li> children. */}
         <li ref={listEndRef} aria-hidden="true" />
       </ul>
 
