@@ -4,6 +4,9 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { createAgent, getStaffUsers, StaffUser, updateAgent } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<StaffUser[]>([]);
@@ -56,19 +59,19 @@ export default function AdminUsersPage() {
       </div>
       {error && <p className="mb-4 text-sm text-[#a34d4d] dark:text-red-400">{error}</p>}
       <form onSubmit={submit} className="mb-8 flex flex-col items-stretch gap-4 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:flex-row sm:flex-wrap sm:items-end">
-        <label className="flex-1 min-w-48 text-sm font-medium">Agent name<input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm" /></label>
-        <label className="flex-1 min-w-48 text-sm font-medium">Agent email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm" /></label>
-        <label className="flex-1 min-w-32 text-sm font-medium">Role<select value={role} onChange={(event) => setRole(event.target.value as 'agent' | 'admin')} className="mt-2 w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 text-sm bg-transparent"><option value="agent">Agent</option><option value="admin">Admin</option></select></label>
+        <label className="flex-1 min-w-48 text-sm font-medium">Agent name<Input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2" /></label>
+        <label className="flex-1 min-w-48 text-sm font-medium">Agent email<Input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2" /></label>
+        <label className="flex-1 min-w-32 text-sm font-medium">Role<Select value={role} onChange={(event) => setRole(event.target.value as 'agent' | 'admin')} className="mt-2"><option value="agent">Agent</option><option value="admin">Admin</option></Select></label>
         <div className="flex-1 min-w-48">
           <label className="text-sm font-medium">Temporary password</label>
           <div className="relative mt-2">
-            <input required minLength={8} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-lg border border-[#d7e0da] px-3.5 py-3 pr-10 text-sm" />
+            <Input required minLength={8} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} className="pr-10" />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:text-zinc-200 focus:outline-none" aria-label={showPassword ? "Hide password" : "Show password"}>
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
         </div>
-        <button type="submit" disabled={saving} className="rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#1e4031] dark:hover:bg-emerald-600 disabled:opacity-60 cursor-pointer">{saving ? <Spinner className="mx-auto h-4 w-4" /> : 'Create agent'}</button>
+        <Button type="submit" disabled={saving}>{saving ? <Spinner className="mx-auto h-4 w-4" /> : 'Create agent'}</Button>
       </form>
       <div className="overflow-hidden rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
         {loading ? <div className="flex min-h-32 items-center justify-center"><Spinner className="h-5 w-5 text-[#28513f]" /></div> : (
