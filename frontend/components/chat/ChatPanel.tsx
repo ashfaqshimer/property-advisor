@@ -307,7 +307,7 @@ export default function ChatPanel() {
             {/* Status colour is decorative; the word "Online" carries it. */}
             <span
               aria-hidden="true"
-              className="size-1.5 shrink-0 rounded-full bg-brand"
+              className="size-1.5 shrink-0 rounded-full bg-green-500"
             />
             {AGENT_STATUS_LINE}
           </p>
@@ -428,7 +428,7 @@ export default function ChatPanel() {
                 <button
                   type="submit"
                   disabled={!fallbackPhone.trim() || fallbackPending}
-                  className="self-start rounded-full bg-brand px-3 py-1.5 font-medium text-on-brand hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                  className="self-start rounded-full bg-green-600 px-3 py-1.5 font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50"
                 >
                   {fallbackPending ? "Sending…" : "Request a call"}
                 </button>
@@ -501,7 +501,7 @@ export default function ChatPanel() {
             type="submit"
             disabled={!canSend}
             aria-label="Send message"
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-brand text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-green-600 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50"
           >
             <SendIcon />
           </button>
