@@ -137,6 +137,9 @@ def search_prospects(
     stmt = select(Prospect).where(Prospect.status == "new")
 
     if latitude is not None and longitude is not None and radius_km is not None:
+        # Prospects may not yet have coordinates (scanner hasn't geocoded them).
+        # Use an OR: match by geo-distance when coordinates exist, OR by location
+        # text when they don't — so ungeocoded prospects are still surfaced.
         prospect_point = cast(
             func.ST_SetSRID(
                 func.ST_MakePoint(Prospect.longitude, Prospect.latitude), 4326
@@ -146,9 +149,13 @@ def search_prospects(
         search_point = cast(
             func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326), Geography()
         )
-        stmt = stmt.where(
-            func.ST_DWithin(prospect_point, search_point, radius_km * 1000)
-        )
+        geo_match = func.ST_DWithin(prospect_point, search_point, radius_km * 1000)
+        has_no_coords = (Prospect.latitude == None) | (Prospect.longitude == None)  # noqa: E711
+        if location:
+            text_match = Prospect.location.ilike(f"%{location.strip()}%")
+            stmt = stmt.where(geo_match | (has_no_coords & text_match))
+        else:
+            stmt = stmt.where(geo_match)
     elif location:
         stmt = stmt.where(Prospect.location.ilike(f"%{location.strip()}%"))
 
@@ -168,6 +175,13 @@ def available_property_by_id(db: Session, property_id: uuid.UUID) -> Property | 
         Property.status == PropertyStatus.AVAILABLE,
     )
     return db.execute(stmt).scalar_one_or_none()
+
+
+def prospect_by_id(db: Session, prospect_id: uuid.UUID) -> Prospect | None:
+    """Return a prospect by its id, regardless of status."""
+    return db.execute(
+        select(Prospect).where(Prospect.id == prospect_id)
+    ).scalar_one_or_none()
 
 
 def admin_properties(
