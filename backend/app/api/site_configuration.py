@@ -41,10 +41,10 @@ def update_site_configuration(
     config = db.scalar(select(SiteConfiguration).limit(1))
     
     if not config:
-        config = SiteConfiguration(**payload.model_dump(exclude_unset=True))
+        config = SiteConfiguration(**payload.model_dump(exclude_unset=True, mode='json'))
         db.add(config)
     else:
-        for field, value in payload.model_dump(exclude_unset=True).items():
+        for field, value in payload.model_dump(exclude_unset=True, mode='json').items():
             setattr(config, field, value)
             
     db.commit()
