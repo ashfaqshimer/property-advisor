@@ -249,6 +249,7 @@ def run_turn(
                     )
                 elif part.text:
                     record(MessageRole.ASSISTANT, content=part.text)
+                    yield part.text + "\n\n"
                     
             # Execute the tools
             response_parts: list[types.Part] = []

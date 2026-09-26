@@ -356,7 +356,7 @@ export default function ChatPanel() {
                 past its cap and force the whole panel to scroll sideways.
               */}
               <p
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed wrap-break-word ${
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap wrap-break-word ${
                   isUser
                     ? "rounded-br-md bg-brand text-on-brand"
                     : "rounded-bl-md bg-agent-bubble text-ink"
