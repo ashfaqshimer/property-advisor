@@ -39,12 +39,12 @@ function ConfigField({
         aria-checked={show ?? true}
         onClick={() => onShowChange(!(show ?? true))}
         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#19352b] focus:ring-offset-2 ${
-          (show ?? true) ? 'bg-[#19352b] dark:bg-zinc-950' : 'bg-gray-200'
+          (show ?? true) ? 'bg-[#19352b] dark:bg-[#28513f]' : 'bg-gray-200 dark:bg-zinc-700'
         }`}
       >
         <span
           aria-hidden="true"
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-zinc-950 shadow ring-0 transition duration-200 ease-in-out ${
+          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
             (show ?? true) ? 'translate-x-4' : 'translate-x-0'
           }`}
         />
