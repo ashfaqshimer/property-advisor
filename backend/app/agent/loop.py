@@ -210,7 +210,7 @@ def run_turn(
             system_instruction=build_system_prompt(db),
         )
         
-        # We need to pull the first chunk to see if it's a function call
+        # We need to pull the first chunk to see if it's not empty
         iterator = iter(response_stream)
         try:
             first_chunk = next(iterator)
@@ -219,24 +219,25 @@ def run_turn(
             yield FALLBACK_REPLY
             return
             
-        first_parts = _parts_of(first_chunk)
-        has_calls = any(part.function_call for part in first_parts)
+        all_parts = []
+        calls = []
+        full_text = ""
         
-        if has_calls:
-            # It's a tool-calling iteration. Exhaust the stream to get all calls/text.
-            all_chunks = [first_chunk]
-            for chunk in iterator:
-                all_chunks.append(chunk)
-                
-            parts = []
-            for chunk in all_chunks:
-                parts.extend(_parts_of(chunk))
-                
-            calls = [part.function_call for part in parts if part.function_call]
-            
-            # Record the model's tool calls
-            contents.append(types.Content(role="model", parts=parts))
+        for chunk in [first_chunk] + list(iterator):
+            parts = _parts_of(chunk)
+            all_parts.extend(parts)
             for part in parts:
+                if part.function_call:
+                    calls.append(part.function_call)
+                elif part.text:
+                    full_text += part.text
+                    yield part.text
+        
+        if calls:
+            if full_text:
+                yield "\n\n"
+            contents.append(types.Content(role="model", parts=all_parts))
+            for part in all_parts:
                 if part.function_call:
                     record(
                         MessageRole.ASSISTANT,
@@ -249,7 +250,6 @@ def run_turn(
                     )
                 elif part.text:
                     record(MessageRole.ASSISTANT, content=part.text)
-                    yield part.text + "\n\n"
                     
             # Execute the tools
             response_parts: list[types.Part] = []
@@ -269,26 +269,7 @@ def run_turn(
             continue
             
         # If there are no function calls, it is a text reply to stream to the user.
-        full_reply = []
-        
-        def process_chunk(chunk):
-            p = _parts_of(chunk)
-            t = "".join(part.text for part in p if part.text)
-            if t:
-                full_reply.append(t)
-                return t
-            return ""
-            
-        t = process_chunk(first_chunk)
-        if t:
-            yield t
-            
-        for chunk in iterator:
-            t = process_chunk(chunk)
-            if t:
-                yield t
-                
-        final_text = "".join(full_reply).strip()
+        final_text = full_text.strip()
         if not final_text:
             logger.warning(
                 "Gemini returned no usable text for chat session %s",

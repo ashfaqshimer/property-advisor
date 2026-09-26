@@ -41,6 +41,7 @@ from app.db import queries
 from app.geocoding import GeocodingError, GoogleGeocoder
 from app.models.lead import Lead, LeadIntent, LeadInterest, LeadSource
 from app.models.property import ListingType, Property, PropertyType
+from app.models.prospect import Prospect
 
 SEARCH_PROPERTIES = "search_properties"
 GET_PROPERTY_DETAILS = "get_property_details"
@@ -294,6 +295,31 @@ def _serialize(prop: Property) -> dict[str, Any]:
     }
 
 
+def _serialize_prospect(prop: Prospect) -> dict[str, Any]:
+    """Map a prospect to look identical to a property for the agent."""
+    digits = re.sub(r"[^\d]", "", prop.price or "")
+    price_lkr = int(digits) if digits else 0
+    return {
+        "id": str(prop.id),
+        "title": prop.title,
+        "location": prop.location,
+        "listing_type": prop.listing_type,
+        "price_lkr": price_lkr,
+        "is_price_per_perch": False,
+        "property_type": prop.property_type,
+        "bedrooms": None,
+        "bathrooms": None,
+        "land_size_perches": None,
+        "floor_area_sqft": None,
+        "parking_spaces": None,
+        "build_year": None,
+        "road_access_ft": None,
+        "furnishing_status": None,
+        "amenities": None,
+        "description": "Newly found listing.",
+    }
+
+
 # --------------------------------------------------------------------------------------
 # Implementations
 # --------------------------------------------------------------------------------------
@@ -331,11 +357,27 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
         radius_km=get_settings().location_search_radius_km if coordinates else None,
     )
 
-    payload: dict[str, Any] = {
-        "match_count": len(matches),
-        "matches": [_serialize(prop) for prop in matches],
-    }
     if not matches:
+        prospects = queries.search_prospects(
+            context.db,
+            location=location,
+            listing_type=_as_listing_type(args.get("listing_type")),
+            property_type=_as_property_type(args.get("property_type")),
+            latitude=coordinates.latitude if coordinates else None,
+            longitude=coordinates.longitude if coordinates else None,
+            radius_km=get_settings().location_search_radius_km if coordinates else None,
+        )
+        payload: dict[str, Any] = {
+            "match_count": len(prospects),
+            "matches": [_serialize_prospect(prop) for prop in prospects],
+        }
+    else:
+        payload: dict[str, Any] = {
+            "match_count": len(matches),
+            "matches": [_serialize(prop) for prop in matches],
+        }
+
+    if payload["match_count"] == 0:
         payload["guidance"] = NO_MATCH_GUIDANCE
     return payload
 
@@ -372,6 +414,10 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     remarks = _clean_text(args.get("remarks"), 4000)
     intent = _as_intent(args.get("intent"))
     interest = _as_interest(args.get("interest"))
+    
+    prop_id_str = args.get("property_id")
+    property_id = _as_uuid(prop_id_str, "property_id") if prop_id_str else None
+    
     budget_min = _as_decimal(args.get("budget_min"), "budget_min")
     budget_max = _as_decimal(args.get("budget_max"), "budget_max")
     if budget_min is not None and budget_max is not None and budget_min > budget_max:
@@ -417,6 +463,8 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         lead.budget_min = budget_min
     if budget_max is not None:
         lead.budget_max = budget_max
+    if property_id is not None:
+        lead.interested_property_id = property_id
 
     context.db.flush()
 
@@ -557,6 +605,10 @@ _CAPTURE_DECLARATION = types.FunctionDeclaration(
                     "'buy' or 'rent' if they're looking for a property, 'sell' if they "
                     "want us to sell or let out theirs."
                 ),
+            ),
+            "property_id": types.Schema(
+                type=types.Type.STRING,
+                description="The id of the specific listing they are interested in, if any.",
             ),
             "budget_min": types.Schema(
                 type=types.Type.NUMBER,

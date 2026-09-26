@@ -16,6 +16,7 @@ from sqlalchemy.types import UserDefinedType
 from sqlalchemy.orm import Session
 
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
+from app.models.prospect import Prospect
 
 # The homepage grid renders eight cards.
 DEFAULT_FEATURED_LIMIT = 6
@@ -119,6 +120,44 @@ def search_properties(
         stmt = stmt.where(Property.bedrooms >= bedrooms)
 
     stmt = stmt.order_by(Property.created_at.desc(), Property.id).limit(limit)
+    return db.execute(stmt).scalars().all()
+
+
+def search_prospects(
+    db: Session,
+    *,
+    location: str | None = None,
+    listing_type: ListingType | None = None,
+    property_type: PropertyType | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    radius_km: float | None = None,
+    limit: int = DEFAULT_SEARCH_LIMIT,
+) -> Sequence[Prospect]:
+    stmt = select(Prospect).where(Prospect.status == "new")
+
+    if latitude is not None and longitude is not None and radius_km is not None:
+        prospect_point = cast(
+            func.ST_SetSRID(
+                func.ST_MakePoint(Prospect.longitude, Prospect.latitude), 4326
+            ),
+            Geography(),
+        )
+        search_point = cast(
+            func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326), Geography()
+        )
+        stmt = stmt.where(
+            func.ST_DWithin(prospect_point, search_point, radius_km * 1000)
+        )
+    elif location:
+        stmt = stmt.where(Prospect.location.ilike(f"%{location.strip()}%"))
+
+    if listing_type is not None:
+        stmt = stmt.where(Prospect.listing_type == listing_type.value)
+    if property_type is not None:
+        stmt = stmt.where(Prospect.property_type == property_type.value)
+
+    stmt = stmt.order_by(Prospect.first_seen_at.desc(), Prospect.id).limit(limit)
     return db.execute(stmt).scalars().all()
 
 
