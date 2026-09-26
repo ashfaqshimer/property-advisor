@@ -386,7 +386,7 @@ export async function createAgent(name: string, email: string, password: string,
   return (await response.json()) as StaffUser;
 }
 
-export async function updateAgent(userId: string, payload: { email?: string; password?: string; is_active?: boolean }): Promise<StaffUser> {
+export async function updateAgent(userId: string, payload: { name?: string; role?: "root" | "admin" | "agent"; email?: string; password?: string; is_active?: boolean }): Promise<StaffUser> {
   const response = await fetch(`${baseUrl()}/admin/users/${userId}`, {
     method: "PATCH",
     credentials: "include",

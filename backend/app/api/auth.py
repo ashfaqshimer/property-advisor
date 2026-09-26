@@ -72,15 +72,29 @@ def update_staff_user(
     user_id: UUID, payload: StaffUserUpdate, db: DbSession, _user: RootStaffUser
 ) -> StaffUser:
     agent = db.get(StaffUser, user_id)
-    if agent is None or agent.role not in (StaffRole.AGENT, StaffRole.ADMIN):
+    if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    
     changes = payload.model_dump(exclude_unset=True)
-    if "role" in changes and changes["role"] in (StaffRole.AGENT, StaffRole.ADMIN):
+    
+    if _user.role != StaffRole.ROOT:
+        if agent.role == StaffRole.ROOT:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+        allowed_keys = {"is_active"}
+        if any(k not in allowed_keys for k in changes.keys()):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only root can edit user details other than status.")
+    else:
+        if agent.role == StaffRole.ROOT and "role" in changes and changes["role"] != StaffRole.ROOT:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot change the role of the root user.")
+
+    if "name" in changes:
+        agent.name = changes["name"]
+    if "role" in changes and changes["role"] in (StaffRole.AGENT, StaffRole.ADMIN, StaffRole.ROOT):
         agent.role = changes["role"]
-        agent.is_superuser = (agent.role == StaffRole.ADMIN)
+        agent.is_superuser = (agent.role in (StaffRole.ADMIN, StaffRole.ROOT))
     if "email" in changes:
         agent.email = changes["email"].lower()
-    if "password" in changes and changes["password"] is not None:
+    if "password" in changes and changes["password"] is not None and changes["password"] != "":
         agent.hashed_password = password_hasher.hash(changes["password"])
     if "is_active" in changes and changes["is_active"] is not None:
         agent.is_active = changes["is_active"]
