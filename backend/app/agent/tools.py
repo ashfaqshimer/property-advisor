@@ -465,7 +465,11 @@ def execute_tool(
             "available_tools": sorted(IMPLEMENTATIONS),
         }
     try:
-        return implementation(context, args or {})
+        # A SAVEPOINT prevents a DB error inside the tool (e.g. DataError) from 
+        # aborting the outer transaction. Without this, a caught DB exception 
+        # leaves the session in a PendingRollback state, crashing the next flush.
+        with context.db.begin_nested():
+            return implementation(context, args or {})
     except ToolArgumentError as exc:
         return {"error": str(exc)}
     except Exception as exc:  # noqa: BLE001 - deliberate catch-all; see docstring
