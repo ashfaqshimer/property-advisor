@@ -25,6 +25,7 @@ from app.scraper.classifier import classify_listing_heuristics
 from app.scraper.ikman_client import IkmanClient, IKMAN_BASE_URL
 from app.agent.client import get_gemini_extractor_client
 from app.schemas.extractor import ExtractedPropertyDraft, GeminiPropertyExtraction
+from app.services.geocoding import geocode_location
 import json
 
 logger = structlog.get_logger(__name__)
@@ -96,6 +97,10 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             elif ad.location and hasattr(ad.location, "name"):
                 loc_str = ad.location.name or ""
 
+            lat, lng = None, None
+            if loc_str:
+                lat, lng = geocode_location(db, loc_str)
+
             new_prospect = Prospect(
                 ikman_ad_id=ad.id,
                 ikman_url=f"{IKMAN_BASE_URL}/en/ad/{ad.slug}" if ad.slug else "",
@@ -103,6 +108,8 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
                 title=ad.title or "",
                 price=ad.price or "",
                 location=loc_str,
+                latitude=lat,
+                longitude=lng,
                 property_type=prop_type,
                 listing_type=listing_type,
                 poster_name=poster_name,

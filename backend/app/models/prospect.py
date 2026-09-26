@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import Boolean, DateTime, SmallInteger, String, Text, Uuid, func
+from sqlalchemy import Boolean, DateTime, SmallInteger, String, Text, Uuid, func, Float
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
@@ -26,6 +26,8 @@ class Prospect(Base):
     title: Mapped[str] = mapped_column(Text)
     price: Mapped[str] = mapped_column(String(128))
     location: Mapped[str] = mapped_column(String(128))
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     property_type: Mapped[str] = mapped_column(String(64))   # land, house, apartment
     listing_type: Mapped[str] = mapped_column(String(32))     # for_sale, for_rent
     
