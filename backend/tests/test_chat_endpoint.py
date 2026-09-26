@@ -36,6 +36,9 @@ from tests.agent_fakes import (
 
 
 class FailingGemini:
+    def generate_stream(self, *args, **kwargs):
+        yield self.generate(*args, **kwargs)
+
     """Upstream is down. `ServerError` is a real `google.genai` error, not a stand-in."""
 
     def generate(self, contents, tools, system_instruction):
@@ -54,7 +57,7 @@ def test_returns_the_reply_and_echoes_the_session(chat_client) -> None:
     response = _post(client, "Hi")
 
     assert response.status_code == 200
-    assert response.json() == {"reply": "Happy to help.", "session_id": SESSION}
+    assert response.text == "Happy to help."
 
 
 def test_a_new_session_creates_one_conversation(chat_client, seeded: Session) -> None:
@@ -107,7 +110,7 @@ def test_tool_call_path_runs_end_to_end(chat_client, seeded: Session) -> None:
     response = _post(client, "Anything in Galle?")
 
     assert response.status_code == 200
-    assert response.json()["reply"] == "I have a colonial retreat in Galle Fort."
+    assert response.text == "I have a colonial retreat in Galle Fort."
     assert fake.call_count == 2
 
     roles = _message_roles(seeded)
@@ -131,7 +134,7 @@ def test_iteration_cap_returns_the_fallback_not_an_error(
     response = _post(client, "Show me everything")
 
     assert response.status_code == 200
-    assert response.json()["reply"] == FALLBACK_REPLY
+    assert response.text == FALLBACK_REPLY
     assert _message_roles(seeded).count(MessageRole.ASSISTANT) >= 1
 
 
@@ -255,9 +258,10 @@ def test_gemini_api_error_is_502(chat_client) -> None:
 
     response = _post(client, "Hi")
 
-    assert response.status_code == 502
+    assert response.status_code == 200
+    assert "[Error:" in response.text
     # The upstream message is not forwarded — the client gets something it can show a user.
-    assert "overloaded" not in response.json()["detail"]
+    assert "overloaded" not in response.text
 
 
 def test_a_failed_turn_persists_nothing(chat_client, seeded: Session) -> None:
@@ -266,7 +270,7 @@ def test_a_failed_turn_persists_nothing(chat_client, seeded: Session) -> None:
     poison every later turn, since history is replayed from `messages`."""
     client = chat_client(FailingGemini())
 
-    assert _post(client, "Hi").status_code == 502
+    assert _post(client, "Hi").status_code == 200
 
     # Rolling back stands in for what production does at the end of the request: `get_db`
     # closes the session, and SQLAlchemy rolls back the open transaction. The suite's
@@ -296,11 +300,13 @@ def test_session_race_retries_once_instead_of_failing(seeded: Session) -> None:
             raise IntegrityError("INSERT", {}, Exception("duplicate key"))
         return run_turn(db, session_id, user_message, client=client)
 
-    reply = chat_module._run_turn_handling_session_race(
-        seeded,
-        ChatRequest(session_id=SESSION, message="Hi"),
-        ScriptedGemini(responses=[text_response("Second time lucky.")]),
-        runner=flaky,
+    reply = "".join(
+        chat_module._run_turn_handling_session_race(
+            seeded,
+            ChatRequest(session_id=SESSION, message="Hi"),
+            ScriptedGemini(responses=[text_response("Second time lucky.")]),
+            runner=flaky,
+        )
     )
 
     assert reply == "Second time lucky."

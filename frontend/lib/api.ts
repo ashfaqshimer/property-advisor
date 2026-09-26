@@ -542,10 +542,12 @@ export async function sendChatMessage({
   sessionId,
   message,
   signal,
+  onChunk,
 }: {
   sessionId: string;
   message: string;
   signal?: AbortSignal;
+  onChunk?: (text: string) => void;
 }): Promise<ChatResponse> {
   const url = `${baseUrl()}/chat`;
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -566,18 +568,31 @@ export async function sendChatMessage({
     throw classifyStatus(response.status);
   }
 
-  let payload: unknown;
+  if (!response.body) {
+    throw new ChatError("unexpected", "The backend returned an empty body.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let fullReply = "";
+
   try {
-    payload = await response.json();
-  } catch {
-    throw new ChatError("unexpected", "The backend returned a malformed body.");
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      if (chunk) {
+        fullReply += chunk;
+        if (onChunk) {
+          onChunk(chunk);
+        }
+      }
+    }
+  } catch (error) {
+    throw classifyTransportFailure(error, signal);
   }
 
-  if (!isChatResponse(payload)) {
-    throw new ChatError("unexpected", "The backend returned an unrecognised body.");
-  }
-
-  return payload;
+  return { reply: fullReply, session_id: sessionId };
 }
 
 export async function captureFallbackLead({

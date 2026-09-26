@@ -44,6 +44,18 @@ class SupportsGenerate(Protocol):
         system_instruction: str,
     ) -> types.GenerateContentResponse: ...
 
+    def generate_stream(
+        self,
+        contents: list[types.Content],
+        tools: list[types.Tool],
+        system_instruction: str,
+    ) -> Any: ...
+
+    def count_tokens(
+        self,
+        contents: list[types.Content] | str,
+    ) -> int: ...
+
 
 class GeminiClient:
     """Thin pass-through to `client.models.generate_content`.
@@ -84,6 +96,24 @@ class GeminiClient:
             ),
         )
 
+    def generate_stream(
+        self,
+        contents: list[types.Content],
+        tools: list[types.Tool],
+        system_instruction: str,
+    ) -> Any:
+        return self._client.models.generate_content_stream(
+            model=self._model,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                tools=tools,
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                ),
+            ),
+        )
+
     def generate_structured(
         self,
         prompt: str,
@@ -98,6 +128,17 @@ class GeminiClient:
             ),
         )
         return response.parsed
+
+    def count_tokens(
+        self,
+        contents: list[types.Content] | str,
+    ) -> int:
+        """Count the number of tokens in a prompt without generating a response."""
+        response = self._client.models.count_tokens(
+            model=self._model,
+            contents=contents,
+        )
+        return response.total_tokens
 
 
 @lru_cache

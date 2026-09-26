@@ -31,6 +31,27 @@ import {
 
 const BASE = "http://127.0.0.1:8000";
 
+const streamResponse = (status: number, text: string) => {
+  const encoder = new TextEncoder();
+  const chunks = [encoder.encode(text)];
+  let idx = 0;
+  
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    body: {
+      getReader: () => ({
+        read: async () => {
+          if (idx < chunks.length) {
+            return { done: false, value: chunks[idx++] };
+          }
+          return { done: true, value: undefined };
+        }
+      })
+    }
+  } as unknown as Response;
+};
+
 const jsonResponse = (status: number, body: unknown) =>
   ({
     ok: status >= 200 && status < 300,
@@ -38,7 +59,7 @@ const jsonResponse = (status: number, body: unknown) =>
     json: async () => body,
   }) as unknown as Response;
 
-const reply = (text: string) => jsonResponse(200, { reply: text, session_id: "s" });
+const reply = (text: string) => streamResponse(200, text);
 
 type ChatHandler = (init: RequestInit) => unknown;
 
@@ -50,7 +71,7 @@ let fetchSpy: ReturnType<typeof vi.fn>;
  */
 function stubBackend(onChat: ChatHandler = () => reply("Of course.")) {
   fetchSpy = vi.fn(async (url: unknown, init: RequestInit = {}) => {
-    if (String(url).endsWith("/health")) return jsonResponse(200, { status: "ok" });
+    if (String(url).endsWith("/health")) return streamResponse(200, "");
     if (String(url).endsWith("/properties/featured")) return jsonResponse(200, []);
     return onChat(init);
   });
@@ -266,25 +287,25 @@ describe("input constraints", () => {
 });
 
 describe("suggestion chips", () => {
-  it("offers the three chips and sends the one clicked", () => {
+  it("offers the three chips and sends the one clicked", async () => {
     stubBackend();
     render(<ChatPanel />);
 
     for (const chip of SUGGESTION_CHIPS) {
-      expect(screen.getByRole("button", { name: chip })).toBeEnabled();
+      expect(await screen.findByRole("button", { name: chip })).toBeEnabled();
     }
 
-    fireEvent.click(screen.getByRole("button", { name: SUGGESTION_CHIPS[0] }));
+    fireEvent.click(await screen.findByRole("button", { name: SUGGESTION_CHIPS[0] }));
 
     expect(bodyOf(0).message).toBe(SUGGESTION_CHIPS[0]);
     expect(turns()[1]).toHaveTextContent(SUGGESTION_CHIPS[0]);
   });
 
-  it("hides the chips once the first message has been sent", () => {
+  it("hides the chips once the first message has been sent", async () => {
     stubBackend();
     render(<ChatPanel />);
 
-    expect(screen.getByRole("button", { name: SUGGESTION_CHIPS[0] })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: SUGGESTION_CHIPS[0] })).toBeInTheDocument();
 
     sendText("Hello");
 
@@ -356,7 +377,7 @@ describe("while a request is in flight", () => {
 });
 
 describe("when a turn fails", () => {
-  const failWith = (status: number) => () => jsonResponse(status, { detail: "nope" });
+  const failWith = (status: number) => () => streamResponse(status, "nope");
 
   it("keeps the message on screen and announces the failure", async () => {
     stubBackend(failWith(502));
@@ -399,7 +420,7 @@ describe("when a turn fails", () => {
 
   it("captures a callback request directly when chat is unavailable", async () => {
     fetchSpy = vi.fn(async (url: unknown, init: RequestInit = {}) => {
-      if (String(url).endsWith("/health")) return jsonResponse(200, { status: "ok" });
+      if (String(url).endsWith("/health")) return streamResponse(200, "");
       if (String(url).endsWith("/properties/featured")) return jsonResponse(200, []);
       if (String(url).endsWith("/chat")) return jsonResponse(502, { detail: "nope" });
       return jsonResponse(200, { captured: true });
@@ -490,7 +511,7 @@ describe("when a turn fails", () => {
     let attempt = 0;
     stubBackend(() => {
       attempt += 1;
-      return attempt === 1 ? jsonResponse(502, {}) : reply("All good now.");
+      return attempt === 1 ? streamResponse(502, "") : reply("All good now.");
     });
     render(<ChatPanel />);
 

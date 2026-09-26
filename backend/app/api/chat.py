@@ -6,8 +6,8 @@ failures an HTTP shape.
 """
 
 import logging
-from typing import Annotated, Protocol
-
+from typing import Annotated, Protocol, Iterator
+from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, Depends, HTTPException, status
 from google.genai import errors as genai_errors
 from sqlalchemy.exc import IntegrityError
@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.agent.client import SupportsGenerate, get_gemini_client
 from app.agent.loop import run_turn
 from app.db.session import get_db
-from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.chat import ChatRequest
 
 router = APIRouter(tags=["chat"])
 logger = logging.getLogger(__name__)
@@ -36,21 +36,14 @@ DbSession = Annotated[Session, Depends(get_db)]
 AgentClient = Annotated[SupportsGenerate, Depends(get_agent_client)]
 
 
-# Deliberately `def`, not `async def`. `run_turn` blocks on Gemini and Postgres for the
-# whole turn; under `async def` it would hold the event loop and serialise every concurrent
-# user. As a plain `def`, FastAPI runs it in the threadpool.
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat")
 def post_chat(
     payload: ChatRequest, db: DbSession, client: AgentClient
-) -> ChatResponse:
-    """Send one user message, get Amaya's complete reply."""
+):
+    """Send one user message, stream Amaya's reply."""
     try:
-        reply = _run_turn_handling_session_race(db, payload, client)
+        reply_stream = _run_turn_handling_session_race(db, payload, client)
     except genai_errors.APIError as exc:
-        # Transport, quota, and upstream 5xx. Retries and backoff stay out of scope on
-        # purpose (see loop.py's docstring) — this only gives the failure a status code.
-        # Note a *safety* block doesn't land here: it comes back as a candidate-less
-        # response, which the loop turns into FALLBACK_REPLY and a 200.
         logger.exception(
             "Gemini request failed while processing chat session %s",
             payload.session_id,
@@ -60,7 +53,15 @@ def post_chat(
             detail="The assistant is unavailable right now. Please try again.",
         ) from exc
 
-    return ChatResponse(reply=reply, session_id=payload.session_id)
+    def generator():
+        try:
+            for chunk in reply_stream:
+                yield chunk
+        except genai_errors.APIError as exc:
+            logger.exception("Gemini request failed during stream for chat session %s", payload.session_id)
+            yield "\n[Error: The assistant is unavailable right now. Please try again.]"
+
+    return StreamingResponse(generator(), media_type="text/plain")
 
 
 class TurnRunner(Protocol):
@@ -72,7 +73,7 @@ class TurnRunner(Protocol):
         session_id: str,
         user_message: str,
         client: SupportsGenerate | None = None,
-    ) -> str: ...
+    ) -> Iterator[str]: ...
 
 
 def _run_turn_handling_session_race(
@@ -80,7 +81,7 @@ def _run_turn_handling_session_race(
     payload: ChatRequest,
     client: SupportsGenerate,
     runner: TurnRunner = run_turn,
-) -> str:
+) -> Iterator[str]:
     """Run the turn, retrying once if a concurrent request created the conversation first.
 
     `conversations.session_id` is UNIQUE, so when two first requests for one session race,

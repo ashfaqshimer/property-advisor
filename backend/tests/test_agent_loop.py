@@ -11,7 +11,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agent import loop
-from app.agent.loop import MAX_TOOL_ITERATIONS, run_turn
+from app.agent.loop import MAX_TOOL_ITERATIONS
+from app.agent.loop import run_turn as _run_turn
+
+def run_turn(*args, **kwargs):
+    return "".join(_run_turn(*args, **kwargs))
 from app.agent.persona import GREETING
 from app.models import Conversation, Lead, Message, MessageRole
 from tests.agent_fakes import (

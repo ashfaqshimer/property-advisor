@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import uuid
 import structlog
-from typing import Any
+from typing import Any, Iterator
 
 from google.genai import types
 from sqlalchemy import func, select
@@ -148,8 +148,8 @@ def run_turn(
     session_id: str,
     user_message: str,
     client: SupportsGenerate | None = None,
-) -> str:
-    """Run one user turn to completion and return Amaya's reply.
+) -> Iterator[str]:
+    """Run one user turn to completion and return a generator of Amaya's reply.
 
     Persists the user message, every tool exchange, and the final assistant message, then
     commits. `client` is injectable so the suite can drive the whole loop from a scripted
@@ -199,75 +199,111 @@ def run_turn(
     contents = _replay(history)
     context = tools.ToolContext(db=db, conversation_id=conversation.id)
 
-    def finish(reply: str) -> str:
+    def finish(reply: str):
         record(MessageRole.ASSISTANT, content=reply)
         db.commit()
-        return reply
 
     for i in range(MAX_TOOL_ITERATIONS):
-        response = gemini.generate(
+        response_stream = gemini.generate_stream(
             contents=contents,
             tools=tools.TOOL_DECLARATIONS,
             system_instruction=build_system_prompt(db),
         )
-        usage = response.usage_metadata
-        logger.info(
-            "gemini_generate",
-            session_id=session_id,
-            iteration=i,
-            prompt_tokens=usage.prompt_token_count if usage else None,
-            candidates_tokens=usage.candidates_token_count if usage else None,
-            total_tokens=usage.total_token_count if usage else None,
-        )
-        parts = _parts_of(response)
-        calls = [part.function_call for part in parts if part.function_call]
-
-        if not calls:
-            # Plain text — the loop's exit. An empty or candidate-less response falls back
-            # rather than returning "" to the user.
-            reply = "".join(part.text for part in parts if part.text).strip()
-            if not reply:
-                logger.warning(
-                    "Gemini returned no usable text for chat session %s",
-                    session_id,
-                )
-            return finish(reply or FALLBACK_REPLY)
-
-        # The model's own turn goes back verbatim, so its function_call parts are echoed
-        # exactly as sent. A response carrying prose *and* a call keeps both.
-        contents.append(types.Content(role="model", parts=parts))
-        for part in parts:
-            if part.function_call:
+        
+        # We need to pull the first chunk to see if it's a function call
+        iterator = iter(response_stream)
+        try:
+            first_chunk = next(iterator)
+        except StopIteration:
+            finish(FALLBACK_REPLY)
+            yield FALLBACK_REPLY
+            return
+            
+        first_parts = _parts_of(first_chunk)
+        has_calls = any(part.function_call for part in first_parts)
+        
+        if has_calls:
+            # It's a tool-calling iteration. Exhaust the stream to get all calls/text.
+            all_chunks = [first_chunk]
+            for chunk in iterator:
+                all_chunks.append(chunk)
+                
+            parts = []
+            for chunk in all_chunks:
+                parts.extend(_parts_of(chunk))
+                
+            calls = [part.function_call for part in parts if part.function_call]
+            
+            # Record the model's tool calls
+            contents.append(types.Content(role="model", parts=parts))
+            for part in parts:
+                if part.function_call:
+                    record(
+                        MessageRole.ASSISTANT,
+                        payload={
+                            "function_call": {
+                                "name": part.function_call.name,
+                                "args": dict(part.function_call.args or {}),
+                            }
+                        },
+                    )
+                elif part.text:
+                    record(MessageRole.ASSISTANT, content=part.text)
+                    
+            # Execute the tools
+            response_parts: list[types.Part] = []
+            for call in calls:
+                name = call.name or ""
+                args = dict(call.args or {})
+                logger.info("tool_execution", tool=name, session_id=session_id)
+                result = tools.execute_tool(name, args, context)
                 record(
-                    MessageRole.ASSISTANT,
-                    payload={
-                        "function_call": {
-                            "name": part.function_call.name,
-                            "args": dict(part.function_call.args or {}),
-                        }
-                    },
+                    MessageRole.TOOL,
+                    payload={"function_response": {"name": name, "response": result}},
                 )
-            elif part.text:
-                record(MessageRole.ASSISTANT, content=part.text)
-
-        response_parts: list[types.Part] = []
-        for call in calls:
-            name = call.name or ""
-            args = dict(call.args or {})
-            logger.info("tool_execution", tool=name, session_id=session_id)
-            result = tools.execute_tool(name, args, context)
-            record(
-                MessageRole.TOOL,
-                payload={"function_response": {"name": name, "response": result}},
+                response_parts.append(
+                    types.Part.from_function_response(name=name, response=result)
+                )
+            contents.append(types.Content(role="user", parts=response_parts))
+            continue
+            
+        # If there are no function calls, it is a text reply to stream to the user.
+        full_reply = []
+        
+        def process_chunk(chunk):
+            p = _parts_of(chunk)
+            t = "".join(part.text for part in p if part.text)
+            if t:
+                full_reply.append(t)
+                return t
+            return ""
+            
+        t = process_chunk(first_chunk)
+        if t:
+            yield t
+            
+        for chunk in iterator:
+            t = process_chunk(chunk)
+            if t:
+                yield t
+                
+        final_text = "".join(full_reply).strip()
+        if not final_text:
+            logger.warning(
+                "Gemini returned no usable text for chat session %s",
+                session_id,
             )
-            response_parts.append(
-                types.Part.from_function_response(name=name, response=result)
-            )
-        contents.append(types.Content(role="user", parts=response_parts))
+            final_text = FALLBACK_REPLY
+            yield final_text
+            
+        finish(final_text)
+        return
 
     # Cap reached with the model still calling tools. Answer in prose rather than looping.
     logger.warning(
         "Gemini tool-call iteration cap reached for chat session %s",
         session_id,
     )
-    return finish(FALLBACK_REPLY)
+    finish(FALLBACK_REPLY)
+    yield FALLBACK_REPLY
+

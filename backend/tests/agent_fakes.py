@@ -107,6 +107,21 @@ class ScriptedGemini:
             f"only {len(self.responses)} were queued."
         )
 
+    def generate_stream(
+        self,
+        contents: list[types.Content],
+        tools: list[types.Tool],
+        system_instruction: str,
+    ) -> Any:
+        response = self.generate(contents, tools, system_instruction)
+        yield response
+
+    def count_tokens(
+        self,
+        contents: list[types.Content] | str,
+    ) -> int:
+        return 10
+
 
 def always_calls(name: str, args: dict[str, Any] | None = None) -> ScriptedGemini:
     """A model that will not stop calling a tool. Used to prove the cap holds."""

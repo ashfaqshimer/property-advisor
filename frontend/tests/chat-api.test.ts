@@ -29,6 +29,27 @@ const jsonResponse = (status: number, body: unknown) =>
     json: async () => body,
   }) as unknown as Response;
 
+const streamResponse = (status: number, text: string) => {
+  const encoder = new TextEncoder();
+  const chunks = [encoder.encode(text)];
+  let idx = 0;
+  
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    body: {
+      getReader: () => ({
+        read: async () => {
+          if (idx < chunks.length) {
+            return { done: false, value: chunks[idx++] };
+          }
+          return { done: true, value: undefined };
+        }
+      })
+    }
+  } as unknown as Response;
+};
+
 /** A rejection carrying the `name` the platform would use, which is all we branch on. */
 const named = (name: string) => Object.assign(new Error(name), { name });
 
@@ -63,7 +84,7 @@ afterEach(() => {
 describe("sendChatMessage request", () => {
   it("posts snake_case JSON to /chat", async () => {
     const fetchSpy = stubFetch(async () =>
-      jsonResponse(200, { reply: "Hi", session_id: "session-1" }),
+      streamResponse(200, "Hi"),
     );
 
     await send();
@@ -80,7 +101,7 @@ describe("sendChatMessage request", () => {
 
   it("returns the parsed reply and session id", async () => {
     stubFetch(async () =>
-      jsonResponse(200, { reply: "Two beds in Nugegoda.", session_id: "session-1" }),
+      streamResponse(200, "Two beds in Nugegoda."),
     );
 
     await expect(send()).resolves.toEqual({
@@ -92,7 +113,7 @@ describe("sendChatMessage request", () => {
   it("does not double the slash when the base URL has a trailing one", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", `${BASE}/`);
     const fetchSpy = stubFetch(async () =>
-      jsonResponse(200, { reply: "Hi", session_id: "s" }),
+      streamResponse(200, "Hi"),
     );
 
     await send();
@@ -102,7 +123,7 @@ describe("sendChatMessage request", () => {
 
   it("always attaches an abort signal, so no request can hang forever", async () => {
     const fetchSpy = stubFetch(async () =>
-      jsonResponse(200, { reply: "Hi", session_id: "s" }),
+      streamResponse(200, "Hi"),
     );
 
     await send();
@@ -138,7 +159,7 @@ describe("captureFallbackLead request", () => {
 describe("missing configuration", () => {
   it("names the variable instead of fetching undefined/chat", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "");
-    const fetchSpy = stubFetch(async () => jsonResponse(200, {}));
+    const fetchSpy = stubFetch(async () => streamResponse(200, ""));
 
     const error = await rejectionFrom(send());
 
@@ -150,14 +171,14 @@ describe("missing configuration", () => {
 
   it("treats a whitespace-only value as missing", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "   ");
-    stubFetch(async () => jsonResponse(200, {}));
+    stubFetch(async () => streamResponse(200, ""));
 
     expect((await rejectionFrom(send())).kind).toBe("config");
   });
 
   it("is not retryable — the same request would fail identically", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "");
-    stubFetch(async () => jsonResponse(200, {}));
+    stubFetch(async () => streamResponse(200, ""));
 
     expect((await rejectionFrom(send())).retryable).toBe(false);
   });
@@ -165,7 +186,7 @@ describe("missing configuration", () => {
 
 describe("error classification", () => {
   it("maps 502 to a retryable upstream failure", async () => {
-    stubFetch(async () => jsonResponse(502, { detail: "upstream" }));
+    stubFetch(async () => streamResponse(502, "upstream"));
 
     const error = await rejectionFrom(send());
     expect(error.kind).toBe("upstream");
@@ -174,7 +195,7 @@ describe("error classification", () => {
   });
 
   it("maps 503 to an unavailable backend that retrying cannot fix", async () => {
-    stubFetch(async () => jsonResponse(503, { detail: "no key" }));
+    stubFetch(async () => streamResponse(503, "no key"));
 
     const error = await rejectionFrom(send());
     expect(error.kind).toBe("unavailable");
@@ -184,14 +205,14 @@ describe("error classification", () => {
   });
 
   it("treats a 422 as our own bug, not a user error", async () => {
-    stubFetch(async () => jsonResponse(422, { detail: [] }));
+    stubFetch(async () => streamResponse(422, ""));
 
     // The input mirrors the backend's limits, so a 422 means the two have drifted.
     expect((await rejectionFrom(send())).kind).toBe("unexpected");
   });
 
   it("classifies an unlisted status rather than assuming a shape", async () => {
-    stubFetch(async () => jsonResponse(500, {}));
+    stubFetch(async () => streamResponse(500, ""));
 
     const error = await rejectionFrom(send());
     expect(error.kind).toBe("unexpected");
@@ -232,22 +253,7 @@ describe("error classification", () => {
     expect((await rejectionFrom(send())).kind).toBe("unexpected");
   });
 
-  it("rejects a 200 that isn't the shape we asked for", async () => {
-    stubFetch(async () => jsonResponse(200, { message: "wrong field" }));
 
-    // Better a named error than `undefined` rendered into a bubble as Amaya's reply.
-    expect((await rejectionFrom(send())).kind).toBe("unexpected");
-  });
-
-  it.each([null, "a bare string", 42])(
-    "rejects a body that isn't an object at all (%s)",
-    async (body) => {
-      stubFetch(async () => jsonResponse(200, body));
-
-      // `typeof null === "object"`, so the null case is the one a naive guard lets through.
-      expect((await rejectionFrom(send())).kind).toBe("unexpected");
-    },
-  );
 });
 
 describe("caller cancellation", () => {
@@ -311,7 +317,7 @@ describe("wakeBackend", () => {
 
   it("does nothing at all when the base URL is missing", () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "");
-    const fetchSpy = stubFetch(async () => jsonResponse(200, {}));
+    const fetchSpy = stubFetch(async () => streamResponse(200, ""));
 
     // The first real send is what reports the misconfiguration; this stays quiet.
     expect(() => wakeBackend()).not.toThrow();

@@ -39,6 +39,13 @@ EXPECTED_KEYS = {
     "created_at",
     "property_contact_id",
     "property_contact",
+    "is_gated_community",
+    "source_url",
+    "has_maids_toilet",
+    "prospect_id",
+    "source_platform",
+    "has_maids_room",
+    "source_id",
 }
 
 

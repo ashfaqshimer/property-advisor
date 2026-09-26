@@ -101,7 +101,7 @@ type Failure = {
  * to the viewport edge and then nudged down a beat later.
  */
 export default function ChatPanel() {
-  const [featuredProperties, setFeaturedProperties] = useState<Property[]>([]);
+  const [featuredProperties, setFeaturedProperties] = useState<Property[] | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: "greeting", role: "agent", text: GREETING },
   ]);
@@ -171,16 +171,36 @@ export default function ChatPanel() {
     setFallbackError(false);
     slowTimerRef.current = setTimeout(() => setSlow(true), SLOW_PENDING_AFTER_MS);
 
+    const agentMessageId = nextId("agent");
+
     try {
-      const response = await sendChatMessage({
+      await sendChatMessage({
         sessionId: sessionId(),
         message: text,
         signal: controller.signal,
+        onChunk: (chunk) => {
+          // Clear pending state as soon as we start receiving text
+          setPending(false);
+          setSlow(false);
+          if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
+          
+          setMessages((current) => {
+            const exists = current.some((m) => m.id === agentMessageId);
+            if (exists) {
+              return current.map((m) =>
+                m.id === agentMessageId ? { ...m, text: m.text + chunk } : m
+              );
+            }
+            return [...current, { id: agentMessageId, role: "agent", text: chunk }];
+          });
+        }
       });
-      setMessages((current) => [
-        ...current,
-        { id: nextId("agent"), role: "agent", text: response.reply },
-      ]);
+      
+      // If the response completed but we never got an onChunk (e.g. empty response)
+      // or if we did, the final state is already in `messages`. We just ensure 
+      // the empty fallback case is handled (sendChatMessage will return the text anyway,
+      // but onChunk would have fired).
+      
     } catch (error) {
       // Our own abort — the panel unmounted mid-request. There is nobody left to tell.
       if (controller.signal.aborted) return;
@@ -235,7 +255,7 @@ export default function ChatPanel() {
 
   const canSend = draft.trim().length > 0 && !pending;
   const hasStartedChat = messages.some((message) => message.role === "user");
-  const propertySuggestions = featuredProperties.map(
+  const propertySuggestions = (featuredProperties ?? []).map(
     (property) => `Tell me more about ${property.title} in ${property.location}`,
   );
   const suggestionChips = [
@@ -425,17 +445,26 @@ export default function ChatPanel() {
         /* `items-start` shrink-wraps each pill to its label, as in the mockup;
             `max-w-full` keeps the longest one inside the panel at 375px. */
         <div className="flex shrink-0 flex-col items-start gap-2 px-4 pb-4">
-          {suggestionChips.map((chip) => (
-            <button
-              key={chip}
-              type="button"
-              onClick={() => submit(chip)}
-              disabled={pending}
-              className="max-w-full rounded-full border border-neutral-200 px-3.5 py-2 text-left text-xs text-muted hover:bg-band-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-            >
-              {chip}
-            </button>
-          ))}
+          {featuredProperties === null ? (
+            <>
+              <div className="h-[34px] w-64 animate-pulse rounded-full bg-neutral-200" />
+              <div className="h-[34px] w-80 animate-pulse rounded-full bg-neutral-200" />
+              <div className="h-[34px] w-72 animate-pulse rounded-full bg-neutral-200" />
+              <div className="h-[34px] w-56 animate-pulse rounded-full bg-neutral-200" />
+            </>
+          ) : (
+            suggestionChips.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => submit(chip)}
+                disabled={pending}
+                className="max-w-full rounded-full border border-neutral-200 px-3.5 py-2 text-left text-xs text-muted hover:bg-band-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+              >
+                {chip}
+              </button>
+            ))
+          )}
         </div>
       )}
 
