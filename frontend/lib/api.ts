@@ -221,6 +221,7 @@ export type ScannerSettingsConfigField = {
   property_types: string[];
   last_run_at?: string | null;
   last_run_status?: string | null;
+  next_run_at?: string | null;
 };
 
 export type SiteConfiguration = {

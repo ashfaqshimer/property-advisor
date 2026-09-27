@@ -324,15 +324,50 @@ export default function SiteConfigurationPage() {
             </div>
           </div>
           
-          {siteConfig.scanner_settings?.last_run_at && (
-            <div className="rounded-lg bg-gray-50 dark:bg-zinc-900 p-4 border border-gray-100 dark:border-zinc-800">
-              <h3 className="text-sm font-medium mb-2">Last Scan Report</h3>
-              <div className="text-sm text-[#64736b] dark:text-zinc-400 space-y-1">
-                <p><span className="font-medium text-black dark:text-zinc-200">Time:</span> {new Date(siteConfig.scanner_settings.last_run_at).toLocaleString()}</p>
-                <p><span className="font-medium text-black dark:text-zinc-200">Status:</span> {siteConfig.scanner_settings.last_run_status || "Completed"}</p>
-              </div>
+          <div className="rounded-lg bg-gray-50 dark:bg-zinc-900 p-4 border border-gray-100 dark:border-zinc-800">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-black dark:text-zinc-200">Scanner Schedule & Status</h3>
+              {siteConfig.scanner_settings?.enabled ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Scheduled
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                  Disabled
+                </span>
+              )}
             </div>
-          )}
+            <div className="text-sm text-[#64736b] dark:text-zinc-400 space-y-1.5">
+              <p>
+                <span className="font-medium text-black dark:text-zinc-200">Next Scan:</span>{" "}
+                {siteConfig.scanner_settings?.enabled
+                  ? siteConfig.scanner_settings?.next_run_at
+                    ? new Date(siteConfig.scanner_settings.next_run_at).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })
+                    : "Scheduled on next restart"
+                  : "Not scheduled (scanner disabled)"}
+              </p>
+              {siteConfig.scanner_settings?.last_run_at && (
+                <>
+                  <p>
+                    <span className="font-medium text-black dark:text-zinc-200">Last Scan:</span>{" "}
+                    {new Date(siteConfig.scanner_settings.last_run_at).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </p>
+                  <p>
+                    <span className="font-medium text-black dark:text-zinc-200">Last Status:</span>{" "}
+                    {siteConfig.scanner_settings.last_run_status || "Completed"}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
           
           <button
             type="button"

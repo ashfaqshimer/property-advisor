@@ -2,7 +2,7 @@ import structlog
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import select
 from sqlalchemy.orm.attributes import flag_modified
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.db.session import SessionLocal
 from app.models.site_configuration import SiteConfiguration
@@ -18,6 +18,59 @@ logger = structlog.get_logger()
 
 # Global scheduler instance
 scheduler = BackgroundScheduler()
+
+def get_next_scan_time() -> datetime | None:
+    """Returns the next scheduled run time of the scanner job, if any."""
+    try:
+        job = scheduler.get_job('property_scanner_job')
+        if job and job.next_run_time:
+            return job.next_run_time
+    except Exception:
+        pass
+    return None
+
+def schedule_property_scanner(freq_hours: int, last_run_at_str: str | None = None) -> datetime | None:
+    """Schedule the background property scanner with intelligent next_run_time calculation."""
+    now = datetime.now(timezone.utc)
+    next_run_time = None
+
+    if last_run_at_str:
+        try:
+            last_run = datetime.fromisoformat(last_run_at_str.replace("Z", "+00:00"))
+            if last_run.tzinfo is None:
+                last_run = last_run.replace(tzinfo=timezone.utc)
+            target = last_run + timedelta(hours=freq_hours)
+            if target <= now:
+                next_run_time = now
+            else:
+                next_run_time = target
+        except Exception:
+            next_run_time = now + timedelta(hours=freq_hours)
+    else:
+        next_run_time = now + timedelta(hours=freq_hours)
+
+    job = scheduler.add_job(
+        run_property_scanner,
+        'interval',
+        hours=freq_hours,
+        id='property_scanner_job',
+        replace_existing=True,
+        next_run_time=next_run_time,
+        coalesce=True,
+        misfire_grace_time=3600,
+    )
+    logger.info(
+        "property_scanner.scheduled",
+        hours=freq_hours,
+        next_run=job.next_run_time.isoformat() if job.next_run_time else None
+    )
+    return job.next_run_time
+
+def remove_property_scanner():
+    """Removes the property scanner job from the scheduler if present."""
+    if scheduler.get_job('property_scanner_job'):
+        scheduler.remove_job('property_scanner_job')
+        logger.info("property_scanner.unscheduled")
 
 def run_property_scanner():
     """The background task that performs the scanning."""
@@ -81,6 +134,9 @@ def run_property_scanner():
         
         settings["last_run_at"] = datetime.now(timezone.utc).isoformat()
         settings["last_run_status"] = new_job.progress
+        next_time = get_next_scan_time()
+        if next_time:
+            settings["next_run_at"] = next_time.isoformat()
         config.scanner_settings = settings
         flag_modified(config, "scanner_settings")
         session.commit()
@@ -108,17 +164,26 @@ def init_scheduler():
         settings = config.scanner_settings
         if settings.get("enabled"):
             freq = settings.get("frequency_hours", 24)
-            scheduler.add_job(
-                run_property_scanner,
-                'interval',
-                hours=freq,
-                id='property_scanner_job',
-                replace_existing=True
-            )
-            logger.info("property_scanner.scheduled", hours=freq)
+            last_run = settings.get("last_run_at")
+            next_run = schedule_property_scanner(freq, last_run)
+            if next_run:
+                try:
+                    with SessionLocal() as session:
+                        result = session.execute(select(SiteConfiguration).limit(1))
+                        cfg = result.scalar_one_or_none()
+                        if cfg:
+                            s = dict(cfg.scanner_settings or {})
+                            s["next_run_at"] = next_run.isoformat()
+                            cfg.scanner_settings = s
+                            flag_modified(cfg, "scanner_settings")
+                            session.commit()
+                except Exception as e:
+                    logger.warning("init_scheduler.save_next_run_failed", error=str(e))
 
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.start()
 
 def shutdown_scheduler():
     """Shuts down the scheduler."""
-    scheduler.shutdown()
+    if scheduler.running:
+        scheduler.shutdown()

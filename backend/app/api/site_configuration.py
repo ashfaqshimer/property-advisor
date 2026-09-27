@@ -6,11 +6,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.auth import RootStaffUser
 from app.db.session import get_db
 from app.models.site_configuration import SiteConfiguration
 from app.schemas.site_configuration import SiteConfigurationResponse, SiteConfigurationUpdate
-from app.services.scanner_scheduler import scheduler, run_property_scanner
+from app.services.scanner_scheduler import (
+    get_next_scan_time,
+    remove_property_scanner,
+    schedule_property_scanner,
+)
 
 router = APIRouter(prefix="/site-configuration", tags=["site-configuration"])
 admin_router = APIRouter(prefix="/admin/site-configuration", tags=["admin-site-configuration"])
@@ -30,6 +36,15 @@ def get_site_configuration(db: DbSession) -> SiteConfiguration:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Site configuration not found."
         )
+    if config.scanner_settings:
+        settings = dict(config.scanner_settings)
+        if not settings.get("enabled"):
+            settings["next_run_at"] = None
+        else:
+            next_run = get_next_scan_time()
+            if next_run:
+                settings["next_run_at"] = next_run.isoformat()
+        config.scanner_settings = settings
     return config
 
 
@@ -51,19 +66,19 @@ def update_site_configuration(
     db.refresh(config)
 
     if payload.scanner_settings is not None:
-        settings = payload.scanner_settings.model_dump()
-        job_id = 'property_scanner_job'
+        settings = dict(config.scanner_settings or {})
         if settings.get("enabled"):
             freq = settings.get("frequency_hours", 24)
-            scheduler.add_job(
-                run_property_scanner,
-                'interval',
-                hours=freq,
-                id=job_id,
-                replace_existing=True
-            )
+            last_run = settings.get("last_run_at")
+            next_run = schedule_property_scanner(freq, last_run)
+            settings["next_run_at"] = next_run.isoformat() if next_run else None
         else:
-            if scheduler.get_job(job_id):
-                scheduler.remove_job(job_id)
+            remove_property_scanner()
+            settings["next_run_at"] = None
+
+        config.scanner_settings = settings
+        flag_modified(config, "scanner_settings")
+        db.commit()
+        db.refresh(config)
 
     return config

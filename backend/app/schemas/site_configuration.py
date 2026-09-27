@@ -22,6 +22,7 @@ class ScannerSettingsConfigField(BaseModel):
     property_types: list[str] = Field(default_factory=lambda: ["house", "apartment"])
     last_run_at: datetime | None = None
     last_run_status: str | None = None
+    next_run_at: datetime | None = None
 
 
 class SiteConfigurationBase(BaseModel):
