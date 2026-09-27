@@ -297,7 +297,11 @@ export default function ChatPanel() {
       id="chat"
       aria-label="AI agent chat"
       tabIndex={-1}
-      className="flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:sticky lg:top-panel-inset lg:h-panel-max lg:max-h-panel-max"
+      className={`flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand transition-[height] duration-300 ease-in-out lg:sticky lg:top-panel-inset lg:max-h-panel-max ${
+        !hasStartedChat
+          ? "lg:h-[calc(var(--spacing-panel-max)-3rem)]"
+          : "lg:h-[calc(var(--spacing-panel-max)-11rem)]"
+      }`}
     >
       <AnimatePresence mode="wait" initial={false}>
         {!hasStartedChat ? (
@@ -310,17 +314,17 @@ export default function ChatPanel() {
             transition={{ duration: 0.25 }}
             className="shrink-0 border-b border-brand/10 bg-gradient-to-b from-agent-bubble via-agent-bubble/40 to-surface p-6 text-center backdrop-blur-xs"
           >
-            <div className="relative mx-auto size-32 shrink-0">
+            <div className="relative mx-auto size-36 shrink-0">
               <Image
                 src="/images/amaya_avatar.png"
                 alt="Amaya Perera"
-                width={128}
-                height={128}
+                width={144}
+                height={144}
                 priority
-                className="size-32 rounded-full object-cover ring-4 ring-brand/15 shadow-md transition-transform duration-300 hover:scale-[1.02]"
+                className="size-36 rounded-full object-cover ring-4 ring-brand/15 shadow-md transition-transform duration-300 hover:scale-[1.02]"
               />
               <span
-                className="absolute bottom-1 right-2.5 flex size-4 items-center justify-center rounded-full bg-white ring-2 ring-white"
+                className="absolute bottom-1.5 right-3 flex size-4 items-center justify-center rounded-full bg-white ring-2 ring-white"
                 aria-hidden="true"
               >
                 <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 duration-1000 ${statusColor}`} />
