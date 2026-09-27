@@ -39,6 +39,7 @@ hide exactly the flakiness worth measuring first.
 
 from __future__ import annotations
 
+import time
 import uuid
 import structlog
 from typing import Any, Iterator
@@ -204,6 +205,7 @@ def run_turn(
         db.commit()
 
     for i in range(MAX_TOOL_ITERATIONS):
+        call_start = time.perf_counter()
         response_stream = gemini.generate_stream(
             contents=contents,
             tools=tools.TOOL_DECLARATIONS,
@@ -215,6 +217,13 @@ def run_turn(
         try:
             first_chunk = next(iterator)
         except StopIteration:
+            duration_ms = (time.perf_counter() - call_start) * 1000
+            logger.warning(
+                "gemini_empty_response",
+                session_id=session_id,
+                iteration=i,
+                duration_ms=round(duration_ms, 2),
+            )
             finish(FALLBACK_REPLY)
             yield FALLBACK_REPLY
             return
@@ -222,8 +231,17 @@ def run_turn(
         all_parts = []
         calls = []
         full_text = ""
+        prompt_tokens = None
+        candidates_tokens = None
+        total_tokens = None
         
         for chunk in [first_chunk] + list(iterator):
+            usage = getattr(chunk, "usage_metadata", None)
+            if usage:
+                prompt_tokens = getattr(usage, "prompt_token_count", prompt_tokens)
+                candidates_tokens = getattr(usage, "candidates_token_count", candidates_tokens)
+                total_tokens = getattr(usage, "total_token_count", total_tokens)
+
             parts = _parts_of(chunk)
             all_parts.extend(parts)
             for part in parts:
@@ -232,6 +250,18 @@ def run_turn(
                 elif part.text:
                     full_text += part.text
                     yield part.text
+        
+        duration_ms = (time.perf_counter() - call_start) * 1000
+        logger.info(
+            "gemini_turn",
+            session_id=session_id,
+            iteration=i,
+            duration_ms=round(duration_ms, 2),
+            prompt_tokens=prompt_tokens,
+            candidates_tokens=candidates_tokens,
+            total_tokens=total_tokens,
+            tool_calls_count=len(calls),
+        )
         
         if calls:
             if full_text:

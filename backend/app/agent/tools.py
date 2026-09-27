@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+import structlog
 from google.genai import types
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,6 +47,8 @@ from app.models.prospect import Prospect
 SEARCH_PROPERTIES = "search_properties"
 GET_PROPERTY_DETAILS = "get_property_details"
 CAPTURE_LEAD = "capture_lead"
+
+logger = structlog.get_logger()
 
 # Repeated to the model in the tool response itself, not just the system prompt. See the
 # module docstring for why the duplication is intentional.
@@ -473,6 +476,18 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         lead.interested_property_id = property_id
 
     context.db.flush()
+
+    logger.info(
+        "lead_captured",
+        conversation_id=str(context.conversation_id),
+        created=created,
+        has_name=bool(lead.name),
+        has_phone=bool(lead.phone),
+        is_complete=bool(lead.name and lead.phone),
+        intent=lead.intent.value if lead.intent else None,
+        interest=lead.interest.value if lead.interest else None,
+        has_budget=bool(lead.budget_min or lead.budget_max),
+    )
 
     still_missing = [
         field

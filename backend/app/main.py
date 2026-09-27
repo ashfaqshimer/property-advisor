@@ -22,13 +22,26 @@ from fastapi import Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from slowapi import _rate_limit_exceeded_handler
+import uuid
 from slowapi.errors import RateLimitExceeded
 
 from app.db.session import get_db
-from app.limiter import limiter
+from app.limiter import get_client_ip, limiter
 from app.services.scanner_scheduler import init_scheduler, shutdown_scheduler
 
 settings = get_settings()
+
+if settings.sentry_dsn:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.app_environment,
+            traces_sample_rate=0.1,
+        )
+        logger.info("sentry_initialized", environment=settings.app_environment)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sentry_init_failed", error=str(exc))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,12 +57,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    client_ip = get_client_ip(request)
     start_time = time.time()
     response = await call_next(request)
     duration_ms = (time.time() - start_time) * 1000
-    
+    response.headers["x-request-id"] = request_id
+
     logger.info(
         "http_request",
+        request_id=request_id,
+        client_ip=client_ip,
         method=request.method,
         path=request.url.path,
         status_code=response.status_code,

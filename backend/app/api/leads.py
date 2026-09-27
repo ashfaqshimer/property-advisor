@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
+import structlog
 from app.db.session import get_db
 from app.auth import CurrentStaffUser
 from app.limiter import limiter
@@ -25,6 +25,7 @@ from app.schemas.lead import (
 
 router = APIRouter(prefix="/admin/leads", tags=["admin-leads"])
 public_router = APIRouter(tags=["leads"])
+logger = structlog.get_logger()
 DbSession = Annotated[Session, Depends(get_db)]
 
 
@@ -45,6 +46,14 @@ def _capture_fallback_lead(
     if not lead.remarks:
         lead.remarks = "Chat was unavailable when this callback request was submitted."
     db.commit()
+
+    logger.info(
+        "fallback_lead_captured",
+        conversation_id=str(conversation.id),
+        session_id=payload.session_id,
+        has_name=bool(lead.name),
+        has_phone=bool(lead.phone),
+    )
     return FallbackLeadResponse()
 
 
