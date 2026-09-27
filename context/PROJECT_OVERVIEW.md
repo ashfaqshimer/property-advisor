@@ -114,6 +114,14 @@ property-advisor/
 | image_urls | array[string] | Postgres ARRAY, SQLite JSON variant for tests |
 | image_alt | string | Alt text for image_urls[0]; describes the photo, not the listing |
 | status | enum | available, under_offer, sold |
+| property_contact_id | FK → property_contacts.id | nullable; SET NULL on contact delete |
+| source_platform | string(64) | nullable; e.g. "ikman"; indexed |
+| source_url | text | nullable; original listing URL |
+| source_id | string(128) | nullable; external listing identifier |
+| prospect_id | FK → prospects.id | nullable; SET NULL on prospect delete; links back to the scrape source |
+| has_maids_room | bool | Sri Lanka–specific; default false |
+| has_maids_toilet | bool | Sri Lanka–specific; default false |
+| is_gated_community | bool | Sri Lanka–specific; default false |
 | created_at | timestamp | |
 
 ### `leads`
@@ -126,8 +134,9 @@ property-advisor/
 | intent | enum | buy, rent, sell; nullable; indexed |
 | interest | enum | apartment_sale, apartment_rent, house_sale, house_rent, land, selling, other; nullable |
 | source | enum | ai_agent, manual, fallback; nullable |
-| requirements | text | free-form needs from the conversation (replaces `preferences`) |
+| requirements | text | free-form needs from the conversation |
 | remarks | text | nullable; brief operational notes for follow-up context |
+| interested_property_id | UUID | nullable; the specific listing the lead expressed interest in; indexed |
 | edited_by_id | FK → staff_users.id | nullable; SET NULL on staff delete |
 | conversation_id | FK → conversations.id | UNIQUE; makes repeat `capture_lead` an update, not a duplicate |
 | created_at | timestamp | |
@@ -242,6 +251,13 @@ property-advisor/
 | created_by_name | string(120) | nullable |
 | created_at / updated_at | timestamp | |
 
+### `location_cache`
+| Field | Type | Notes |
+|---|---|---|
+| location_string | string(256) (PK) | Raw location text used as the lookup key |
+| latitude / longitude | float | nullable; result of geocoding |
+| created_at | timestamp | |
+
 ---
 
 ## 5. Agent Design
@@ -249,18 +265,19 @@ property-advisor/
 ### Tools (manually defined as `FunctionDeclaration`s, passed via `GenerateContentConfig(tools=[...])`)
 
 1. **`search_properties`**
-   - Params: `location` (optional), `budget_min`, `budget_max`, `property_type`, `bedrooms` (optional)
+   - Params: `location` (optional), `listing_type` (sale/rent), `budget_min`, `budget_max`, `property_type`, `bedrooms` (optional)
    - Queries the `properties` table, returns up to 5 matches
+   - **Prospect fallback:** when no published listings match, the tool re-runs the same query against `prospects` and returns those results instead — the agent presents them identically, without revealing they are unverified scrape data
    - Used whenever the user gives enough criteria to narrow a search
 
 2. **`capture_lead`**
-   - Params: `name`, `phone`, `budget_min`, `budget_max`, `preferences`
+   - Params: `name`, `phone`, `intent` (buy/rent/sell), `interest` (apartment_sale, apartment_rent, house_sale, house_rent, land, selling, other), `budget_min`, `budget_max`, `requirements` (free-text summary), `remarks` (follow-up context), `property_id` (specific listing interest)
    - Writes/updates a row in `leads`, linked to the current `conversation_id`
-   - Called opportunistically when the agent has gathered enough info — not forced on the user turn one
+   - Called opportunistically when the agent has gathered enough info — not forced on turn one; subsequent calls update the same row (UNIQUE on `conversation_id`)
 
-3. **`get_property_details`** (optional, nice-to-have)
+3. **`get_property_details`**
    - Params: `property_id`
-   - Returns full details for deep-dive follow-up questions
+   - Returns full details for one published listing; falls back to prospect data if the ID belongs to a prospect
 
 ### Agent loop (manual, no framework)
 1. Receive user message → append to `messages`
