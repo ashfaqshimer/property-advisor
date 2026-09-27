@@ -542,6 +542,13 @@ def execute_tool(
     except ToolArgumentError as exc:
         return {"error": str(exc)}
     except Exception as exc:  # noqa: BLE001 - deliberate catch-all; see docstring
+        logger.exception(
+            "tool_execution_failed",
+            tool=name,
+            args=args,
+            error=str(exc),
+            exc_info=exc,
+        )
         return {
             "error": f"{name} failed: {type(exc).__name__}.",
             "guidance": (
