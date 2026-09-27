@@ -299,44 +299,44 @@ export default function ChatPanel() {
       tabIndex={-1}
       className="flex scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:sticky lg:top-panel-inset lg:max-h-panel-max"
     >
-      <div className="flex shrink-0 items-center gap-4 border-b border-neutral-200/70 bg-gradient-to-b from-band-strong/85 to-band-strong/60 px-5 py-4 backdrop-blur-xs">
-        <div className="relative shrink-0">
-          <Image
-            src="/images/amaya_avatar_compressed.png"
-            alt=""
-            width={56}
-            height={56}
-            aria-hidden="true"
-            className="size-14 rounded-full object-cover ring-2 ring-brand/15 shadow-sm"
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="font-display text-base font-semibold leading-tight text-ink">
+      <div className="shrink-0 border-b border-neutral-200/80 bg-gradient-to-b from-band-strong/85 to-band-strong/50 px-5 py-4 backdrop-blur-xs">
+        <div className="flex items-center gap-4">
+          <div className="relative shrink-0">
+            <Image
+              src="/images/amaya_avatar_compressed.png"
+              alt=""
+              width={64}
+              height={64}
+              aria-hidden="true"
+              className="size-16 rounded-full object-cover ring-2 ring-brand/20 shadow-sm"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-lg font-semibold leading-tight text-ink">
               Amaya Perera
             </p>
-            <span className="rounded-full border border-brand/20 bg-brand/5 px-2 py-0.5 text-[0.6875rem] font-medium text-brand">
+            <p className="mt-0.5 text-xs font-medium text-brand">
               Property Specialist
-            </span>
+            </p>
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+              <span className="relative flex size-1.5 shrink-0" aria-hidden="true">
+                <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 duration-1000 ${statusColor}`} />
+                <span className={`relative inline-flex size-1.5 rounded-full ${statusColor}`} />
+              </span>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={statusText}
+                  initial={{ opacity: 0, y: 2 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -2 }}
+                  transition={{ duration: 0.15 }}
+                  className="inline-block truncate"
+                >
+                  {statusText}
+                </motion.span>
+              </AnimatePresence>
+            </p>
           </div>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-            <span className="relative flex size-1.5 shrink-0" aria-hidden="true">
-              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 duration-1000 ${statusColor}`} />
-              <span className={`relative inline-flex size-1.5 rounded-full ${statusColor}`} />
-            </span>
-            <AnimatePresence mode="wait">
-              <motion.span
-                key={statusText}
-                initial={{ opacity: 0, y: 2 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -2 }}
-                transition={{ duration: 0.15 }}
-                className="inline-block truncate"
-              >
-                {statusText}
-              </motion.span>
-            </AnimatePresence>
-          </p>
         </div>
       </div>
 
