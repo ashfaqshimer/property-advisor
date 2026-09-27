@@ -299,20 +299,20 @@ export default function ChatPanel() {
       tabIndex={-1}
       className="flex scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:sticky lg:top-panel-inset lg:max-h-panel-max"
     >
-      <div className="flex shrink-0 items-center gap-3.5 border-b border-neutral-200/60 bg-band-strong/70 px-5 py-3.5 backdrop-blur-xs">
-        <div className="shrink-0">
+      <div className="flex shrink-0 items-center gap-4 border-b border-neutral-200/70 bg-gradient-to-b from-band-strong/85 to-band-strong/60 px-5 py-4 backdrop-blur-xs">
+        <div className="relative shrink-0">
           <Image
             src="/images/amaya_avatar_compressed.png"
             alt=""
-            width={48}
-            height={48}
+            width={56}
+            height={56}
             aria-hidden="true"
-            className="size-12 rounded-full object-cover ring-2 ring-white/90 shadow-2xs"
+            className="size-14 rounded-full object-cover ring-2 ring-brand/15 shadow-sm"
           />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="font-display text-[0.9375rem] font-semibold leading-tight text-ink">
+            <p className="font-display text-base font-semibold leading-tight text-ink">
               Amaya Perera
             </p>
             <span className="rounded-full border border-brand/20 bg-brand/5 px-2 py-0.5 text-[0.6875rem] font-medium text-brand">
