@@ -36,7 +36,6 @@ describe("PropertyGrid", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Featured properties" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Handpicked for you")).toBeInTheDocument();
     expect(screen.getByText(/A curated selection across Colombo/)).toBeInTheDocument();
   });
 
@@ -46,6 +45,38 @@ describe("PropertyGrid", () => {
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(
       FEATURED_PROPERTIES.length,
     );
+  });
+
+  it("renders accessible navigation controls for the carousel", () => {
+    render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
+
+    expect(
+      screen.getByRole("button", { name: "Previous properties" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Next properties" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Pause auto-slide" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders progress segment tabs for each listing plus the concierge card", () => {
+    render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(FEATURED_PROPERTIES.length + 1);
+  });
+
+  it("renders an off-market concierge end-cap card linking to chat", () => {
+    render(<PropertyGridContent properties={FEATURED_PROPERTIES} />);
+
+    expect(screen.getByText("Off-Market Concierge")).toBeInTheDocument();
+    expect(
+      screen.getByText("Looking for something specific?"),
+    ).toBeInTheDocument();
+    const chatLink = screen.getByRole("link", { name: /Ask Amaya to match/ });
+    expect(chatLink).toHaveAttribute("href", "#chat");
   });
 });
 
