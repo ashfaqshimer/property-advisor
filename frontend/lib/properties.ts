@@ -28,6 +28,7 @@ export type Property = {
   imageUrl: string | null;
   /** Describes the photo, not the listing — the title is already adjacent. */
   imageAlt: string;
+  listingType: "sale" | "rent";
 };
 
 export function formatPrice(price: number, currency: "LKR"): string {
@@ -49,6 +50,7 @@ export function mapProperty(record: PropertyApiRecord): Property {
     sqft: record.floor_area_sqft,
     imageUrl: record.image_urls[0] ?? null,
     imageAlt: record.image_alt,
+    listingType: record.listing_type,
   };
 }
 
@@ -70,6 +72,7 @@ export const FEATURED_PROPERTIES: Property[] = [
     imageUrl: photo("1613490493576-7fde63acd811"),
     imageAlt:
       "Two-storey white villa with a timber-lined upper deck beside a long lap pool",
+    listingType: "sale",
   },
   {
     id: "havelock-residences",
@@ -84,6 +87,7 @@ export const FEATURED_PROPERTIES: Property[] = [
     imageUrl: photo("1545324418-cc1a3fa10c00"),
     imageAlt:
       "Upper floors and balconies of a contemporary apartment building at dusk",
+    listingType: "sale",
   },
   {
     id: "courtyard-townhouse",
@@ -98,6 +102,7 @@ export const FEATURED_PROPERTIES: Property[] = [
     imageUrl: photo("1600585154340-be6161a56a0c"),
     imageAlt:
       "Dark timber-clad townhouse set back behind a mature tree and clipped lawn",
+    listingType: "sale",
   },
   {
     id: "skyline-penthouse",
@@ -112,6 +117,7 @@ export const FEATURED_PROPERTIES: Property[] = [
     imageUrl: photo("1600607687939-ce8a6c25118c"),
     imageAlt:
       "Open-plan living room with a timber feature wall and full-height glazing onto a terrace",
+    listingType: "sale",
   },
   {
     id: "restored-colonial-retreat",
@@ -126,6 +132,7 @@ export const FEATURED_PROPERTIES: Property[] = [
     imageUrl: photo("1570129477492-45c003edd2be"),
     imageAlt:
       "Grey clapboard colonial house with a white wraparound veranda and front lawn",
+    listingType: "sale",
   },
   {
     id: "hillside-bungalow",
@@ -139,6 +146,7 @@ export const FEATURED_PROPERTIES: Property[] = [
     imageUrl: photo("1568605114967-8130f3a36994"),
     imageAlt:
       "Gabled timber house lit from within at dusk, framed by a wooded hillside",
+    listingType: "sale",
   },
   {
     id: "poolside-garden-house",
@@ -152,6 +160,7 @@ export const FEATURED_PROPERTIES: Property[] = [
     imageUrl: photo("1512917774080-9991f1c4c750"),
     imageAlt:
       "Single-storey white villa with sliding glass doors opening onto a pool terrace",
+    listingType: "sale",
   },
   {
     id: "beachside-terrace-house",
@@ -165,5 +174,6 @@ export const FEATURED_PROPERTIES: Property[] = [
     imageUrl: photo("1564013799919-ab600027ffc6"),
     imageAlt:
       "White two-storey house with balconies and palms above a curved pool",
+    listingType: "sale",
   },
 ];

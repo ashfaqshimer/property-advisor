@@ -39,6 +39,7 @@ hide exactly the flakiness worth measuring first.
 
 from __future__ import annotations
 
+import json
 import time
 import uuid
 import structlog
@@ -59,6 +60,24 @@ from app.models.message import Message, MessageRole
 # that this number bounds the cost of one misbehaving conversation.
 MAX_TOOL_ITERATIONS = 5
 logger = structlog.get_logger()
+
+# Sentinel character used to frame status events in the text stream. NUL (\x00) cannot
+# appear in valid UTF-8 prose, so it will never collide with real reply text.
+_STATUS_SEP = "\x00"
+
+# Human-sounding hints emitted before a tool-call iteration. Rotated by iteration index so
+# a two-call turn (search → reply) doesn't repeat the same line twice.
+_STATUS_HINTS = [
+    "Just a sec\u2026",
+    "One moment\u2026",
+    "Checking that for you\u2026",
+    "Bear with me\u2026",
+]
+
+
+def _status_event(text: str) -> str:
+    """Wrap a status hint as a null-delimited JSON line for the stream."""
+    return _STATUS_SEP + json.dumps({"type": "status", "text": text}) + _STATUS_SEP
 
 
 def get_or_create_conversation(db: Session, session_id: str) -> Conversation:
@@ -280,7 +299,7 @@ def run_turn(
                     )
                 elif part.text:
                     record(MessageRole.ASSISTANT, content=part.text)
-                    
+
             # Execute the tools
             response_parts: list[types.Part] = []
             for call in calls:
@@ -296,6 +315,12 @@ def run_turn(
                     types.Part.from_function_response(name=name, response=result)
                 )
             contents.append(types.Content(role="user", parts=response_parts))
+
+            # Emit a status hint so the frontend can show a contextual indicator while
+            # we spin up the next Gemini call. The hint is chosen by iteration index so
+            # successive calls rotate through the list rather than repeating.
+            hint = _STATUS_HINTS[(i + 1) % len(_STATUS_HINTS)]
+            yield _status_event(hint)
             continue
             
         # If there are no function calls, it is a text reply to stream to the user.

@@ -53,19 +53,20 @@ export const AGENT_STATUS_LINE = "Online · replies might take a few seconds";
 export const PENDING_LABEL = "Amaya is typing…";
 
 /**
- * Swapped in once a request has been slow enough to look broken. A cold start can run ~22s and
- * a tool-calling turn was measured at 30s on its own, so silence here reads as a dead panel
- * rather than a waking one.
- *
- * Deliberately commits to no number. An earlier draft said "up to half a minute", which the
- * measurements above then contradicted — and a pending message that under-promises is worse
- * than one that stays vague.
+ * Shown in the typing bubble once the backend emits a status event (tool call in progress).
+ * Human-sounding so it feels like Amaya thinking, not a loading spinner.
  */
-export const SLOW_PENDING_LABEL =
-  "This is taking a little longer than usual…";
+export const STATUS_HINT_DEFAULT = "Just a sec\u2026";
 
-/** Spec calls for roughly 8–10s: long enough that a warm turn (4–11s) usually never shows it. */
-export const SLOW_PENDING_AFTER_MS = 9_000;
+/**
+ * Fallback slow label — only shown when no status event has arrived within the threshold
+ * (e.g. cold start or pre-tool latency). Raised to 20s: a single tool-calling turn was
+ * measured at 16–30s, so 9s was triggering on nearly every search. Kept vague — no ETA.
+ */
+export const SLOW_PENDING_LABEL = "This one's taking a moment\u2026";
+
+/** Raised from 9s: warm tool-call turns hit 16–30s, so 9s was too eager. */
+export const SLOW_PENDING_AFTER_MS = 20_000;
 
 /**
  * What the visitor is told when a turn fails, keyed by the classification `lib/api.ts` made.

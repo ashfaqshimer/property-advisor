@@ -28,7 +28,7 @@ class GoogleGeocoder:
         if not self.api_key:
             raise GeocodingError("Google Maps API key is not configured")
 
-        params = urlencode({"address": location, "key": self.api_key})
+        params = urlencode({"address": location, "components": "country:LK", "key": self.api_key})
         request = Request(
             f"https://maps.googleapis.com/maps/api/geocode/json?{params}",
             headers={"Accept": "application/json"},
@@ -45,8 +45,17 @@ class GoogleGeocoder:
         if status != "OK":
             raise GeocodingError(f"Google Maps geocoding returned {status!r}")
 
+        results = payload.get("results") or []
+        if not results:
+            return None
+
+        first = results[0]
+        types_set = set(first.get("types", []))
+        if types_set == {"country", "political"} and "sri lanka" not in location.lower():
+            return None
+
         try:
-            location_data = payload["results"][0]["geometry"]["location"]
+            location_data = first["geometry"]["location"]
             latitude = float(location_data["lat"])
             longitude = float(location_data["lng"])
         except (IndexError, KeyError, TypeError, ValueError) as exc:

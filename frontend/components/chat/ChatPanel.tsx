@@ -11,6 +11,7 @@ import {
   MAX_MESSAGE_LENGTH,
   sendChatMessage,
   wakeBackend,
+  type ChatStatusEvent,
 } from "@/lib/api";
 import {
   AGENT_STATUS_LINE,
@@ -19,6 +20,7 @@ import {
   PENDING_LABEL,
   SLOW_PENDING_AFTER_MS,
   SLOW_PENDING_LABEL,
+  STATUS_HINT_DEFAULT,
   SPEAKER_LABELS,
   SELLING_SUGGESTION,
   type ChatMessage,
@@ -77,6 +79,8 @@ export default function ChatPanel() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [pending, setPending] = useState(false);
   const [slow, setSlow] = useState(false);
+  /** Text hint received from a backend status event; null = show animated dots. */
+  const [statusHint, setStatusHint] = useState<string | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [fallbackName, setFallbackName] = useState("");
   const [fallbackPhone, setFallbackPhone] = useState("");
@@ -127,6 +131,7 @@ export default function ChatPanel() {
     setFallbackSubmitted(false);
     setFallbackError(false);
     setIsReading(true);
+    setStatusHint(null);
     
     const startGenerating = () => {
       if (controller.signal.aborted) return;
@@ -134,6 +139,7 @@ export default function ChatPanel() {
       setIsGenerating(true);
       setPending(true);
       setSlow(false);
+      setStatusHint(null);
       slowTimerRef.current = setTimeout(() => setSlow(true), SLOW_PENDING_AFTER_MS);
     };
 
@@ -152,12 +158,21 @@ export default function ChatPanel() {
         sessionId: sessionId(),
         message: text,
         signal: controller.signal,
+        onStatus: (event: ChatStatusEvent) => {
+          if (controller.signal.aborted) return;
+          // A status event means a tool call is in flight. Show the hint text and
+          // cancel the slow timer — the backend is clearly alive and working.
+          if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
+          setSlow(false);
+          setStatusHint(event.text || STATUS_HINT_DEFAULT);
+        },
         onChunk: (chunk) => {
           clearTimeout(pendingTimer);
           setIsReading(false);
           setIsGenerating(true);
           setPending(false);
           setSlow(false);
+          setStatusHint(null);
           if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current);
           
           setMessages((current) => {
@@ -200,6 +215,7 @@ export default function ChatPanel() {
         setIsGenerating(false);
         setPending(false);
         setSlow(false);
+        setStatusHint(null);
       }
     }
   }, []);
@@ -338,7 +354,22 @@ export default function ChatPanel() {
               className="flex justify-start origin-bottom-left"
             >
               <p className="max-w-[85%] rounded-2xl rounded-bl-md bg-agent-bubble px-3.5 py-2.5 text-sm leading-relaxed text-ink">
-                {slow ? (
+                {statusHint ? (
+                  // Backend told us it's doing a tool call — show a human hint.
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={statusHint}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="inline-block text-muted"
+                    >
+                      {statusHint}
+                    </motion.span>
+                  </AnimatePresence>
+                ) : slow ? (
+                  // Fallback: no status event yet but the slow timer fired.
                   <span className="text-muted">{SLOW_PENDING_LABEL}</span>
                 ) : (
                   <>

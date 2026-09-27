@@ -543,22 +543,76 @@ function classifyStatus(status: number): ChatError {
 }
 
 /**
- * Send one turn and wait for Amaya's complete reply. There is no streaming — one request,
- * one whole answer.
+ * Status event emitted by the backend mid-turn to signal tool-call activity.
+ * Framed with NUL sentinels so it can never be confused with real reply text.
+ */
+export type ChatStatusEvent = { type: "status"; text: string };
+
+/** The NUL character used to delimit status events in the plain-text stream. */
+const STATUS_SEP = "\x00";
+
+/**
+ * Extract all complete \x00{...}\x00 status blocks from `raw`, call `onStatus` for each
+ * one, and return the remainder (reply text with sentinels stripped).
+ */
+function extractStatusEvents(
+  raw: string,
+  onStatus?: (event: ChatStatusEvent) => void,
+): string {
+  if (!raw.includes(STATUS_SEP)) return raw;
+
+  const parts = raw.split(STATUS_SEP);
+  let clean = "";
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    // Odd-indexed parts are the content between sentinel pairs.
+    if (i % 2 === 1) {
+      if (onStatus && part) {
+        try {
+          const parsed = JSON.parse(part) as unknown;
+          if (
+            typeof parsed === "object" &&
+            parsed !== null &&
+            (parsed as Record<string, unknown>).type === "status" &&
+            typeof (parsed as Record<string, unknown>).text === "string"
+          ) {
+            onStatus(parsed as ChatStatusEvent);
+          }
+        } catch {
+          // Malformed sentinel — treat as plain text rather than crashing.
+          clean += part;
+        }
+      }
+    } else {
+      clean += part;
+    }
+  }
+
+  return clean;
+}
+
+/**
+ * Send one turn and stream Amaya's reply chunk by chunk.
  *
  * `signal` is for the caller's own cancellation (an unmount); the timeout is added on top,
  * so the request ends at whichever fires first.
+ *
+ * `onChunk` receives only real reply text — status events are stripped and forwarded to
+ * `onStatus` instead.
  */
 export async function sendChatMessage({
   sessionId,
   message,
   signal,
   onChunk,
+  onStatus,
 }: {
   sessionId: string;
   message: string;
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
+  onStatus?: (event: ChatStatusEvent) => void;
 }): Promise<ChatResponse> {
   const url = `${baseUrl()}/chat`;
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -590,19 +644,20 @@ export async function sendChatMessage({
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (value) {
-        const chunk = decoder.decode(value, { stream: !done });
-        if (chunk) {
-          fullReply += chunk;
-          if (onChunk) onChunk(chunk);
-        }
-      } else if (done) {
-        const chunk = decoder.decode();
-        if (chunk) {
-          fullReply += chunk;
-          if (onChunk) onChunk(chunk);
+      const rawChunk = value
+        ? decoder.decode(value, { stream: !done })
+        : done
+          ? decoder.decode()
+          : "";
+
+      if (rawChunk) {
+        const clean = extractStatusEvents(rawChunk, onStatus);
+        if (clean) {
+          fullReply += clean;
+          if (onChunk) onChunk(clean);
         }
       }
+
       if (done) break;
     }
   } catch (error) {

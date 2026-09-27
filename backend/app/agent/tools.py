@@ -330,27 +330,44 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
         budget_min, budget_max = budget_max, budget_min
 
     location = _clean_text(args.get("location"), 120)
-    coordinates = None
-    if location:
-        settings = get_settings()
-        if settings.google_maps_api_key:
-            try:
-                coordinates = GoogleGeocoder(settings.google_maps_api_key).geocode(location)
-            except GeocodingError:
-                coordinates = None
+    listing_type = _as_listing_type(args.get("listing_type"))
+    property_type = _as_property_type(args.get("property_type"))
+    bedrooms = _as_int(args.get("bedrooms"), "bedrooms")
 
-    matches = queries.search_properties(
-        context.db,
-        location=location,
-        budget_min=budget_min,
-        budget_max=budget_max,
-        listing_type=_as_listing_type(args.get("listing_type")),
-        property_type=_as_property_type(args.get("property_type")),
-        bedrooms=_as_int(args.get("bedrooms"), "bedrooms"),
-        latitude=coordinates.latitude if coordinates else None,
-        longitude=coordinates.longitude if coordinates else None,
-        radius_km=get_settings().location_search_radius_km if coordinates else None,
-    )
+    matches = []
+    if location:
+        matches = queries.search_properties(
+            context.db,
+            location=location,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            listing_type=listing_type,
+            property_type=property_type,
+            bedrooms=bedrooms,
+        )
+
+    coordinates = None
+    if not matches:
+        if location:
+            settings = get_settings()
+            if settings.google_maps_api_key:
+                try:
+                    coordinates = GoogleGeocoder(settings.google_maps_api_key).geocode(location)
+                except GeocodingError:
+                    coordinates = None
+
+        matches = queries.search_properties(
+            context.db,
+            location=location,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            listing_type=listing_type,
+            property_type=property_type,
+            bedrooms=bedrooms,
+            latitude=coordinates.latitude if coordinates else None,
+            longitude=coordinates.longitude if coordinates else None,
+            radius_km=get_settings().location_search_radius_km if coordinates else None,
+        )
 
     if not matches:
         prospects = queries.search_prospects(
@@ -577,8 +594,11 @@ _SEARCH_DECLARATION = types.FunctionDeclaration(
             "location": types.Schema(
                 type=types.Type.STRING,
                 description=(
-                    "Area, neighborhood, landmark, or city. Nearby listings are included: "
-                    "'Havelock City', 'Bambalapitiya', 'Colombo 5', 'Rajagiriya', or 'Galle'."
+                    "Neighbourhood, district, or city — not a property name. "
+                    "Extract the area from what the user said: 'Colombo 5', "
+                    "'Bambalapitiya', 'Rajagiriya', 'Galle'. "
+                    "If the user only named a building or development (e.g. 'Havelock Residences'), "
+                    "pass it here verbatim — the search checks both titles and areas."
                 ),
             ),
             "budget_min": types.Schema(
@@ -597,7 +617,11 @@ _SEARCH_DECLARATION = types.FunctionDeclaration(
             "listing_type": types.Schema(
                 type=types.Type.STRING,
                 enum=["sale", "rent"],
-                description="Whether the listing is for sale or rent.",
+                description=(
+                    "'sale' if the user is buying, 'rent' if renting. "
+                    "OMIT this field entirely if the user has not indicated whether "
+                    "they want to buy or rent — do not guess."
+                ),
             ),
             "bedrooms": types.Schema(
                 type=types.Type.INTEGER,

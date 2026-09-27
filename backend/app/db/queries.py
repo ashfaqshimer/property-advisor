@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Sequence
 from decimal import Decimal
 
-from sqlalchemy import cast, func, select
+from sqlalchemy import case, cast, func, select
 from sqlalchemy.types import UserDefinedType
 from sqlalchemy.orm import Session
 
@@ -103,11 +103,18 @@ def search_properties(
         search_point = cast(
             func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326), Geography()
         )
-        stmt = stmt.where(
-            func.ST_DWithin(property_point, search_point, radius_km * 1000)
-        )
+        geo_match = func.ST_DWithin(property_point, search_point, radius_km * 1000)
+        if location:
+            term = f"%{location.strip()}%"
+            text_match = Property.title.ilike(term) | Property.location.ilike(term)
+            stmt = stmt.where(geo_match | text_match)
+        else:
+            stmt = stmt.where(geo_match)
     elif location:
-        stmt = stmt.where(Property.location.ilike(f"%{location.strip()}%"))
+        term = f"%{location.strip()}%"
+        stmt = stmt.where(
+            Property.title.ilike(term) | Property.location.ilike(term)
+        )
     if budget_min is not None:
         stmt = stmt.where(Property.price >= budget_min)
     if budget_max is not None:
@@ -119,7 +126,18 @@ def search_properties(
     if bedrooms is not None:
         stmt = stmt.where(Property.bedrooms >= bedrooms)
 
-    stmt = stmt.order_by(Property.created_at.desc(), Property.id).limit(limit)
+    if location:
+        term = f"%{location.strip()}%"
+        text_priority = case(
+            (Property.title.ilike(term), 0),
+            (Property.location.ilike(term), 1),
+            else_=2,
+        )
+        stmt = stmt.order_by(text_priority, Property.created_at.desc(), Property.id)
+    else:
+        stmt = stmt.order_by(Property.created_at.desc(), Property.id)
+
+    stmt = stmt.limit(limit)
     return db.execute(stmt).scalars().all()
 
 

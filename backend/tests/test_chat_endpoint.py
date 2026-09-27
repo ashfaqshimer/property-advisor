@@ -51,6 +51,11 @@ def _post(client: TestClient, message: str, session_id: str = SESSION):
     return client.post("/chat", json={"session_id": session_id, "message": message})
 
 
+def _clean(text: str) -> str:
+    import re
+    return re.sub(r"\x00[^\x00]*\x00", "", text).lstrip()
+
+
 def test_returns_the_reply_and_echoes_the_session(chat_client) -> None:
     client = chat_client(ScriptedGemini(responses=[text_response("Happy to help.")]))
 
@@ -110,7 +115,7 @@ def test_tool_call_path_runs_end_to_end(chat_client, seeded: Session) -> None:
     response = _post(client, "Anything in Galle?")
 
     assert response.status_code == 200
-    assert response.text == "I have a colonial retreat in Galle Fort."
+    assert _clean(response.text) == "I have a colonial retreat in Galle Fort."
     assert fake.call_count == 2
 
     roles = _message_roles(seeded)
@@ -134,7 +139,7 @@ def test_iteration_cap_returns_the_fallback_not_an_error(
     response = _post(client, "Show me everything")
 
     assert response.status_code == 200
-    assert response.text == FALLBACK_REPLY
+    assert _clean(response.text) == FALLBACK_REPLY
     assert _message_roles(seeded).count(MessageRole.ASSISTANT) >= 1
 
 
