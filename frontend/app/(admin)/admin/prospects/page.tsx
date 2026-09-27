@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X } from "lucide-react";
 
 import {
   Prospect,
@@ -39,6 +39,23 @@ export default function ProspectsPage() {
   const [propertyType, setPropertyType] = useState<string>("all");
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedSearch(value), 350);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+  };
   
   // Scan State
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
@@ -123,9 +140,9 @@ export default function ProspectsPage() {
 
   const fetchProspects = async () => {
     setLoading(true);
-    
-    let property_type = propertyType === "all" ? undefined : propertyType;
-    let listing_type = transactionType;
+
+    const property_type = propertyType === "all" ? undefined : propertyType;
+    const listing_type = transactionType;
 
     try {
       const data = await getProspects({
@@ -133,7 +150,8 @@ export default function ProspectsPage() {
         property_type,
         listing_type,
         page,
-        page_size: 25
+        page_size: 25,
+        q: debouncedSearch || undefined,
       });
       setProspects(data.items);
       setTotalPages(data.total_pages);
@@ -146,7 +164,7 @@ export default function ProspectsPage() {
 
   useEffect(() => {
     fetchProspects();
-  }, [filterStatus, transactionType, propertyType, page]);
+  }, [filterStatus, transactionType, propertyType, page, debouncedSearch]);
 
   const refreshActiveJobs = async () => {
     try {
@@ -355,8 +373,31 @@ export default function ProspectsPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-4 border-b border-[#dce4df] dark:border-zinc-800 pb-4">
+      {/* Filters + Search */}
+      <div className="mt-8 flex flex-col gap-4 border-b border-[#dce4df] dark:border-zinc-800 pb-4">
+        {/* Search bar */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#718078] dark:text-zinc-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Search by location, title or contact name…"
+            className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-950 pl-9 pr-9 py-2 text-sm outline-none focus:border-[#28513f] dark:focus:border-emerald-600 placeholder:text-[#a0aba4] dark:placeholder:text-zinc-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-white cursor-pointer transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter row */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-center gap-2 text-sm shrink-0">
           <Filter className="h-4 w-4 text-[#718078] dark:text-zinc-400" />
           <span className="font-medium text-[#1a2923] dark:text-zinc-200">Filters</span>
@@ -440,6 +481,7 @@ export default function ProspectsPage() {
               Land
             </button>
           )}
+        </div>
         </div>
       </div>
 
@@ -616,8 +658,8 @@ export default function ProspectsPage() {
           </table>
         </div>
         
-        {/* Pagination */}
-        {totalPages > 1 && (
+        {/* Pagination — hidden in search mode */}
+        {!debouncedSearch && totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-[#dce4df] dark:border-zinc-800 px-6 py-4">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -636,6 +678,17 @@ export default function ProspectsPage() {
             >
               Next
             </button>
+          </div>
+        )}
+        {/* Search mode: show result count instead of pagination */}
+        {debouncedSearch && !loading && (
+          <div className="flex items-center border-t border-[#dce4df] dark:border-zinc-800 px-6 py-3">
+            <span className="text-xs text-[#64736b] dark:text-zinc-400">
+              {prospects.length === 0
+                ? `No results for "${debouncedSearch}"`
+                : `${prospects.length} result${prospects.length !== 1 ? "s" : ""} for "${debouncedSearch}"`
+              }
+            </span>
           </div>
         )}
       </div>

@@ -866,14 +866,18 @@ export type PaginatedProspects = {
   total_pages: number;
 };
 
-export async function getProspects(filters?: { status?: string; property_type?: string; listing_type?: string; page?: number; page_size?: number }): Promise<PaginatedProspects> {
+export async function getProspects(filters?: { status?: string; property_type?: string; listing_type?: string; page?: number; page_size?: number; q?: string }): Promise<PaginatedProspects> {
   const params = new URLSearchParams();
   if (filters?.status) params.append("status", filters.status);
   if (filters?.property_type) params.append("property_type", filters.property_type);
   if (filters?.listing_type) params.append("listing_type", filters.listing_type);
-  if (filters?.page) params.append("page", filters.page.toString());
-  if (filters?.page_size) params.append("page_size", filters.page_size.toString());
-  
+  if (filters?.q) params.append("q", filters.q);
+  // Skip page/page_size when q is present — backend handles that
+  if (!filters?.q) {
+    if (filters?.page) params.append("page", filters.page.toString());
+    if (filters?.page_size) params.append("page_size", filters.page_size.toString());
+  }
+
   const qs = params.toString() ? `?${params.toString()}` : "";
   const response = await fetch(`${baseUrl()}/admin/prospects${qs}`, {
     method: "GET",

@@ -519,29 +519,68 @@ def list_prospects(
     status: str | None = None,
     property_type: str | None = None,
     listing_type: str | None = None,
+    q: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> Any:
     stmt = select(Prospect).where(Prospect.classification == "owner")
-    
+
     if status:
         stmt = stmt.where(Prospect.status == status)
     if property_type:
         stmt = stmt.where(Prospect.property_type == property_type)
     if listing_type:
         stmt = stmt.where(Prospect.listing_type == listing_type)
-        
+
+    if q:
+        # Trigram fuzzy search: use the pg_trgm `%` similarity operator across
+        # location, title, and poster_name.  Fallback to ILIKE so that short
+        # tokens (< 3 chars) which trgm ignores still return substring matches.
+        term = q.strip()
+        trgm_match = (
+            Prospect.location.op("%")(term)
+            | Prospect.title.op("%")(term)
+            | Prospect.poster_name.op("%")(term)
+        )
+        ilike_match = (
+            Prospect.location.ilike(f"%{term}%")
+            | Prospect.title.ilike(f"%{term}%")
+            | Prospect.poster_name.ilike(f"%{term}%")
+        )
+        stmt = stmt.where(trgm_match | ilike_match)
+
+        # In search mode, bypass normal pagination; return flat results (max 100)
+        # ordered by best trigram match on location first, then date.
+        similarity_score = (
+            func.greatest(
+                func.similarity(Prospect.location, term),
+                func.similarity(Prospect.title, term),
+                func.coalesce(func.similarity(Prospect.poster_name, term), 0.0),
+            )
+        )
+        stmt = stmt.order_by(similarity_score.desc(), Prospect.first_seen_at.desc())
+
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = db.execute(count_stmt).scalar_one()
+        items = db.execute(stmt.limit(100)).scalars().all()
+        return {
+            "items": items,
+            "total": total,
+            "page": 1,
+            "page_size": 100,
+            "total_pages": 1,
+        }
+
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = db.execute(count_stmt).scalar_one()
-    
+
     stmt = stmt.order_by(Prospect.first_seen_at.desc())
-        
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    
+
     items = db.execute(stmt).scalars().all()
-    
+
     total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
-    
+
     return {
         "items": items,
         "total": total,
