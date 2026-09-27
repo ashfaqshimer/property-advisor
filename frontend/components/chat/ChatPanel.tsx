@@ -297,53 +297,117 @@ export default function ChatPanel() {
       id="chat"
       aria-label="AI agent chat"
       tabIndex={-1}
-      className="flex scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:sticky lg:top-panel-inset lg:max-h-panel-max"
+      className="flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:sticky lg:top-panel-inset lg:h-panel-max lg:max-h-panel-max"
     >
-      <div className="shrink-0 border-b border-neutral-200/80 bg-gradient-to-b from-band-strong/85 to-band-strong/50 px-5 py-4 backdrop-blur-xs">
-        <div className="flex items-center gap-4">
-          <div className="relative shrink-0">
-            <Image
-              src="/images/amaya_avatar_compressed.png"
-              alt=""
-              width={64}
-              height={64}
-              aria-hidden="true"
-              className="size-16 rounded-full object-cover ring-2 ring-brand/20 shadow-sm"
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-lg font-semibold leading-tight text-ink">
-              Amaya Perera
-            </p>
-            <p className="mt-0.5 text-xs font-medium text-brand">
-              Property Specialist
-            </p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-              <span className="relative flex size-1.5 shrink-0" aria-hidden="true">
+      <AnimatePresence mode="wait" initial={false}>
+        {!hasStartedChat ? (
+          /* Showcase Card before conversation begins */
+          <motion.div
+            key="showcase-header"
+            initial={{ opacity: 0, height: "auto" }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="shrink-0 border-b border-brand/10 bg-gradient-to-b from-agent-bubble via-agent-bubble/40 to-surface p-6 text-center backdrop-blur-xs"
+          >
+            <div className="relative mx-auto size-32 shrink-0">
+              <Image
+                src="/images/amaya_avatar.png"
+                alt="Amaya Perera"
+                width={128}
+                height={128}
+                priority
+                className="size-32 rounded-full object-cover ring-4 ring-brand/15 shadow-md transition-transform duration-300 hover:scale-[1.02]"
+              />
+              <span
+                className="absolute bottom-1 right-2.5 flex size-4 items-center justify-center rounded-full bg-white ring-2 ring-white"
+                aria-hidden="true"
+              >
                 <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 duration-1000 ${statusColor}`} />
-                <span className={`relative inline-flex size-1.5 rounded-full ${statusColor}`} />
+                <span className={`relative inline-flex size-3 rounded-full ${statusColor}`} />
               </span>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={statusText}
-                  initial={{ opacity: 0, y: 2 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.15 }}
-                  className="inline-block truncate"
+            </div>
+            <div className="mt-3">
+              <p className="font-display text-xl font-bold leading-tight text-ink">
+                Amaya Perera
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-brand tracking-wide">
+                Property Specialist
+              </p>
+              <p className="mt-2 text-xs text-muted">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={statusText}
+                    initial={{ opacity: 0, y: 2 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    transition={{ duration: 0.15 }}
+                    className="inline-block truncate"
+                  >
+                    {statusText}
+                  </motion.span>
+                </AnimatePresence>
+              </p>
+            </div>
+          </motion.div>
+        ) : (
+          /* Compact Header during active conversation */
+          <motion.div
+            key="compact-header"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="shrink-0 border-b border-brand/10 bg-gradient-to-b from-agent-bubble/80 to-surface px-5 py-4 backdrop-blur-xs"
+          >
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                <Image
+                  src="/images/amaya_avatar.png"
+                  alt="Amaya Perera"
+                  width={64}
+                  height={64}
+                  aria-hidden="true"
+                  className="size-16 rounded-full object-cover ring-2 ring-brand/20 shadow-sm"
+                />
+                <span
+                  className="absolute bottom-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-white ring-2 ring-white"
+                  aria-hidden="true"
                 >
-                  {statusText}
-                </motion.span>
-              </AnimatePresence>
-            </p>
-          </div>
-        </div>
-      </div>
+                  <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 duration-1000 ${statusColor}`} />
+                  <span className={`relative inline-flex size-2.5 rounded-full ${statusColor}`} />
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-display text-lg font-semibold leading-tight text-ink">
+                  Amaya Perera
+                </p>
+                <p className="mt-0.5 text-xs font-medium text-brand">
+                  Property Specialist
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={statusText}
+                      initial={{ opacity: 0, y: 2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -2 }}
+                      transition={{ duration: 0.15 }}
+                      className="inline-block truncate"
+                    >
+                      {statusText}
+                    </motion.span>
+                  </AnimatePresence>
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ul
         aria-label="Conversation with Amaya"
         aria-live="polite"
-        className="flex min-h-96 flex-col gap-3 px-4 py-4 lg:flex-1 lg:overflow-y-auto overflow-x-hidden scrollbar-subtle"
+        className="flex flex-1 min-h-0 flex-col gap-3 px-4 py-4 lg:flex-1 lg:overflow-y-auto overflow-x-hidden scrollbar-subtle"
       >
         <AnimatePresence initial={false}>
           {messages.map((message) => {
