@@ -297,11 +297,7 @@ export default function ChatPanel() {
       id="chat"
       aria-label="AI agent chat"
       tabIndex={-1}
-      className={`flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand transition-[height] duration-300 ease-in-out lg:sticky lg:top-panel-inset lg:max-h-panel-max ${
-        !hasStartedChat
-          ? "lg:h-[calc(var(--spacing-panel-max)-3rem)]"
-          : "lg:h-[calc(var(--spacing-panel-max)-11rem)]"
-      }`}
+      className="flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand transition-[height] duration-300 ease-in-out lg:sticky lg:top-panel-inset lg:max-h-panel-max lg:h-[760px]"
     >
       <AnimatePresence mode="wait" initial={false}>
         {!hasStartedChat ? (
