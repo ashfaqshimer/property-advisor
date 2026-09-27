@@ -249,6 +249,28 @@ describe("sending a message", () => {
     expect(sendButton()).toHaveAttribute("type", "submit");
     expect(form).toContainElement(sendButton());
   });
+
+  it("submits the message when pressing Enter without Shift", () => {
+    stubBackend(() => deferred().promise);
+    render(<ChatPanel />);
+
+    fireEvent.change(input(), { target: { value: "Colombo 3 apartment" } });
+    fireEvent.keyDown(input(), { key: "Enter", shiftKey: false });
+
+    expect(turns()[1]).toHaveTextContent("Colombo 3 apartment");
+    expect(input()).toHaveValue("");
+  });
+
+  it("does not submit the message when pressing Shift + Enter", () => {
+    stubBackend();
+    render(<ChatPanel />);
+
+    fireEvent.change(input(), { target: { value: "Line 1" } });
+    fireEvent.keyDown(input(), { key: "Enter", shiftKey: true });
+
+    expect(chatCalls()).toHaveLength(0);
+    expect(input()).toHaveValue("Line 1");
+  });
 });
 
 describe("input constraints", () => {

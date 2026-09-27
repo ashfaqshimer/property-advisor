@@ -94,6 +94,15 @@ export default function ChatPanel() {
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listEndRef = useRef<HTMLLIElement | null>(null);
   const hasRenderedRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(Math.max(textarea.scrollHeight, 24), 140);
+    textarea.style.height = `${nextHeight}px`;
+  }, []);
 
   /** Lazy so it never runs on the server, where `crypto.randomUUID` would be pointless. */
   const sessionId = () => (sessionIdRef.current ??= crypto.randomUUID());
@@ -220,6 +229,17 @@ export default function ChatPanel() {
     }
   }, []);
 
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [draft, adjustTextareaHeight]);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      submit(draft);
+    }
+  };
+
   const submit = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || pending) return;
@@ -227,6 +247,9 @@ export default function ChatPanel() {
     const id = nextId("user");
     setMessages((current) => [...current, { id, role: "user", text: trimmed }]);
     setDraft("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
     void runTurn(trimmed, id);
   };
 
@@ -462,39 +485,30 @@ export default function ChatPanel() {
       )}
 
       <div className="shrink-0 border-t border-neutral-200 px-4 py-3">
-        {/*
-          A real <form>, which is what makes Enter send with no keydown handler of our own,
-          and what lets the browser own the semantics of a submit button.
-        */}
         <form
           onSubmit={(event) => {
             event.preventDefault();
             submit(draft);
           }}
-          className="flex items-center gap-2 rounded-full border border-neutral-200 py-1.5 pr-1.5 pl-4"
+          className="flex items-end gap-2 rounded-2xl border border-neutral-200 bg-surface px-3.5 py-2 transition-colors focus-within:border-brand focus-within:ring-1 focus-within:ring-brand"
         >
-          {/* No visible label in the mockup, and a placeholder is not a name. */}
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
+            rows={1}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleKeyDown}
             disabled={pending}
-            /* Mirrors the backend's own limit, so its 422 is unreachable from the UI. */
             maxLength={MAX_MESSAGE_LENGTH}
             aria-label="Ask Amaya"
             placeholder="Ask about a neighbourhood, budget, or style…"
-            /*
-              The panel column is ~300px at `lg`, too narrow for the full
-              placeholder. `text-ellipsis` is what makes it trail off cleanly
-              instead of being sliced mid-word against the send button.
-            */
-            className="min-w-0 flex-1 bg-transparent text-sm text-ellipsis text-ink placeholder:text-muted focus:outline-none disabled:opacity-60"
+            className="min-w-0 flex-1 resize-none bg-transparent py-0.5 text-sm leading-relaxed text-ink placeholder:text-muted focus:outline-none disabled:opacity-60 overflow-y-auto max-h-32"
           />
           <button
             type="submit"
             disabled={!canSend}
             aria-label="Send message"
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-green-600 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-green-600 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50 transition-opacity mb-0.5"
           >
             <SendIcon />
           </button>
