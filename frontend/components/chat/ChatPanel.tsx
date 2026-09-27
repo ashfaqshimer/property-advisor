@@ -297,27 +297,33 @@ export default function ChatPanel() {
       id="chat"
       aria-label="AI agent chat"
       tabIndex={-1}
-      className="flex scroll-mt-panel-inset flex-col overflow-hidden rounded-xl border border-neutral-200 bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:sticky lg:top-panel-inset lg:max-h-panel-max"
+      className="flex scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:sticky lg:top-panel-inset lg:max-h-panel-max"
     >
-      <div className="flex shrink-0 items-center gap-3 bg-band-strong px-5 py-4">
-        <Image
-          src="/images/amaya_avatar_compressed.png"
-          alt=""
-          width={48}
-          height={48}
-          aria-hidden="true"
-          className="size-12 shrink-0 rounded-full object-cover"
-        >
-        </Image>
+      <div className="flex shrink-0 items-center gap-3.5 border-b border-neutral-200/60 bg-band-strong/70 px-5 py-3.5 backdrop-blur-xs">
+        <div className="shrink-0">
+          <Image
+            src="/images/amaya_avatar_compressed.png"
+            alt=""
+            width={48}
+            height={48}
+            aria-hidden="true"
+            className="size-12 rounded-full object-cover ring-2 ring-white/90 shadow-2xs"
+          />
+        </div>
         <div className="min-w-0">
-          <p className="font-display text-[0.9375rem] leading-tight text-ink">
-            Amaya Perera
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-display text-[0.9375rem] font-semibold leading-tight text-ink">
+              Amaya Perera
+            </p>
+            <span className="rounded-full border border-brand/20 bg-brand/5 px-2 py-0.5 text-[0.6875rem] font-medium text-brand">
+              Property Specialist
+            </span>
+          </div>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-            <span
-              aria-hidden="true"
-              className={`size-1.5 shrink-0 rounded-full ${statusColor}`}
-            />
+            <span className="relative flex size-1.5 shrink-0" aria-hidden="true">
+              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 duration-1000 ${statusColor}`} />
+              <span className={`relative inline-flex size-1.5 rounded-full ${statusColor}`} />
+            </span>
             <AnimatePresence mode="wait">
               <motion.span
                 key={statusText}
@@ -325,7 +331,7 @@ export default function ChatPanel() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -2 }}
                 transition={{ duration: 0.15 }}
-                className="inline-block"
+                className="inline-block truncate"
               >
                 {statusText}
               </motion.span>
@@ -337,7 +343,7 @@ export default function ChatPanel() {
       <ul
         aria-label="Conversation with Amaya"
         aria-live="polite"
-        className="flex min-h-96 flex-col gap-3 px-4 py-4 lg:flex-1 lg:overflow-y-auto overflow-x-hidden"
+        className="flex min-h-96 flex-col gap-3 px-4 py-4 lg:flex-1 lg:overflow-y-auto overflow-x-hidden scrollbar-subtle"
       >
         <AnimatePresence initial={false}>
           {messages.map((message) => {
@@ -444,7 +450,7 @@ export default function ChatPanel() {
                 <button
                   type="submit"
                   disabled={!fallbackPhone.trim() || fallbackPending}
-                  className="self-start rounded-full bg-green-600 px-3 py-1.5 font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50"
+                  className="self-start rounded-full bg-brand px-3.5 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed transition-colors"
                 >
                   {fallbackPending ? "Sending…" : "Request a call"}
                 </button>
@@ -475,16 +481,19 @@ export default function ChatPanel() {
                 type="button"
                 onClick={() => submit(chip)}
                 disabled={pending}
-                className="max-w-full rounded-full border border-neutral-200 px-3.5 py-2 text-left text-xs text-muted hover:bg-band-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                className="group flex max-w-full items-center gap-2 rounded-full border border-neutral-200/90 bg-white/70 px-3.5 py-1.5 text-left text-xs font-medium text-muted transition-all hover:border-brand/40 hover:bg-white hover:text-ink hover:shadow-2xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                {chip}
+                <span className="text-brand/60 group-hover:text-brand transition-colors text-[0.6875rem]" aria-hidden="true">
+                  ✦
+                </span>
+                <span className="truncate">{chip}</span>
               </button>
             ))
           )}
         </div>
       )}
 
-      <div className="shrink-0 border-t border-neutral-200 px-4 py-3">
+      <div className="shrink-0 border-t border-neutral-200/80 px-4 py-3">
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -502,13 +511,13 @@ export default function ChatPanel() {
             maxLength={MAX_MESSAGE_LENGTH}
             aria-label="Ask Amaya"
             placeholder="Ask about a neighbourhood, budget, or style…"
-            className="min-w-0 flex-1 resize-none bg-transparent py-0.5 text-sm leading-relaxed text-ink placeholder:text-muted focus:outline-none disabled:opacity-60 overflow-y-auto max-h-32"
+            className="min-w-0 flex-1 resize-none bg-transparent py-0.5 text-sm leading-relaxed text-ink placeholder:text-muted focus:outline-none disabled:opacity-60 overflow-y-auto max-h-32 scrollbar-subtle"
           />
           <button
             type="submit"
             disabled={!canSend}
             aria-label="Send message"
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-green-600 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50 transition-opacity mb-0.5"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-brand text-on-brand hover:bg-brand/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed transition-all mb-0.5 active:scale-95"
           >
             <SendIcon />
           </button>
