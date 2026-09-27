@@ -18,6 +18,14 @@ structlog.configure(
 logger = structlog.get_logger()
 
 from contextlib import asynccontextmanager
+from fastapi import Depends
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from app.db.session import get_db
+from app.limiter import limiter
 from app.services.scanner_scheduler import init_scheduler, shutdown_scheduler
 
 settings = get_settings()
@@ -31,6 +39,8 @@ async def lifespan(app: FastAPI):
     shutdown_scheduler()
 
 app = FastAPI(title="Property Advisor API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
@@ -82,6 +92,7 @@ def gemini_not_configured(_request: Request, exc: GeminiNotConfigured) -> JSONRe
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    """Smoke-test route: confirms the app boots and routing works."""
+def health(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Smoke-test route: confirms the app boots, routing works, and DB responds."""
+    db.execute(text("SELECT 1"))
     return {"status": "ok"}

@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     auth_cookie_secure: bool = False
     auth_cookie_samesite: str = "lax"
 
+    auth_reset_password_token_secret: str = "dev-secret-reset-token-change-in-prod"
+    auth_verification_token_secret: str = "dev-secret-verify-token-change-in-prod"
+
     # Used only by the one-time local bootstrap command.
     bootstrap_admin_secret: str = ""
 

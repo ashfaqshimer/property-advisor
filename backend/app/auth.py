@@ -98,8 +98,14 @@ class SyncAccessTokenDatabase(AccessTokenDatabase[StaffSession]):
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[StaffUser, uuid.UUID]):
-    reset_password_token_secret = "SECRET_CHANGE_ME"
-    verification_token_secret = "SECRET_CHANGE_ME"
+    reset_password_token_secret = "dev-secret-reset-token-change-in-prod"
+    verification_token_secret = "dev-secret-verify-token-change-in-prod"
+
+    def __init__(self, user_db: BaseUserDatabase[StaffUser, uuid.UUID]):
+        super().__init__(user_db)
+        settings = get_settings()
+        self.reset_password_token_secret = settings.auth_reset_password_token_secret
+        self.verification_token_secret = settings.auth_verification_token_secret
 
     async def on_after_register(self, user: StaffUser, request: Optional[Request] = None):
         pass

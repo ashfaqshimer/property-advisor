@@ -40,6 +40,12 @@ from app.models.auth import StaffUser  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def disable_scheduler(monkeypatch):
+    monkeypatch.setattr("app.main.init_scheduler", lambda: None)
+    monkeypatch.setattr("app.main.shutdown_scheduler", lambda: None)
+
+
 def _enforce_foreign_keys(engine: Engine) -> None:
     """SQLite ignores foreign keys unless asked, per connection.
 

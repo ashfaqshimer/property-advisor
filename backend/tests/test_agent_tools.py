@@ -61,6 +61,7 @@ class TestSearch:
             lambda: SimpleNamespace(google_maps_api_key="test-key", location_search_radius_km=5),
         )
         monkeypatch.setattr(tools.queries, "search_properties", fake_search)
+        monkeypatch.setattr(tools.queries, "search_prospects", lambda *args, **kwargs: [])
 
         result = tools.search_properties(_context(seeded), {"location": "Havelock City"})
 

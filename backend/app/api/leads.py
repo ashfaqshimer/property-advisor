@@ -4,13 +4,14 @@ from collections.abc import Sequence
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.auth import CurrentStaffUser
+from app.limiter import limiter
 from app.agent.loop import get_or_create_conversation
 from app.models.conversation import Conversation
 from app.models.lead import Lead, LeadIntent, LeadInterest, LeadSource
@@ -48,8 +49,9 @@ def _capture_fallback_lead(
 
 
 @public_router.post("/leads/fallback", response_model=FallbackLeadResponse)
+@limiter.limit("10/minute")
 def capture_fallback_lead(
-    payload: FallbackLeadRequest, db: DbSession
+    request: Request, payload: FallbackLeadRequest, db: DbSession
 ) -> FallbackLeadResponse:
     """Capture a callback request without involving the AI agent."""
     try:

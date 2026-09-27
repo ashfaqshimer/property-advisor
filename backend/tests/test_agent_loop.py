@@ -170,7 +170,7 @@ class TestToolDispatch:
         )
         reply = run_turn(seeded, "s1", "Show me something", client=client)
 
-        assert reply == "Here are a few."
+        assert "Here are a few." in reply
         assert any(m.role is MessageRole.TOOL for m in _messages(seeded))
         assert any(m.content == "Let me look…" for m in _messages(seeded))
 

@@ -8,7 +8,7 @@ failures an HTTP shape.
 import logging
 from typing import Annotated, Protocol, Iterator
 from fastapi.responses import StreamingResponse
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from google.genai import errors as genai_errors
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.agent.client import SupportsGenerate, get_gemini_client
 from app.agent.loop import run_turn
 from app.db.session import get_db
+from app.limiter import limiter
 from app.schemas.chat import ChatRequest
 
 router = APIRouter(tags=["chat"])
@@ -37,8 +38,9 @@ AgentClient = Annotated[SupportsGenerate, Depends(get_agent_client)]
 
 
 @router.post("/chat")
+@limiter.limit("20/minute")
 def post_chat(
-    payload: ChatRequest, db: DbSession, client: AgentClient
+    request: Request, payload: ChatRequest, db: DbSession, client: AgentClient
 ):
     """Send one user message, stream Amaya's reply."""
     try:
@@ -97,8 +99,8 @@ def _run_turn_handling_session_race(
     needs two concurrent transactions, which the SQLite-backed suite can't stage, so the
     test supplies a runner that fails once. Injection beats patching a module global.
     """
-    iterator = runner(db, payload.session_id, payload.message, client=client)
     try:
+        iterator = runner(db, payload.session_id, payload.message, client=client)
         first_chunk = next(iterator)
     except StopIteration:
         return iter([])
@@ -108,8 +110,8 @@ def _run_turn_handling_session_race(
             payload.session_id,
         )
         db.rollback()
-        iterator = runner(db, payload.session_id, payload.message, client=client)
         try:
+            iterator = runner(db, payload.session_id, payload.message, client=client)
             first_chunk = next(iterator)
         except StopIteration:
             return iter([])
