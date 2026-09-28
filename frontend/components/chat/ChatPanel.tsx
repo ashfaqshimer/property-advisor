@@ -8,6 +8,7 @@ import {
   ChatError,
   captureFallbackLead,
   getFeaturedProperties,
+  getSiteConfiguration,
   MAX_MESSAGE_LENGTH,
   sendChatMessage,
   wakeBackend,
@@ -18,6 +19,7 @@ import {
   FALLBACK_PROPERTY_SUGGESTIONS,
   GREETING,
   PENDING_LABEL,
+  SERVICES_SUGGESTION_CHIPS,
   SLOW_PENDING_AFTER_MS,
   SLOW_PENDING_LABEL,
   STATUS_HINT_DEFAULT,
@@ -71,6 +73,7 @@ type Failure = {
 
 export default function ChatPanel() {
   const [featuredProperties, setFeaturedProperties] = useState<Property[] | null>(null);
+  const [isServicesLayout, setIsServicesLayout] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: "greeting", role: "agent", text: GREETING },
   ]);
@@ -122,6 +125,24 @@ export default function ChatPanel() {
     getFeaturedProperties()
       .then((records) => setFeaturedProperties(records.slice(0, 3).map(mapProperty)))
       .catch(() => setFeaturedProperties([]));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlLayout = params.get("layout") || params.get("view");
+      if (urlLayout === "services") {
+        setIsServicesLayout(true);
+      }
+    }
+
+    getSiteConfiguration()
+      .then((config) => {
+        if (config?.extra_settings?.homepage_layout === "services") {
+          setIsServicesLayout(true);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -275,14 +296,20 @@ export default function ChatPanel() {
 
   const canSend = draft.trim().length > 0 && !pending;
   const hasStartedChat = messages.some((message) => message.role === "user");
+  const isServicesMode =
+    isServicesLayout ||
+    (featuredProperties !== null && featuredProperties.length === 0);
+
   const propertySuggestions = (featuredProperties ?? []).map(
     (property) => `Tell me more about ${property.title} in ${property.location}`,
   );
-  const suggestionChips = [
-    SELLING_SUGGESTION,
-    ...propertySuggestions,
-    ...FALLBACK_PROPERTY_SUGGESTIONS.slice(0, 3 - propertySuggestions.length),
-  ];
+  const suggestionChips = isServicesMode
+    ? SERVICES_SUGGESTION_CHIPS
+    : [
+        SELLING_SUGGESTION,
+        ...propertySuggestions,
+        ...FALLBACK_PROPERTY_SUGGESTIONS.slice(0, 3 - propertySuggestions.length),
+      ];
 
   let statusText = AGENT_STATUS_LINE;
   let statusColor = "bg-green-500";

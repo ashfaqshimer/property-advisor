@@ -19,6 +19,14 @@ export type ChatMessage = {
 export const GREETING =
   "Hi, I'm Amaya with Property Advisor. Whether you're after land, a house, or an apartment, tell me what you have in mind and I'll take it from there.";
 
+/** Dedicated suggestion chips when displaying the Bespoke Services & Market Guide layout */
+export const SERVICES_SUGGESTION_CHIPS: string[] = [
+  "Find me an off-market property in Colombo",
+  "I need a title deed & Land Registry check",
+  "I want to discuss a turnkey renovation",
+  "I want to list or sell my property",
+];
+
 /** The first chip is always available, even while featured listings are loading. */
 export const SELLING_SUGGESTION = "I want to sell my apartment";
 
@@ -30,10 +38,7 @@ export const FALLBACK_PROPERTY_SUGGESTIONS: string[] = [
 ];
 
 /** Stable fallback retained for tests and other consumers of the chat constants. */
-export const SUGGESTION_CHIPS: string[] = [
-  SELLING_SUGGESTION,
-  ...FALLBACK_PROPERTY_SUGGESTIONS,
-];
+export const SUGGESTION_CHIPS: string[] = SERVICES_SUGGESTION_CHIPS;
 
 /** How each speaker is announced to a screen reader, since colour and side
  *  alignment carry that distinction visually and neither is perceivable. */
