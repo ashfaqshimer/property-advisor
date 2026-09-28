@@ -1,8 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import PropertyCard from "@/components/properties/PropertyCard";
 import { PropertyGridContent } from "@/components/properties/PropertyGrid";
+import ServicesAndMarketGuide from "@/components/properties/ServicesAndMarketGuide";
 import { FEATURED_PROPERTIES, type Property } from "@/lib/properties";
 
 /** A card is only ever rendered from fixture data, so tests start from one. */
@@ -173,3 +174,32 @@ describe("property fixtures", () => {
     }
   });
 });
+
+describe("ServicesAndMarketGuide fallback", () => {
+  it("renders with correct heading and navigation anchors", () => {
+    render(<ServicesAndMarketGuide />);
+    const section = screen.getByRole("region", {
+      name: "Curated Sourcing, Legal Due Diligence & Renovations",
+    });
+    expect(section).toHaveAttribute("id", "featured-properties");
+    expect(section).toHaveAttribute("aria-labelledby", "featured-properties-heading");
+  });
+
+  it("allows switching between sourcing, legal, and renovation pillars", () => {
+    render(<ServicesAndMarketGuide />);
+    expect(
+      screen.getByText("Colombo Market Benchmarks & Sourcing Profiles"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Legal & Deeds/ }));
+    expect(
+      screen.getByText("Protecting Your Real Estate Capital Before You Commit"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Renovations/ }));
+    expect(
+      screen.getByText("Renovations & High-Yield Fit-Outs"),
+    ).toBeInTheDocument();
+  });
+});
+

@@ -24,9 +24,9 @@ export const SELLING_SUGGESTION = "I want to sell my apartment";
 
 /** Used until featured listings arrive, or when the featured-listings request fails. */
 export const FALLBACK_PROPERTY_SUGGESTIONS: string[] = [
-  "Tell me about the 3-bedroom apartment in Colombo",
-  "Show me properties in Galle",
+  "Find me an apartment in Colombo 3 or 7",
   "What's available in Rajagiriya?",
+  "I need legal advice or renovation help",
 ];
 
 /** Stable fallback retained for tests and other consumers of the chat constants. */

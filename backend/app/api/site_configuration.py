@@ -61,6 +61,7 @@ def update_site_configuration(
     else:
         for field, value in payload.model_dump(exclude_unset=True, mode='json').items():
             setattr(config, field, value)
+            flag_modified(config, field)
             
     db.commit()
     db.refresh(config)

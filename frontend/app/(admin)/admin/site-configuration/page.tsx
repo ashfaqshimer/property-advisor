@@ -98,6 +98,16 @@ export default function SiteConfigurationPage() {
     });
   }
 
+  function updateExtraSetting(key: string, value: unknown) {
+    setSiteConfig(s => ({
+      ...s,
+      extra_settings: {
+        ...(s.extra_settings || {}),
+        [key]: value,
+      }
+    }));
+  }
+
   useEffect(() => {
     getCurrentUser().then((user) => {
       if (!user || !["root", "admin"].includes(user.role)) {
@@ -129,6 +139,7 @@ export default function SiteConfigurationPage() {
         x_link: siteConfig.x_link,
         tiktok_link: siteConfig.tiktok_link,
         scanner_settings: siteConfig.scanner_settings,
+        extra_settings: siteConfig.extra_settings || {},
         prospect_retention_days: siteConfig.prospect_retention_days,
       });
       setSiteConfig(updated);
@@ -378,6 +389,62 @@ export default function SiteConfigurationPage() {
             {updatingSiteConfig ? "Saving..." : "Save scanner configuration"}
           </button>
         </div>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
+        <h2 className="text-lg font-medium">Homepage Main Section Layout</h2>
+        <p className="mt-1 text-sm text-[#64736b]">
+          Toggle the primary presentation next to the chat panel for all visitors.
+        </p>
+
+        <div className="mt-5 space-y-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="homepage_layout"
+              value="featured"
+              checked={(siteConfig.extra_settings?.homepage_layout ?? "featured") === "featured"}
+              onChange={() => updateExtraSetting("homepage_layout", "featured")}
+              className="mt-1 size-4 accent-[#19352b]"
+            />
+            <div>
+              <span className="text-sm font-medium text-ink dark:text-zinc-200">
+                Featured Properties Carousel (Default)
+              </span>
+              <p className="text-xs text-[#64736b] mt-0.5">
+                Displays active featured properties in the carousel, automatically falling back to the Services Hub if 0 listings exist.
+              </p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="homepage_layout"
+              value="services"
+              checked={siteConfig.extra_settings?.homepage_layout === "services"}
+              onChange={() => updateExtraSetting("homepage_layout", "services")}
+              className="mt-1 size-4 accent-[#19352b]"
+            />
+            <div>
+              <span className="text-sm font-medium text-ink dark:text-zinc-200">
+                Curated Sourcing & Services Hub (New Layout)
+              </span>
+              <p className="text-xs text-[#64736b] mt-0.5">
+                Always displays the Bespoke Sourcing (Market Benchmarks), Legal & Title Due Diligence, and Renovations layout (even when properties exist in the database).
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={(e) => handleUpdateSiteConfig(e as any)}
+          disabled={updatingSiteConfig}
+          className="mt-5 rounded-lg bg-[#19352b] dark:bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#132820] dark:hover:bg-[#1f4233] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+        >
+          {updatingSiteConfig ? "Saving..." : "Save Layout Preference"}
+        </button>
       </div>
 
       <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">

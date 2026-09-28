@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import PropertyCard from "@/components/properties/PropertyCard";
-import { getFeaturedProperties } from "@/lib/api";
+import ServicesAndMarketGuide from "@/components/properties/ServicesAndMarketGuide";
+import { getFeaturedProperties, getSiteConfiguration } from "@/lib/api";
 import { mapProperty } from "@/lib/properties";
 
 const SLIDE_DURATION_MS = 5500;
@@ -396,32 +397,47 @@ export default function PropertyGrid() {
     ReturnType<typeof mapProperty>[] | null
   >(null);
   const [hasError, setHasError] = useState(false);
+  const [preferredLayout, setPreferredLayout] = useState<"featured" | "services" | null>(null);
 
   useEffect(() => {
+    // 1. Allow instant dev preview via ?layout=services / ?layout=featured (or ?view=...)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlLayout = params.get("layout") || params.get("view");
+      if (urlLayout === "services" || urlLayout === "featured") {
+        setPreferredLayout(urlLayout);
+      }
+    }
+
+    // 2. Fetch site configuration to respect root / admin setting
+    getSiteConfiguration()
+      .then((config) => {
+        const layout = config?.extra_settings?.homepage_layout;
+        if (layout === "services" || layout === "featured") {
+          setPreferredLayout((current) => current ?? (layout as "featured" | "services"));
+        }
+      })
+      .catch(() => {});
+
+    // 3. Fetch featured properties
     getFeaturedProperties()
       .then((records) => setProperties(records.map(mapProperty).slice(0, 6)))
       .catch(() => setHasError(true));
   }, []);
 
-  if (hasError) {
-    return (
-      <PropertyGridMessage>
-        Featured properties are temporarily unavailable.
-      </PropertyGridMessage>
-    );
+  // If admin configured "services" (or URL param requested it), render the new layout directly
+  if (preferredLayout === "services") {
+    return <ServicesAndMarketGuide />;
   }
 
   if (properties === null) {
     return <PropertyGridSkeleton />;
   }
 
-  if (properties.length === 0) {
-    return (
-      <PropertyGridMessage>
-        No featured properties are available right now.
-      </PropertyGridMessage>
-    );
+  if (hasError || properties.length === 0) {
+    return <ServicesAndMarketGuide />;
   }
 
   return <PropertyGridContent properties={properties} />;
 }
+
