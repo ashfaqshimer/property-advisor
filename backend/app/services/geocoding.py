@@ -52,15 +52,22 @@ def geocode_location(db: Session, location_string: str) -> Tuple[Optional[float]
                 lat = float(location_data.get("lat"))
                 lng = float(location_data.get("lng"))
                 
-            # 3. Save to cache even if null to prevent repeated API calls for bad locations.
             new_cache = LocationCache(
                 location_string=location_string,
                 latitude=lat,
                 longitude=lng
             )
             db.add(new_cache)
-            db.commit()
-            
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+                cached = db.execute(
+                    select(LocationCache).where(LocationCache.location_string == location_string)
+                ).scalar_one_or_none()
+                if cached:
+                    return cached.latitude, cached.longitude
+
             return lat, lng
             
     except Exception as e:

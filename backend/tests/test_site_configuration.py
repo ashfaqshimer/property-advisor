@@ -57,6 +57,11 @@ def test_site_configuration_update_and_get_with_scanner(authenticated_client: Te
 
 
 def test_schedule_property_scanner_intelligent_next_run() -> None:
+    # When last_run_at is None (first enable), it should schedule for immediate run (<= now)
+    next_time_none = schedule_property_scanner(24, None)
+    assert next_time_none is not None
+    assert next_time_none <= datetime.now(timezone.utc) + timedelta(seconds=5)
+
     # When last_run_at is older than frequency, it should schedule for immediate run (<= now)
     past_time = (datetime.now(timezone.utc) - timedelta(hours=30)).isoformat()
     next_time = schedule_property_scanner(24, past_time)

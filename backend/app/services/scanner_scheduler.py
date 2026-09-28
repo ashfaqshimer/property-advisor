@@ -45,9 +45,9 @@ def schedule_property_scanner(freq_hours: int, last_run_at_str: str | None = Non
             else:
                 next_run_time = target
         except Exception:
-            next_run_time = now + timedelta(hours=freq_hours)
+            next_run_time = now
     else:
-        next_run_time = now + timedelta(hours=freq_hours)
+        next_run_time = now
 
     job = scheduler.add_job(
         run_property_scanner,
@@ -84,7 +84,7 @@ def run_property_scanner():
             logger.info("property_scanner.no_config")
             return
             
-        settings = config.scanner_settings
+        settings = dict(config.scanner_settings or {})
         if not settings.get("enabled"):
             logger.info("property_scanner.disabled_in_db")
             return
@@ -126,14 +126,17 @@ def run_property_scanner():
             session.commit()
             return
             
-        req = ScanRequest(categories=list(set(categories)), pages_per_category=pages_to_scan)
-        asyncio.run(_run_scan_job(str(job_id), req))
-        
-        # Refresh the job to get its final status updated by _run_scan_job
-        session.refresh(new_job)
-        
+        try:
+            req = ScanRequest(categories=list(set(categories)), pages_per_category=pages_to_scan)
+            asyncio.run(_run_scan_job(str(job_id), req))
+            session.refresh(new_job)
+            status_text = new_job.progress or new_job.status
+        except Exception as e:
+            logger.exception("property_scanner.failed", error=str(e))
+            status_text = f"Failed: {e}"
+
         settings["last_run_at"] = datetime.now(timezone.utc).isoformat()
-        settings["last_run_status"] = new_job.progress
+        settings["last_run_status"] = status_text
         next_time = get_next_scan_time()
         if next_time:
             settings["next_run_at"] = next_time.isoformat()
