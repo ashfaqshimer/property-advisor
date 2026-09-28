@@ -117,7 +117,7 @@ def run_property_scanner():
         if "land" in property_types:
             categories.append("land-for-sale")
         if "commercial" in property_types:
-            categories.extend(["commercial-property-for-sale", "commercial-property-to-rent"])
+            categories.extend(["commercial-property-sale", "commercial-property-rent"])
             
         if not categories:
             logger.info("property_scanner.no_categories")
