@@ -179,26 +179,29 @@ describe("ServicesAndMarketGuide fallback", () => {
   it("renders with correct heading and navigation anchors", () => {
     render(<ServicesAndMarketGuide />);
     const section = screen.getByRole("region", {
-      name: "Curated Sourcing, Legal Due Diligence & Renovations",
+      name: "Full-Service Property Advisory Across Sri Lanka",
     });
     expect(section).toHaveAttribute("id", "featured-properties");
     expect(section).toHaveAttribute("aria-labelledby", "featured-properties-heading");
   });
 
-  it("allows switching between sourcing, legal, and renovation pillars", () => {
+  it("displays all three core advisory pillars and lead capture form", () => {
     render(<ServicesAndMarketGuide />);
     expect(
-      screen.getByText("Colombo Market Benchmarks & Sourcing Profiles"),
+      screen.getByRole("heading", { level: 3, name: "Buying, Selling & Private Matching" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Title Due Diligence & Conveyancing" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Turnkey Renovations & Fit-Outs" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Legal & Deeds/ }));
     expect(
-      screen.getByText("Protecting Your Real Estate Capital Before You Commit"),
+      screen.getByRole("heading", { level: 3, name: "Request a Confidential Advisory Call" }),
     ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Renovations/ }));
     expect(
-      screen.getByText("Renovations & High-Yield Fit-Outs"),
+      screen.getByPlaceholderText(/Phone or WhatsApp Number/),
     ).toBeInTheDocument();
   });
 });
