@@ -114,7 +114,7 @@ class TestPromptSourceOfTruth:
         offenders = [
             path.relative_to(BACKEND_DIR)
             for path in (BACKEND_DIR / "app").rglob("*.py")
-            if "gemini-3" in path.read_text() and path.name != "config.py"
+            if "gemini-3" in path.read_text(encoding="utf-8") and path.name != "config.py"
         ]
         assert offenders == []
 

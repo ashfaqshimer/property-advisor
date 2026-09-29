@@ -22,6 +22,8 @@ os.environ.setdefault(
     "DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/test"
 )
 os.environ["GOOGLE_MAPS_API_KEY"] = ""
+os.environ["TELEGRAM_BOT_TOKEN"] = ""
+os.environ["TELEGRAM_CHAT_ID"] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

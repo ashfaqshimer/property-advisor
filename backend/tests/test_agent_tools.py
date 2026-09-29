@@ -371,6 +371,29 @@ class TestCaptureLead:
         leads = db_session.execute(select(Lead)).scalars().all()
         assert {lead.name for lead in leads} == {"First", "Second"}
 
+    def test_capture_lead_triggers_notification_when_phone_added(
+        self, db_session: Session
+    ):
+        from unittest.mock import patch
+
+        context = _context(db_session, "sess-notify")
+        with patch("app.agent.tools.send_lead_alert") as mock_notify:
+            # First turn: name only -> no notification yet
+            tools.capture_lead(context, {"name": "Test User"})
+            mock_notify.assert_not_called()
+
+            # Second turn: phone provided -> triggers notification
+            tools.capture_lead(context, {"phone": "0771234567", "intent": "buy"})
+            assert mock_notify.call_count == 1
+            args, kwargs = mock_notify.call_args
+            assert kwargs["name"] == "Test User"
+            assert kwargs["phone"] == "0771234567"
+            assert kwargs["intent"] == "buy"
+
+            # Third turn: same phone, updated remarks -> does not duplicate alert
+            tools.capture_lead(context, {"remarks": "Prefers evening contact"})
+            assert mock_notify.call_count == 1
+
 
 class TestExecuteTool:
     def test_unknown_tool_returns_an_error_the_model_can_read(self, db_session: Session):

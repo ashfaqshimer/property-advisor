@@ -22,6 +22,7 @@ from app.schemas.lead import (
     ManualLeadCreate,
     LeadUpdate,
 )
+from app.services.notifications import send_lead_alert
 
 router = APIRouter(prefix="/admin/leads", tags=["admin-leads"])
 public_router = APIRouter(tags=["leads"])
@@ -46,6 +47,15 @@ def _capture_fallback_lead(
     if not lead.remarks:
         lead.remarks = "Chat was unavailable when this callback request was submitted."
     db.commit()
+
+    if lead.phone:
+        send_lead_alert(
+            name=lead.name,
+            phone=lead.phone,
+            requirements=lead.requirements,
+            remarks=lead.remarks,
+            source=LeadSource.FALLBACK.value,
+        )
 
     logger.info(
         "fallback_lead_captured",

@@ -43,6 +43,7 @@ from app.geocoding import GeocodingError, GoogleGeocoder
 from app.models.lead import Lead, LeadIntent, LeadInterest, LeadSource
 from app.models.property import ListingType, Property, PropertyType
 from app.models.prospect import Prospect
+from app.services.notifications import send_lead_alert
 
 SEARCH_PROPERTIES = "search_properties"
 GET_PROPERTY_DETAILS = "get_property_details"
@@ -466,6 +467,7 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     ).scalar_one_or_none()
 
     created = lead is None
+    prev_phone = lead.phone if lead else None
     if lead is None:
         lead = Lead(
             conversation_id=context.conversation_id,
@@ -493,6 +495,20 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         lead.interested_property_id = property_id
 
     context.db.flush()
+
+    if lead.phone and (not prev_phone or lead.phone != prev_phone):
+        send_lead_alert(
+            name=lead.name,
+            phone=lead.phone,
+            intent=lead.intent.value if lead.intent else None,
+            interest=lead.interest.value if lead.interest else None,
+            budget_min=lead.budget_min,
+            budget_max=lead.budget_max,
+            requirements=lead.requirements,
+            remarks=lead.remarks,
+            source=lead.source.value if lead.source else "ai_agent",
+            property_id=lead.interested_property_id,
+        )
 
     logger.info(
         "lead_captured",

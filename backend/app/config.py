@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # Used only by the one-time local bootstrap command.
     bootstrap_admin_secret: str = ""
 
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     @property
     def cloudinary_configured(self) -> bool:
         return all(
