@@ -114,7 +114,7 @@ export default function ServicesAndMarketGuide() {
     try {
       await captureFallbackLead({
         sessionId: crypto.randomUUID(),
-        name: name.trim() || null,
+        name: name.trim(),
         phone: phone.trim(),
       });
       setIsSubmitted(true);
