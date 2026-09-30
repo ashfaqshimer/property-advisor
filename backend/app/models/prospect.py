@@ -26,6 +26,8 @@ class Prospect(Base):
     title: Mapped[str] = mapped_column(Text)
     price: Mapped[str] = mapped_column(String(128))
     location: Mapped[str] = mapped_column(String(128))
+    suburb: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    suburb_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     property_type: Mapped[str] = mapped_column(String(64))   # land, house, apartment

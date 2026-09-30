@@ -23,6 +23,7 @@ from app.schemas.prospect import (
 )
 from app.scraper.classifier import classify_listing_heuristics
 from app.scraper.ikman_client import IkmanClient, IKMAN_BASE_URL
+from app.scraper.location_extractor import extract_suburb
 from app.agent.client import get_gemini_extractor_client
 from app.schemas.extractor import ExtractedPropertyDraft, GeminiPropertyExtraction
 from app.services.geocoding import geocode_location
@@ -32,6 +33,47 @@ logger = structlog.get_logger(__name__)
 
 admin_router = APIRouter(prefix="/admin/prospects", tags=["Admin Prospects"])
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+def _enrich_location_from_detail(db: Session, prospect: Prospect, detail: Any) -> bool:
+    """Enriches prospect suburb, location and geocodes from Ikman ad detail payload."""
+    changed = False
+    if not detail or not detail.location:
+        return False
+
+    loc_obj = detail.location
+    suburb_name = None
+    parent_district = None
+
+    if isinstance(loc_obj, dict):
+        suburb_name = loc_obj.get("name")
+        parent = loc_obj.get("parent")
+        if isinstance(parent, dict):
+            parent_district = parent.get("name")
+    elif hasattr(loc_obj, "name"):
+        suburb_name = loc_obj.name
+        if hasattr(loc_obj, "parent") and loc_obj.parent:
+            parent_district = loc_obj.parent.get("name") if isinstance(loc_obj.parent, dict) else getattr(loc_obj.parent, "name", None)
+
+    if suburb_name:
+        if prospect.suburb != suburb_name or prospect.suburb_source != "ikman_detail":
+            prospect.suburb = suburb_name
+            prospect.suburb_source = "ikman_detail"
+            changed = True
+
+        if parent_district and prospect.location != parent_district:
+            prospect.location = parent_district
+            changed = True
+
+        # Re-geocode with verified suburb
+        target = f"{suburb_name}, {prospect.location}" if prospect.location else suburb_name
+        lat, lng = geocode_location(db, target)
+        if lat is not None and (prospect.latitude != lat or prospect.longitude != lng):
+            prospect.latitude = lat
+            prospect.longitude = lng
+            changed = True
+
+    return changed
 
 
 def _update_job_status(job_id: str, status: str, progress: str, error: str | None = None) -> None:
@@ -97,9 +139,13 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             elif ad.location and hasattr(ad.location, "name"):
                 loc_str = ad.location.name or ""
 
+            suburb = extract_suburb(title=ad.title or "", slug=ad.slug or "", district=loc_str)
+            suburb_source = "extracted" if suburb else None
+
+            geo_target = f"{suburb}, {loc_str}" if suburb and loc_str else (suburb or loc_str)
             lat, lng = None, None
-            if loc_str:
-                lat, lng = geocode_location(db, loc_str)
+            if geo_target:
+                lat, lng = geocode_location(db, geo_target)
 
             new_prospect = Prospect(
                 ikman_ad_id=ad.id,
@@ -108,6 +154,8 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
                 title=ad.title or "",
                 price=ad.price or "",
                 location=loc_str,
+                suburb=suburb,
+                suburb_source=suburb_source,
                 latitude=lat,
                 longitude=lng,
                 property_type=prop_type,
@@ -337,13 +385,15 @@ async def _run_phone_fetch_job(job_id: str) -> None:
                 _update_job_status(job_id, "running", f"Fetching phone for {prospect.title} ({processed}/{len(prospects)})")
                 if prospect.ikman_slug:
                     detail = await client.fetch_ad_detail(prospect.ikman_slug)
-                    if detail and detail.contactCard and detail.contactCard.phoneNumbers:
-                        prospect.poster_name = detail.contactCard.name
-                        prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
-                        found_phones += 1
-                        
-                        # Commit incrementally
-                        db.commit()
+                    if detail:
+                        loc_updated = _enrich_location_from_detail(db, prospect, detail)
+                        if detail.contactCard and detail.contactCard.phoneNumbers:
+                            prospect.poster_name = detail.contactCard.name
+                            prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+                            found_phones += 1
+                            db.commit()
+                        elif loc_updated:
+                            db.commit()
                 
                 processed += 1
                 
@@ -409,13 +459,20 @@ async def fetch_single_prospect_phone(
     client = IkmanClient(delay=0) # Single manual fetch, no delay needed
     try:
         detail = await client.fetch_ad_detail(prospect.ikman_slug)
-        if detail and detail.contactCard and detail.contactCard.phoneNumbers:
-            prospect.poster_name = detail.contactCard.name
-            prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
-            db.commit()
-            db.refresh(prospect)
+        if detail:
+            loc_updated = _enrich_location_from_detail(db, prospect, detail)
+            if detail.contactCard and detail.contactCard.phoneNumbers:
+                prospect.poster_name = detail.contactCard.name
+                prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+                db.commit()
+                db.refresh(prospect)
+            elif loc_updated:
+                db.commit()
+                db.refresh(prospect)
+            else:
+                raise HTTPException(status_code=404, detail="Phone number not found on ikman")
         else:
-            raise HTTPException(status_code=404, detail="Phone number not found on ikman")
+            raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
     finally:
         await client.close()
         
@@ -444,7 +501,7 @@ async def generate_property_draft(
         if not detail:
             raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
             
-        updated_contact = False
+        updated_contact = _enrich_location_from_detail(db, prospect, detail)
         if detail.contactCard:
             if detail.contactCard.name and prospect.poster_name != detail.contactCard.name:
                 prospect.poster_name = detail.contactCard.name
@@ -533,32 +590,44 @@ def list_prospects(
         stmt = stmt.where(Prospect.listing_type == listing_type)
 
     if q:
-        # Trigram fuzzy search: use the pg_trgm `%` similarity operator across
-        # location, title, and poster_name.  Fallback to ILIKE so that short
-        # tokens (< 3 chars) which trgm ignores still return substring matches.
         term = q.strip()
-        trgm_match = (
-            Prospect.location.op("%")(term)
-            | Prospect.title.op("%")(term)
-            | Prospect.poster_name.op("%")(term)
-        )
-        ilike_match = (
-            Prospect.location.ilike(f"%{term}%")
-            | Prospect.title.ilike(f"%{term}%")
-            | Prospect.poster_name.ilike(f"%{term}%")
-        )
-        stmt = stmt.where(trgm_match | ilike_match)
-
-        # In search mode, bypass normal pagination; return flat results (max 100)
-        # ordered by best trigram match on location first, then date.
-        similarity_score = (
-            func.greatest(
-                func.similarity(Prospect.location, term),
-                func.similarity(Prospect.title, term),
-                func.coalesce(func.similarity(Prospect.poster_name, term), 0.0),
+        is_postgres = db.bind.dialect.name == "postgresql" if db.bind else False
+        if is_postgres:
+            # Trigram fuzzy search: use the pg_trgm `%` similarity operator across
+            # location, suburb, title, and poster_name. Fallback to ILIKE so that short
+            # tokens (< 3 chars) which trgm ignores still return substring matches.
+            trgm_match = (
+                Prospect.location.op("%")(term)
+                | Prospect.suburb.op("%")(term)
+                | Prospect.title.op("%")(term)
+                | Prospect.poster_name.op("%")(term)
             )
-        )
-        stmt = stmt.order_by(similarity_score.desc(), Prospect.first_seen_at.desc())
+            ilike_match = (
+                Prospect.location.ilike(f"%{term}%")
+                | Prospect.suburb.ilike(f"%{term}%")
+                | Prospect.title.ilike(f"%{term}%")
+                | Prospect.poster_name.ilike(f"%{term}%")
+            )
+            stmt = stmt.where(trgm_match | ilike_match)
+
+            similarity_score = (
+                func.greatest(
+                    func.similarity(Prospect.location, term),
+                    func.coalesce(func.similarity(Prospect.suburb, term), 0.0),
+                    func.similarity(Prospect.title, term),
+                    func.coalesce(func.similarity(Prospect.poster_name, term), 0.0),
+                )
+            )
+            stmt = stmt.order_by(similarity_score.desc(), Prospect.first_seen_at.desc())
+        else:
+            # SQLite fallback for test environment
+            ilike_match = (
+                Prospect.location.ilike(f"%{term}%")
+                | Prospect.suburb.ilike(f"%{term}%")
+                | Prospect.title.ilike(f"%{term}%")
+                | Prospect.poster_name.ilike(f"%{term}%")
+            )
+            stmt = stmt.where(ilike_match).order_by(Prospect.first_seen_at.desc())
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = db.execute(count_stmt).scalar_one()

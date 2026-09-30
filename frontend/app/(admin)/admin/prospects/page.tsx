@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles } from "lucide-react";
 
 import {
   Prospect,
@@ -600,8 +600,33 @@ export default function ProspectsPage() {
                           </a>
                         )}
                       </div>
-                      <div className="mt-1 text-xs text-[#64736b] dark:text-zinc-400">
-                        {prospect.property_type} • {prospect.listing_type} • {prospect.location}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[#64736b] dark:text-zinc-400">
+                        <span>{prospect.property_type}</span>
+                        <span>•</span>
+                        <span>{prospect.listing_type}</span>
+                        <span>•</span>
+                        {prospect.suburb ? (
+                          <span
+                            className="inline-flex items-center gap-1 font-medium text-[#1a2923] dark:text-zinc-200"
+                            title={
+                              prospect.suburb_source === "ikman_detail"
+                                ? "Verified location from Ikman ad detail"
+                                : "Inferred from ad title"
+                            }
+                          >
+                            {prospect.suburb_source === "ikman_detail" ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            ) : (
+                              <Sparkles className="h-3 w-3 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
+                            )}
+                            <span>{prospect.suburb}</span>
+                            {prospect.location && prospect.location.toLowerCase() !== prospect.suburb.toLowerCase() && (
+                              <span className="font-normal text-[#64736b] dark:text-zinc-400">({prospect.location})</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span>{prospect.location}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 font-medium text-[#1a2923] dark:text-zinc-200">

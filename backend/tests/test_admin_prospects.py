@@ -85,3 +85,55 @@ def test_get_active_jobs_returns_root_info(authenticated_client: TestClient, db_
     
     assert data["last_scan_at"] is not None
     assert data["last_scan_by"] == "root user"
+
+
+def test_prospect_suburb_search_and_enrichment(authenticated_client: TestClient, db_session: Session) -> None:
+    from app.models.prospect import Prospect
+    from app.api.prospects import _enrich_location_from_detail
+    from app.scraper.schemas import IkmanAdDetail, IkmanLocation
+
+    prospect = Prospect(
+        ikman_ad_id="ad-piliyandala-1",
+        ikman_url="https://ikman.lk/en/ad/piliyandala-house",
+        ikman_slug="piliyandala-house-for-sale-colombo",
+        title="Modern House for Sale",
+        price="Rs 25,000,000",
+        location="Colombo",
+        suburb="Piliyandala",
+        suburb_source="extracted",
+        property_type="house",
+        listing_type="sale",
+        classification="owner",
+        confidence=90,
+        classification_reasons=["no_membership_no_shop"],
+        classification_method="heuristic",
+        status="new",
+    )
+    db_session.add(prospect)
+    db_session.commit()
+
+    # 1. Fetch prospects and verify suburb fields are returned
+    resp = authenticated_client.get("/admin/prospects")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert len(items) == 1
+    assert items[0]["suburb"] == "Piliyandala"
+    assert items[0]["suburb_source"] == "extracted"
+
+    # 2. Search by suburb
+    search_resp = authenticated_client.get("/admin/prospects?q=Piliyandala")
+    assert search_resp.status_code == 200
+    search_items = search_resp.json()["items"]
+    assert len(search_items) == 1
+    assert search_items[0]["id"] == str(prospect.id)
+
+    # 3. Test _enrich_location_from_detail with authoritative ikman detail
+    detail = IkmanAdDetail(
+        id="ad-piliyandala-1",
+        location=IkmanLocation(name="Piliyandala", parent={"id": 1506, "name": "Colombo"}),
+    )
+    changed = _enrich_location_from_detail(db_session, prospect, detail)
+    assert changed is True
+    assert prospect.suburb == "Piliyandala"
+    assert prospect.suburb_source == "ikman_detail"
+    assert prospect.location == "Colombo"
