@@ -96,6 +96,11 @@ export default async function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="#services" className={linkClass}>
+                  Services
+                </Link>
+              </li>
+              <li>
                 <Link href="#journey" className={linkClass}>
                   About
                 </Link>

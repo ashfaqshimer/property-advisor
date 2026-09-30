@@ -1,6 +1,7 @@
 import Navbar from "@/components/layout/Navbar";
 import Hero from "@/components/layout/Hero";
 import HowItWorks from "@/components/home/HowItWorks";
+import ServicesSection from "@/components/home/ServicesSection";
 import PropertyJourney from "@/components/home/PropertyJourney";
 import FeaturedProperties from "@/components/home/FeaturedProperties";
 import IslandWideReach from "@/components/home/IslandWideReach";
@@ -15,6 +16,7 @@ export default function Home() {
       <main className="flex-1">
         <Hero />
         <HowItWorks />
+        <ServicesSection />
         <PropertyJourney />
         <FeaturedProperties />
         <IslandWideReach />
