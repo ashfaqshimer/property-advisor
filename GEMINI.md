@@ -4,7 +4,7 @@
 
 * **Project:** Property Advisor – A real estate brokerage platform for the Sri Lankan (Colombo-focused) market.
 * **AI Persona:** Amaya (female, early twenties). The agent chats with buyers/renters to match properties and capture leads. Do not rename the brand or persona.
-* **Current State:** Frontend shell is complete using local fixtures. Backend (Render) has DB layer and agent loop, but the API endpoints (`POST /chat`, `GET /properties`) are not yet wired.
+* **Current State:** The full public-facing stack and admin dashboard are live and connected. Observability (structured JSON logging via structlog) is active in production. Frontend is deployed on Vercel, backend on Render.
 * **Core Constraint:** The agent uses a **hand-rolled tool-calling loop** against the raw Gemini API (`gemini-3.1-flash-lite`). **Do not use LangChain, LangGraph, or any agent frameworks.**
 
 ## Workflow & Efficiency Rules
@@ -42,3 +42,14 @@
 * **Scope:** Only access the `property-advisor` database.
 * **Environment:** You may access both development and production data.
 * **CRITICAL SAFETY RULE:** **NEVER** edit or delete production data without explicit user confirmation. If you are attempting to delete or edit production data, you must ask the user repeatedly to confirm before proceeding.
+
+## Deployment & Infrastructure (Render MCP)
+
+* **Workspace:** `Hobby Projects` (`tea-d9d7ejrbc2fs73emal00`)
+* **Service:** `property-advisor` (ID: `srv-da2as415efls73erss9g`, slug: `property-advisor-96sg`)
+* **URL:** `https://property-advisor-96sg.onrender.com`
+* **Root Dir:** `backend/`
+* **Build Command:** `pip install uv && uv sync --frozen --no-dev && uv run alembic upgrade head`
+* **Start Command:** `uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+* **Render MCP:** Enabled via server `render`. Available tools include `list_services`, `get_service`, `list_deploys`, `trigger_deploy`, `list_logs`, `update_environment_variables`, and `get_metrics`.
+
