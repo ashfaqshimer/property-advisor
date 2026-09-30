@@ -73,6 +73,8 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    telegram_leads_thread_id: int | None = None
+    telegram_alerts_thread_id: int | None = None
 
     @property
     def cloudinary_configured(self) -> bool:

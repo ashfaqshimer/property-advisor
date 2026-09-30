@@ -127,6 +127,7 @@ def send_telegram_notification(
     text: str,
     reply_markup: dict[str, Any] | None = None,
     *,
+    thread_id: int | None = None,
     sync: bool = False,
 ) -> bool:
     """Send a notification message to the configured Telegram chat.
@@ -148,6 +149,11 @@ def send_telegram_notification(
         "text": text,
         "parse_mode": "HTML",
     }
+    # Only supergroups (negative IDs) support message threads / topics.
+    # Passing message_thread_id to private user chats causes Telegram 400.
+    if thread_id is not None and chat_id.startswith("-"):
+        payload["message_thread_id"] = thread_id
+
     if reply_markup:
         payload["reply_markup"] = reply_markup
 
@@ -159,7 +165,11 @@ def send_telegram_notification(
                 if not data.get("ok"):
                     logger.warning("telegram_send_failed", status=resp.status_code, response=data)
                     return False
-                logger.info("telegram_notification_sent", chat_id=chat_id)
+                logger.info(
+                    "telegram_notification_sent",
+                    chat_id=chat_id,
+                    thread_id=payload.get("message_thread_id"),
+                )
                 return True
         except Exception as e:
             logger.warning("telegram_send_error", error=str(e))
@@ -185,6 +195,7 @@ def send_lead_alert(
     remarks: str | None = None,
     source: str | None = None,
     property_id: UUID | None = None,
+    thread_id: int | None = None,
     sync: bool = False,
 ) -> bool:
     """Format and send a new lead alert to Telegram."""
@@ -201,4 +212,44 @@ def send_lead_alert(
         property_id=property_id,
     )
     keyboard = build_inline_keyboard(phone)
-    return send_telegram_notification(text, reply_markup=keyboard, sync=sync)
+    settings = get_settings()
+    target_thread_id = (
+        thread_id if thread_id is not None else settings.telegram_leads_thread_id
+    )
+    return send_telegram_notification(
+        text,
+        reply_markup=keyboard,
+        thread_id=target_thread_id,
+        sync=sync,
+    )
+
+
+def send_system_alert(
+    title: str,
+    details: str,
+    *,
+    level: str = "ERROR",
+    thread_id: int | None = None,
+    sync: bool = False,
+) -> bool:
+    """Format and send a technical system error or quota warning to Telegram."""
+    emoji = "⚠️" if level.upper() == "WARNING" else "🚨"
+    settings = get_settings()
+    env = settings.app_environment.upper()
+
+    lines = [
+        f"{emoji} <b>System Alert: {html.escape(title)}</b> [{html.escape(env)}]",
+        "",
+        f"<b>Level:</b> {html.escape(level.upper())}",
+        "<b>Details:</b>",
+        f"<pre>{html.escape(details)}</pre>",
+    ]
+    text = "\n".join(lines)
+    target_thread_id = (
+        thread_id if thread_id is not None else settings.telegram_alerts_thread_id
+    )
+    return send_telegram_notification(
+        text,
+        thread_id=target_thread_id,
+        sync=sync,
+    )

@@ -113,3 +113,55 @@ def test_send_telegram_notification_api_failure():
         # Never raises, returns False gracefully
         result = send_telegram_notification("Test", sync=True)
         assert result is False
+
+
+def test_send_telegram_notification_thread_routing():
+    with patch("app.services.notifications.get_settings") as mock_settings, patch(
+        "httpx.Client.post"
+    ) as mock_post:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"ok": True}
+        mock_post.return_value = mock_resp
+
+        # 1. Supergroup (starts with -) includes thread ID
+        mock_settings.return_value.telegram_bot_token = "123:ABC"
+        mock_settings.return_value.telegram_chat_id = "-100123456"
+        send_telegram_notification("Group topic msg", thread_id=18, sync=True)
+        _, kwargs = mock_post.call_args
+        assert kwargs["json"]["message_thread_id"] == 18
+
+        # 2. Private chat (positive ID) ignores thread ID to prevent Telegram 400 error
+        mock_settings.return_value.telegram_chat_id = "5043469550"
+        send_telegram_notification("Private DM msg", thread_id=18, sync=True)
+        _, kwargs = mock_post.call_args
+        assert "message_thread_id" not in kwargs["json"]
+
+
+def test_send_system_alert():
+    from app.services.notifications import send_system_alert
+
+    with patch("app.services.notifications.get_settings") as mock_settings, patch(
+        "httpx.Client.post"
+    ) as mock_post:
+        mock_settings.return_value.telegram_bot_token = "123:ABC"
+        mock_settings.return_value.telegram_chat_id = "-100123456"
+        mock_settings.return_value.telegram_alerts_thread_id = 19
+        mock_settings.return_value.app_environment = "production"
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"ok": True}
+        mock_post.return_value = mock_resp
+
+        ok = send_system_alert(
+            title="Gemini Quota Exceeded",
+            details="ResourceExhausted: 429 quota exceeded for gemini-3.1-flash-lite",
+            level="WARNING",
+            sync=True,
+        )
+        assert ok is True
+        _, kwargs = mock_post.call_args
+        payload = kwargs["json"]
+        assert payload["message_thread_id"] == 19
+        assert "System Alert: Gemini Quota Exceeded" in payload["text"]
+        assert "ResourceExhausted: 429" in payload["text"]
+        assert "[PRODUCTION]" in payload["text"]
