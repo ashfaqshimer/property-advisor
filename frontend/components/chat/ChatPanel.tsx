@@ -71,7 +71,13 @@ type Failure = {
   error: ChatError;
 };
 
-export default function ChatPanel() {
+export default function ChatPanel({
+  className = "",
+  onClose,
+}: {
+  className?: string;
+  onClose?: () => void;
+} = {}) {
   const [featuredProperties, setFeaturedProperties] = useState<Property[] | null>(null);
   const [isServicesLayout, setIsServicesLayout] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -294,6 +300,22 @@ export default function ChatPanel() {
     }
   };
 
+  useEffect(() => {
+    const handleOpenChat = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prompt?: string }>;
+      const prompt = customEvent.detail?.prompt;
+      if (prompt) {
+        submit(prompt);
+      }
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    };
+
+    window.addEventListener("open-amaya-chat", handleOpenChat);
+    return () => window.removeEventListener("open-amaya-chat", handleOpenChat);
+  }, [pending]);
+
   const canSend = draft.trim().length > 0 && !pending;
   const hasStartedChat = messages.some((message) => message.role === "user");
   const isServicesMode =
@@ -324,8 +346,28 @@ export default function ChatPanel() {
       id="chat"
       aria-label="AI agent chat"
       tabIndex={-1}
-      className="flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand transition-[height] duration-300 ease-in-out lg:sticky lg:top-panel-inset lg:max-h-panel-max lg:h-[760px]"
+      className={`relative flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand transition-[height] duration-300 ease-in-out lg:sticky lg:top-panel-inset lg:max-h-panel-max lg:h-[760px] ${className}`}
     >
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close chat"
+          className="absolute top-4 right-4 z-20 flex size-8 cursor-pointer items-center justify-center rounded-full bg-white/80 border border-neutral-200/80 text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-4"
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      )}
       <AnimatePresence mode="wait" initial={false}>
         {!hasStartedChat ? (
           /* Showcase Card before conversation begins */

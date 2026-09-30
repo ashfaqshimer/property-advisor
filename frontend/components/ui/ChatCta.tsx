@@ -1,37 +1,37 @@
-/** Padding only — the hero's CTA is a headline-scale control, the header's is not. */
+"use client";
+
+import { openChat } from "@/lib/chat-dialog";
+
 const SIZES = {
-  sm: "px-4 py-2",
-  lg: "px-6 py-3",
+  sm: "px-4 py-2 text-xs",
+  md: "px-5 py-2.5 text-sm",
+  lg: "px-6 py-3 text-sm",
 };
 
-/**
- * The site's single call to action. Used by the hero and, three times over, by
- * the header (desktop row and mobile panel).
- *
- * An anchor, not a button: the target is a real element on the page, so this
- * works with no JS and is keyboard reachable without any extra handling.
- *
- * Size is a prop rather than an overridable class because two competing `px-*`
- * utilities in one class list resolve by stylesheet order, not by argument
- * order — passing `px-4` via className would not reliably beat the default.
- */
 export default function ChatCta({
   className = "",
-  size = "lg",
+  size = "md",
+  label = "Talk to Amaya",
   onClick,
 }: {
   className?: string;
   size?: keyof typeof SIZES;
-  /** Lets the header's mobile panel close itself when the CTA is used. */
+  label?: string;
   onClick?: () => void;
 }) {
+  const handleClick = () => {
+    openChat();
+    onClick?.();
+  };
+
   return (
     <a
       href="#chat"
-      onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-full bg-brand ${SIZES[size]} text-sm font-semibold text-on-brand transition-colors hover:bg-brand/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${className}`}
+      onClick={handleClick}
+      aria-label="Chat with our AI Agent"
+      className={`group inline-flex items-center gap-2 rounded-full bg-brand font-medium text-on-brand shadow-xs transition-all hover:bg-[#233c32] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${SIZES[size]} ${className}`}
     >
-      {/* Decorative. The accessible name has to come from the label alone. */}
+      <span>{label}</span>
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"
@@ -40,11 +40,10 @@ export default function ChatCta({
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="size-4 shrink-0"
+        className="size-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5"
       >
-        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+        <path d="M5 12h14M12 5l7 7-7 7" />
       </svg>
-      Chat with our AI Agent
     </a>
   );
 }
