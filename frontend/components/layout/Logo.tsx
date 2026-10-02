@@ -1,6 +1,6 @@
 /**
- * Brand mark — minimalist house outline icon + "Property Advisor" wordmark.
- * Matches the refined modern aesthetic in the design mockup.
+ * Brand mark — minimalist house outline icon + "Property Advisor" wordmark
+ * with "Better Advice, Brighter Moves" tagline beneath.
  */
 export default function Logo({ className = "" }: { className?: string }) {
   return (
@@ -18,8 +18,13 @@ export default function Logo({ className = "" }: { className?: string }) {
         <path d="M3 10.5 12 3l9 7.5" />
         <path d="M5 9v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
       </svg>
-      <span className="font-bold text-base sm:text-lg tracking-[0.16em] uppercase text-ink">
-        Property Advisor
+      <span className="flex flex-col leading-tight">
+        <span className="font-bold text-base sm:text-lg tracking-[0.16em] uppercase text-ink">
+          Property Advisor
+        </span>
+        <span className="text-[0.6rem] tracking-[0.12em] text-neutral-500 uppercase">
+          Better Advice, Brighter Moves
+        </span>
       </span>
     </span>
   );

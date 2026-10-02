@@ -11,6 +11,7 @@ import {
   FaLinkedin,
 } from "react-icons/fa6";
 import { RiInstagramFill } from "react-icons/ri";
+import { IoLogoWhatsapp } from "react-icons/io";
 
 const linkClass =
   "rounded-sm transition-colors hover:text-brand focus-visible:ring-2 " +
@@ -55,6 +56,16 @@ export default async function Footer() {
     href: siteConfig?.x_link?.value || "https://x.com",
     icon: <FaXTwitter aria-hidden="true" className={iconClass} />,
   });
+
+  // WhatsApp — only shown when configured in the admin panel
+  if (siteConfig?.whatsapp?.show && siteConfig.whatsapp.value) {
+    const sanitized = siteConfig.whatsapp.value.replace(/[^\d+]/g, "");
+    socialLinks.push({
+      label: "WhatsApp",
+      href: `https://wa.me/${sanitized}`,
+      icon: <IoLogoWhatsapp aria-hidden="true" className={iconClass} />,
+    });
+  }
 
   const hasPhone =
     siteConfig?.phone_numbers?.show &&
