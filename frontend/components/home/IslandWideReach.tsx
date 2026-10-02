@@ -168,84 +168,104 @@ export default function IslandWideReach() {
                     strokeLinejoin="round"
                   />
 
-                  {/* Colombo Hub Indicator - Sleek dual-ring with smooth ambient beacon breath */}
-                  <g
-                    className="cursor-pointer"
-                    onClick={() => handleLocationClick("Colombo")}
-                    onMouseEnter={() => setActiveCity("Colombo")}
-                    onMouseLeave={() => setActiveCity(null)}
-                  >
-                    <title>Colombo (Main Hub)</title>
-                    {/* Layer 1: Ambient beacon breathing ring (smooth 3s expansion) */}
-                    <circle
-                      cx="45.9"
-                      cy="199.8"
-                      r="4"
-                      className="fill-[#2c4a3e]/10 stroke-[#2c4a3e]/40 stroke-[0.8]"
-                    >
-                      <animate
-                        attributeName="r"
-                        values="4;13;13"
-                        keyTimes="0;0.7;1"
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="0.7;0;0"
-                        keyTimes="0;0.7;1"
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                    </circle>
+                  {/* Colombo Hub Indicator - Sleek beacon pulse & focal pin */}
+                  {(() => {
+                    const colomboPin = REGION_PINS.find((p) => p.id === "colombo");
+                    const isColomboHighlighted =
+                      activeCity !== null &&
+                      (colomboPin?.matchedCities.includes(activeCity) ?? false);
 
-                    {/* Layer 2: Offset ambient beacon ring for continuous tranquil pulse */}
-                    <circle
-                      cx="45.9"
-                      cy="199.8"
-                      r="4"
-                      className="fill-[#2c4a3e]/10 stroke-[#2c4a3e]/40 stroke-[0.8]"
-                    >
-                      <animate
-                        attributeName="r"
-                        values="4;13;13"
-                        keyTimes="0;0.7;1"
-                        dur="3s"
-                        begin="1.5s"
-                        repeatCount="indefinite"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="0.7;0;0"
-                        keyTimes="0;0.7;1"
-                        dur="3s"
-                        begin="1.5s"
-                        repeatCount="indefinite"
-                      />
-                    </circle>
+                    return (
+                      <g
+                        className="cursor-pointer"
+                        onClick={() => handleLocationClick("Colombo")}
+                        onMouseEnter={() => setActiveCity("Colombo")}
+                        onMouseLeave={() => setActiveCity(null)}
+                      >
+                        <title>Colombo (Main Hub)</title>
+                        {/* Layer 1: Continuous beacon ripple wave 1 */}
+                        <circle
+                          cx="45.9"
+                          cy="199.8"
+                          r="4"
+                          fill="#2c4a3e"
+                          fillOpacity="0.2"
+                          stroke="#2c4a3e"
+                          strokeWidth="1.2"
+                        >
+                          <animate
+                            attributeName="r"
+                            from="4"
+                            to="22"
+                            dur="2.4s"
+                            repeatCount="indefinite"
+                          />
+                          <animate
+                            attributeName="opacity"
+                            from="0.85"
+                            to="0"
+                            dur="2.4s"
+                            repeatCount="indefinite"
+                          />
+                        </circle>
 
-                    {/* Base resting halo */}
-                    <circle
-                      cx="45.9"
-                      cy="199.8"
-                      r="6.5"
-                      className="fill-[#2c4a3e]/10 stroke-[#2c4a3e]/25 stroke-[0.8]"
-                    />
-                    {/* Crisp white knockout ring */}
-                    <circle
-                      cx="45.9"
-                      cy="199.8"
-                      r="3.8"
-                      className="fill-white stroke-[#2c4a3e] stroke-[1.2]"
-                    />
-                    {/* Solid inner center dot */}
-                    <circle
-                      cx="45.9"
-                      cy="199.8"
-                      r="2"
-                      className="fill-[#2c4a3e]"
-                    />
-                  </g>
+                        {/* Layer 2: Continuous beacon ripple wave 2 (offset) */}
+                        <circle
+                          cx="45.9"
+                          cy="199.8"
+                          r="4"
+                          fill="#2c4a3e"
+                          fillOpacity="0.2"
+                          stroke="#2c4a3e"
+                          strokeWidth="1.2"
+                        >
+                          <animate
+                            attributeName="r"
+                            from="4"
+                            to="22"
+                            dur="2.4s"
+                            begin="1.2s"
+                            repeatCount="indefinite"
+                          />
+                          <animate
+                            attributeName="opacity"
+                            from="0.85"
+                            to="0"
+                            dur="2.4s"
+                            begin="1.2s"
+                            repeatCount="indefinite"
+                          />
+                        </circle>
+
+                        {/* Base resting halo / hover highlight */}
+                        <circle
+                          cx="45.9"
+                          cy="199.8"
+                          r={isColomboHighlighted ? 8 : 6.5}
+                          fill="#2c4a3e"
+                          fillOpacity={isColomboHighlighted ? 0.25 : 0.12}
+                          stroke="#2c4a3e"
+                          strokeWidth="0.8"
+                          strokeOpacity={isColomboHighlighted ? 0.6 : 0.3}
+                          className="transition-all duration-200"
+                        />
+                        {/* Crisp white knockout ring */}
+                        <circle
+                          cx="45.9"
+                          cy="199.8"
+                          r={isColomboHighlighted ? 4.5 : 3.8}
+                          className="fill-white stroke-[#2c4a3e] stroke-[1.5] transition-all duration-200"
+                        />
+                        {/* Solid inner center dot */}
+                        <circle
+                          cx="45.9"
+                          cy="199.8"
+                          r={isColomboHighlighted ? 2.5 : 2}
+                          className="fill-[#2c4a3e] transition-all duration-200"
+                        />
+                      </g>
+                    );
+                  })()}
 
                   {/* Regional City Pins with interactive hover/active states */}
                   {REGION_PINS.filter((p) => !p.isHub).map((pin) => {
@@ -267,7 +287,12 @@ export default function IslandWideReach() {
                             cx={pin.cx}
                             cy={pin.cy}
                             r="7"
-                            className="fill-[#2c4a3e]/15 stroke-[#2c4a3e]/40 stroke-[0.8] animate-pulse"
+                            fill="#2c4a3e"
+                            fillOpacity="0.2"
+                            stroke="#2c4a3e"
+                            strokeWidth="1"
+                            strokeOpacity="0.6"
+                            className="animate-pulse"
                           />
                         )}
                         <circle
