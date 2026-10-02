@@ -153,10 +153,6 @@ export default function Hero() {
                     height={48}
                     className="size-full object-cover"
                   />
-                  <span
-                    className="absolute bottom-0 right-0 size-3 rounded-full bg-emerald-500 ring-2 ring-white"
-                    aria-hidden="true"
-                  />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-ink">Meet Amaya</h3>

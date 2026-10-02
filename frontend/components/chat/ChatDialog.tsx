@@ -72,10 +72,6 @@ export default function ChatDialog() {
                   height={40}
                   className="size-full object-cover"
                 />
-                <span
-                  className="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-400 ring-2 ring-brand"
-                  aria-hidden="true"
-                />
               </div>
               <div className="text-left">
                 <p className="text-xs font-semibold leading-tight">Ask Amaya</p>
