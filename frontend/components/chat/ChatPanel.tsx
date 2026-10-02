@@ -117,6 +117,13 @@ export default function ChatPanel({
     textarea.style.height = `${nextHeight}px`;
   }, []);
 
+  const nextId = (role: ChatMessage["role"]) => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return `${role}-${crypto.randomUUID()}`;
+    }
+    return `${role}-${Date.now()}-${++messageCountRef.current}`;
+  };
+
   /** Restore chat session from sessionStorage on client load */
   useEffect(() => {
     if (typeof window === "undefined" || process.env.NODE_ENV === "test") return;
@@ -125,7 +132,17 @@ export default function ChatPanel({
       if (raw) {
         const data = JSON.parse(raw);
         if (Array.isArray(data.messages) && data.messages.length > 0) {
-          setMessages(data.messages);
+          const seenIds = new Set<string>();
+          const sanitizedMessages: ChatMessage[] = data.messages.map((msg: ChatMessage) => {
+            if (!msg.id || seenIds.has(msg.id)) {
+              const uniqueId = nextId(msg.role || "agent");
+              seenIds.add(uniqueId);
+              return { ...msg, id: uniqueId };
+            }
+            seenIds.add(msg.id);
+            return msg;
+          });
+          setMessages(sanitizedMessages);
         }
         if (typeof data.sessionId === "string" && data.sessionId) {
           sessionIdRef.current = data.sessionId;
@@ -182,9 +199,6 @@ export default function ChatPanel({
 
   /** Lazy so it never runs on the server, where `crypto.randomUUID` would be pointless. */
   const sessionId = () => (sessionIdRef.current ??= crypto.randomUUID());
-
-  /** A counter, not a UUID: these ids only have to be unique within one mounted panel. */
-  const nextId = (role: ChatMessage["role"]) => `${role}-${++messageCountRef.current}`;
 
   useEffect(() => {
     wakeBackend();

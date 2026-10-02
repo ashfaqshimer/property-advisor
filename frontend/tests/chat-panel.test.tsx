@@ -263,6 +263,24 @@ describe("sending a message", () => {
     expect(input()).toHaveValue("");
   });
 
+  it("assigns unique keys across turns and avoids duplicate child keys", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    stubBackend(() => reply("Understood."));
+    render(<ChatPanel />);
+
+    sendText("First question");
+    await act(async () => {});
+
+    sendText("Second question");
+    await act(async () => {});
+
+    const duplicateKeyCalls = errorSpy.mock.calls.filter((args) =>
+      args.some((arg) => typeof arg === "string" && arg.includes("same key"))
+    );
+    expect(duplicateKeyCalls).toHaveLength(0);
+    errorSpy.mockRestore();
+  });
+
   it("does not submit the message when pressing Shift + Enter", () => {
     stubBackend();
     render(<ChatPanel />);
