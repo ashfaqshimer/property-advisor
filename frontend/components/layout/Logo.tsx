@@ -1,8 +1,43 @@
+import Image from "next/image";
+
+interface LogoProps {
+  className?: string;
+  variant?: "vector" | "minimal";
+}
+
 /**
- * Brand mark — minimalist house outline icon + "Property Advisor" wordmark
- * with "Better Advice, Brighter Moves" tagline beneath.
+ * Brand mark:
+ * - "vector": Vector emblem icon + separated text SVG side by side for the Navbar.
+ * - "minimal": Lightweight inline SVG house icon + HTML text wordmark for footer.
  */
-export default function Logo({ className = "" }: { className?: string }) {
+export default function Logo({
+  className = "",
+  variant = "minimal",
+}: LogoProps) {
+  if (variant === "vector") {
+    return (
+      <span className={`inline-flex items-center gap-2.5 sm:gap-3 ${className}`}>
+        <Image
+          src="/Property_Advisor_Icon.svg"
+          alt=""
+          width={56}
+          height={56}
+          className="size-11 sm:size-14 shrink-0 w-auto h-11 sm:h-14 object-contain"
+          aria-hidden="true"
+          priority
+        />
+        <Image
+          src="/Property_Advisor_Text.svg"
+          alt="Property Advisor"
+          width={140}
+          height={56}
+          className="h-10 sm:h-[52px] w-auto shrink-0 object-contain"
+          priority
+        />
+      </span>
+    );
+  }
+
   return (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <svg
