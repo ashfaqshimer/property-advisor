@@ -9,6 +9,7 @@ class IkmanCategory(BaseModel):
 
 class IkmanLocation(BaseModel):
     name: str | None = None
+    parent: dict[str, Any] | None = None
 
 
 class IkmanContactCard(BaseModel):

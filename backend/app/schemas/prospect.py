@@ -11,6 +11,10 @@ class ProspectBase(BaseModel):
     title: str
     price: str
     location: str
+    suburb: str | None = None
+    suburb_source: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     property_type: str
     listing_type: str
     poster_name: str | None = None

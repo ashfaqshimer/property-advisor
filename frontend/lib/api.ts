@@ -903,6 +903,10 @@ export type Prospect = {
   title: string;
   price: string;
   location: string;
+  suburb?: string | null;
+  suburb_source?: "extracted" | "ikman_detail" | null;
+  latitude?: number | null;
+  longitude?: number | null;
   property_type: string;
   listing_type: string;
   poster_name: string | null;
