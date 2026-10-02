@@ -87,38 +87,41 @@ export default function ChatDialog() {
       </AnimatePresence>
 
       {/* Slide-over Dialog */}
-      <AnimatePresence>
-        {isOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-              aria-hidden="true"
-            />
+      <div
+        className={`fixed inset-0 z-50 flex justify-end ${
+          isOpen ? "pointer-events-auto" : "pointer-events-none"
+        }`}
+        aria-hidden={!isOpen}
+        inert={!isOpen ? true : undefined}
+      >
+        {/* Backdrop */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: isOpen ? 1 : 0 }}
+          transition={{ duration: 0.25 }}
+          onClick={() => setIsOpen(false)}
+          className={`fixed inset-0 bg-black/50 backdrop-blur-xs ${
+            isOpen ? "pointer-events-auto" : "pointer-events-none"
+          }`}
+          aria-hidden="true"
+        />
 
-            {/* Slide-in Container */}
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              className="relative z-50 flex h-full w-full max-w-lg flex-col bg-surface shadow-2xl sm:max-w-xl"
-            >
-              <div className="h-full w-full overflow-hidden">
-                <ChatPanel
-                  className="h-full max-h-none min-h-0 rounded-none border-0 shadow-none lg:h-full lg:max-h-none lg:sticky-none"
-                  onClose={() => setIsOpen(false)}
-                />
-              </div>
-            </motion.div>
+        {/* Slide-in Container */}
+        <motion.div
+          initial={false}
+          animate={{ x: isOpen ? 0 : "100%" }}
+          transition={{ type: "spring", damping: 28, stiffness: 280 }}
+          className="relative z-50 flex h-full w-full max-w-lg flex-col bg-surface shadow-2xl sm:max-w-xl pointer-events-auto"
+        >
+          <div className="h-full w-full overflow-hidden">
+            <ChatPanel
+              className="h-full max-h-none min-h-0 rounded-none border-0 shadow-none lg:h-full lg:max-h-none lg:sticky-none"
+              onClose={() => setIsOpen(false)}
+              isOpen={isOpen}
+            />
           </div>
-        )}
-      </AnimatePresence>
+        </motion.div>
+      </div>
     </>
   );
 }

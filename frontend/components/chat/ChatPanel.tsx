@@ -71,12 +71,16 @@ type Failure = {
   error: ChatError;
 };
 
+const SESSION_STORAGE_KEY = "property_advisor_chat_session";
+
 export default function ChatPanel({
   className = "",
   onClose,
+  isOpen,
 }: {
   className?: string;
   onClose?: () => void;
+  isOpen?: boolean;
 } = {}) {
   const [featuredProperties, setFeaturedProperties] = useState<Property[] | null>(null);
   const [isServicesLayout, setIsServicesLayout] = useState(false);
@@ -111,6 +115,69 @@ export default function ChatPanel({
     textarea.style.height = "auto";
     const nextHeight = Math.min(Math.max(textarea.scrollHeight, 24), 140);
     textarea.style.height = `${nextHeight}px`;
+  }, []);
+
+  /** Restore chat session from sessionStorage on client load */
+  useEffect(() => {
+    if (typeof window === "undefined" || process.env.NODE_ENV === "test") return;
+    try {
+      const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          setMessages(data.messages);
+        }
+        if (typeof data.sessionId === "string" && data.sessionId) {
+          sessionIdRef.current = data.sessionId;
+        }
+      }
+    } catch {}
+  }, []);
+
+  /** Save chat session to sessionStorage across user turns */
+  useEffect(() => {
+    if (typeof window === "undefined" || process.env.NODE_ENV === "test") return;
+    try {
+      if (messages.length > 1 || messages[0]?.id !== "greeting") {
+        sessionStorage.setItem(
+          SESSION_STORAGE_KEY,
+          JSON.stringify({
+            sessionId: sessionIdRef.current,
+            messages,
+          })
+        );
+      }
+    } catch {}
+  }, [messages]);
+
+  /** When modal opens, scroll to latest message and focus input */
+  useEffect(() => {
+    if (isOpen) {
+      listEndRef.current?.scrollIntoView?.({ block: "nearest" });
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleResetChat = useCallback(() => {
+    sessionIdRef.current = crypto.randomUUID();
+    setMessages([{ id: "greeting", role: "agent", text: GREETING }]);
+    setDraft("");
+    setFailure(null);
+    setStatusHint(null);
+    setIsReading(false);
+    setIsGenerating(false);
+    setPending(false);
+    if (typeof window !== "undefined" && process.env.NODE_ENV !== "test") {
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {}
+    }
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
   }, []);
 
   /** Lazy so it never runs on the server, where `crypto.randomUUID` would be pointless. */
@@ -348,26 +415,51 @@ export default function ChatPanel({
       tabIndex={-1}
       className={`relative flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand transition-[height] duration-300 ease-in-out lg:sticky lg:top-panel-inset lg:max-h-panel-max lg:h-[760px] ${className}`}
     >
-      {onClose && (
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close chat"
-          className="absolute top-4 right-4 z-20 flex size-8 cursor-pointer items-center justify-center rounded-full bg-white/80 border border-neutral-200/80 text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-4"
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        {hasStartedChat && (
+          <button
+            type="button"
+            onClick={handleResetChat}
+            aria-label="Start new conversation"
+            title="Start new conversation"
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-white/80 border border-neutral-200/80 text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
           >
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </button>
-      )}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-4"
+              aria-hidden="true"
+            >
+              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
+          </button>
+        )}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close chat"
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-white/80 border border-neutral-200/80 text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-4"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
       <AnimatePresence mode="wait" initial={false}>
         {!hasStartedChat ? (
           /* Showcase Card before conversation begins */
