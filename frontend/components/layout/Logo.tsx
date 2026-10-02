@@ -2,13 +2,14 @@ import Image from "next/image";
 
 interface LogoProps {
   className?: string;
-  variant?: "vector" | "minimal";
+  variant?: "vector" | "minimal" | "stacked";
 }
 
 /**
  * Brand mark:
  * - "vector": Vector emblem icon + separated text SVG side by side for the Navbar.
- * - "minimal": Lightweight inline SVG house icon + HTML text wordmark for footer.
+ * - "stacked": Vector emblem icon on top of text SVG vertically for the Footer.
+ * - "minimal": Lightweight inline SVG house icon + HTML text wordmark.
  */
 export default function Logo({
   className = "",
@@ -33,6 +34,28 @@ export default function Logo({
           height={56}
           className="h-10 sm:h-[52px] w-auto shrink-0 object-contain"
           priority
+        />
+      </span>
+    );
+  }
+
+  if (variant === "stacked") {
+    return (
+      <span className={`inline-flex flex-col items-center gap-3 sm:gap-4 ${className}`}>
+        <Image
+          src="/Property_Advisor_Icon.svg"
+          alt=""
+          width={96}
+          height={96}
+          className="size-20 sm:size-24 shrink-0 w-auto h-20 sm:h-24 object-contain"
+          aria-hidden="true"
+        />
+        <Image
+          src="/Property_Advisor_Text.svg"
+          alt="Property Advisor"
+          width={160}
+          height={65}
+          className="h-10 sm:h-12 w-auto shrink-0 object-contain"
         />
       </span>
     );

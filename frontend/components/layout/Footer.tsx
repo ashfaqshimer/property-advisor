@@ -86,10 +86,11 @@ export default async function Footer() {
           {/* Brand Column (Left) */}
           <div className="lg:col-span-5">
             <Link href="/" className="inline-block">
-              <Logo />
+              <Logo variant="stacked" />
             </Link>
-            <p className="mt-3 text-xs tracking-wider text-neutral-500 uppercase">
-              Find better. Understand more.
+            <p className="mt-4 max-w-sm text-sm/6 text-neutral-600">
+              Colombo-based, island-wide reach. Thoughtful, AI-guided property
+              search across Sri Lanka.
             </p>
           </div>
 
