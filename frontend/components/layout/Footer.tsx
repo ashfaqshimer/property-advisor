@@ -133,10 +133,16 @@ export default async function Footer() {
                   </p>
                 )}
                 {hasPhone && (
-                  <p className="flex items-center gap-2">
-                    <FaPhone className="size-3 text-neutral-400" />
-                    <span>{siteConfig?.phone_numbers?.values?.[0]}</span>
-                  </p>
+                  <div className="flex items-start gap-2">
+                    <FaPhone className="size-3 text-neutral-400 mt-0.5 shrink-0" />
+                    <div className="flex flex-col gap-1">
+                      {siteConfig?.phone_numbers?.values?.map((phone, i) => (
+                        <a key={i} href={`tel:${phone.replace(/\s+/g, "")}`} className="hover:text-brand transition-colors">
+                          {phone}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {hasCity && (
                   <p className="flex items-center gap-2">
