@@ -133,6 +133,7 @@ describe("property mapping", () => {
       sqft: null,
       imageUrl: "https://images.unsplash.com/photo-villa",
       imageAlt: "White villa beside a pool",
+      listingType: "sale",
     });
   });
 
