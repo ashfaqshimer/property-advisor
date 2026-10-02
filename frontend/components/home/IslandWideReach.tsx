@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Container from "@/components/layout/Container";
 import { openChat } from "@/lib/chat-dialog";
@@ -16,7 +17,69 @@ const LOCATIONS = [
   "Mount Lavinia",
 ];
 
+const REGION_PINS = [
+  {
+    id: "colombo",
+    name: "Colombo",
+    cx: 45.9,
+    cy: 199.8,
+    isHub: true,
+    matchedCities: ["Colombo", "Dehiwala", "Rajagiriya", "Nugegoda", "Battaramulla", "Mount Lavinia"],
+  },
+  {
+    id: "negombo",
+    name: "Negombo",
+    cx: 44.3,
+    cy: 182.5,
+    matchedCities: ["Negombo"],
+  },
+  {
+    id: "kandy",
+    name: "Kandy",
+    cx: 93.0,
+    cy: 177.5,
+    matchedCities: ["Kandy"],
+  },
+  {
+    id: "galle",
+    name: "Galle",
+    cx: 67.6,
+    cy: 253.5,
+    matchedCities: ["Galle"],
+  },
+  {
+    id: "matara",
+    name: "Matara",
+    cx: 88.1,
+    cy: 259.6,
+    matchedCities: ["Matara"],
+  },
+  {
+    id: "jaffna",
+    name: "Jaffna",
+    cx: 54.8,
+    cy: 31.7,
+    matchedCities: ["Jaffna"],
+  },
+  {
+    id: "trincomalee",
+    name: "Trincomalee",
+    cx: 129.4,
+    cy: 97.8,
+    matchedCities: ["Trincomalee"],
+  },
+  {
+    id: "batticaloa",
+    name: "Batticaloa",
+    cx: 157.4,
+    cy: 151.7,
+    matchedCities: ["Batticaloa"],
+  },
+];
+
 export default function IslandWideReach() {
+  const [activeCity, setActiveCity] = useState<string | null>(null);
+
   const handleLocationClick = (loc: string) => {
     openChat(`Show me properties in ${loc}`);
   };
@@ -89,11 +152,11 @@ export default function IslandWideReach() {
 
             {/* Map Outline Graphic & City List Grid */}
             <div className="mt-10 grid grid-cols-1 items-center gap-8 rounded-2xl border border-neutral-200/80 bg-white p-6 shadow-xs sm:grid-cols-12 sm:gap-6">
-              {/* Sri Lanka Stylized Silhouette SVG with glowing location dots */}
+              {/* Sri Lanka Stylized Silhouette SVG with gentle beacon & interactive pins */}
               <div className="flex justify-center sm:col-span-5">
                 <svg
                   viewBox="0 0 200 280"
-                  className="h-60 w-auto drop-shadow-sm"
+                  className="h-60 w-auto drop-shadow-sm select-none"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
                   aria-label="Map of Sri Lanka with covered regions"
@@ -105,48 +168,148 @@ export default function IslandWideReach() {
                     strokeLinejoin="round"
                   />
 
-                  {/* Colombo Dot & Ping Wave */}
-                  <circle cx="45.9" cy="199.8" r="4.5" className="fill-[#2c4a3e]" />
-                  <circle cx="45.9" cy="199.8" r="9" className="animate-ping fill-[#2c4a3e]/30" />
+                  {/* Colombo Hub Indicator - Sleek dual-ring with smooth ambient beacon breath */}
+                  <g
+                    className="cursor-pointer"
+                    onClick={() => handleLocationClick("Colombo")}
+                    onMouseEnter={() => setActiveCity("Colombo")}
+                    onMouseLeave={() => setActiveCity(null)}
+                  >
+                    <title>Colombo (Main Hub)</title>
+                    {/* Layer 1: Ambient beacon breathing ring (smooth 3s expansion) */}
+                    <circle
+                      cx="45.9"
+                      cy="199.8"
+                      r="4"
+                      className="fill-[#2c4a3e]/10 stroke-[#2c4a3e]/40 stroke-[0.8]"
+                    >
+                      <animate
+                        attributeName="r"
+                        values="4;13;13"
+                        keyTimes="0;0.7;1"
+                        dur="3s"
+                        repeatCount="indefinite"
+                      />
+                      <animate
+                        attributeName="opacity"
+                        values="0.7;0;0"
+                        keyTimes="0;0.7;1"
+                        dur="3s"
+                        repeatCount="indefinite"
+                      />
+                    </circle>
 
-                  {/* Negombo */}
-                  <circle cx="44.3" cy="182.5" r="3.5" className="fill-[#2c4a3e]" />
+                    {/* Layer 2: Offset ambient beacon ring for continuous tranquil pulse */}
+                    <circle
+                      cx="45.9"
+                      cy="199.8"
+                      r="4"
+                      className="fill-[#2c4a3e]/10 stroke-[#2c4a3e]/40 stroke-[0.8]"
+                    >
+                      <animate
+                        attributeName="r"
+                        values="4;13;13"
+                        keyTimes="0;0.7;1"
+                        dur="3s"
+                        begin="1.5s"
+                        repeatCount="indefinite"
+                      />
+                      <animate
+                        attributeName="opacity"
+                        values="0.7;0;0"
+                        keyTimes="0;0.7;1"
+                        dur="3s"
+                        begin="1.5s"
+                        repeatCount="indefinite"
+                      />
+                    </circle>
 
-                  {/* Kandy */}
-                  <circle cx="93.0" cy="177.5" r="3.5" className="fill-[#2c4a3e]" />
+                    {/* Base resting halo */}
+                    <circle
+                      cx="45.9"
+                      cy="199.8"
+                      r="6.5"
+                      className="fill-[#2c4a3e]/10 stroke-[#2c4a3e]/25 stroke-[0.8]"
+                    />
+                    {/* Crisp white knockout ring */}
+                    <circle
+                      cx="45.9"
+                      cy="199.8"
+                      r="3.8"
+                      className="fill-white stroke-[#2c4a3e] stroke-[1.2]"
+                    />
+                    {/* Solid inner center dot */}
+                    <circle
+                      cx="45.9"
+                      cy="199.8"
+                      r="2"
+                      className="fill-[#2c4a3e]"
+                    />
+                  </g>
 
-                  {/* Galle */}
-                  <circle cx="67.6" cy="253.5" r="3.5" className="fill-[#2c4a3e]" />
+                  {/* Regional City Pins with interactive hover/active states */}
+                  {REGION_PINS.filter((p) => !p.isHub).map((pin) => {
+                    const isHighlighted =
+                      activeCity !== null && pin.matchedCities.includes(activeCity);
 
-                  {/* Matara */}
-                  <circle cx="88.1" cy="259.6" r="3" className="fill-[#2c4a3e]" />
-
-                  {/* Jaffna / North */}
-                  <circle cx="54.8" cy="31.7" r="3" className="fill-[#2c4a3e]" />
-
-                  {/* Trincomalee */}
-                  <circle cx="129.4" cy="97.8" r="3" className="fill-[#2c4a3e]" />
-
-                  {/* Batticaloa */}
-                  <circle cx="157.4" cy="151.7" r="3" className="fill-[#2c4a3e]" />
+                    return (
+                      <g
+                        key={pin.id}
+                        className="cursor-pointer transition-all duration-300"
+                        onClick={() => handleLocationClick(pin.name)}
+                        onMouseEnter={() => setActiveCity(pin.name)}
+                        onMouseLeave={() => setActiveCity(null)}
+                      >
+                        <title>{pin.name}</title>
+                        {/* Highlight ring on hover / active */}
+                        {isHighlighted && (
+                          <circle
+                            cx={pin.cx}
+                            cy={pin.cy}
+                            r="7"
+                            className="fill-[#2c4a3e]/15 stroke-[#2c4a3e]/40 stroke-[0.8] animate-pulse"
+                          />
+                        )}
+                        <circle
+                          cx={pin.cx}
+                          cy={pin.cy}
+                          r={isHighlighted ? 4.2 : 3}
+                          className="fill-[#2c4a3e] transition-all duration-200"
+                        />
+                      </g>
+                    );
+                  })}
                 </svg>
               </div>
 
-              {/* City List with Bullet Points */}
+              {/* City List with Interactive Bullet Points */}
               <div className="sm:col-span-7">
                 <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-1">
-                  {LOCATIONS.map((loc) => (
-                    <li key={loc}>
-                      <button
-                        type="button"
-                        onClick={() => handleLocationClick(loc)}
-                        className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-neutral-700 transition-colors hover:text-brand"
-                      >
-                        <span className="size-1.5 rounded-full bg-brand" />
-                        <span>{loc}</span>
-                      </button>
-                    </li>
-                  ))}
+                  {LOCATIONS.map((loc) => {
+                    const isMatched = activeCity === loc;
+                    return (
+                      <li key={loc}>
+                        <button
+                          type="button"
+                          onClick={() => handleLocationClick(loc)}
+                          onMouseEnter={() => setActiveCity(loc)}
+                          onMouseLeave={() => setActiveCity(null)}
+                          className={`inline-flex cursor-pointer items-center gap-2 text-xs font-medium transition-colors ${
+                            isMatched
+                              ? "text-brand font-semibold"
+                              : "text-neutral-700 hover:text-brand"
+                          }`}
+                        >
+                          <span
+                            className={`size-1.5 rounded-full transition-transform ${
+                              isMatched ? "scale-150 bg-brand" : "bg-brand"
+                            }`}
+                          />
+                          <span>{loc}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
                   <li className="text-xs italic text-neutral-400">
                     ... and more
                   </li>
