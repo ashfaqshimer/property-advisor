@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+from typing import Any
 
 import httpx
 from bs4 import BeautifulSoup
@@ -42,14 +43,18 @@ class IkmanClient:
             logger.error("Failed to parse initialData JSON")
             return None
 
-    async def fetch_listing_page(self, category_slug: str, page: int = 1) -> list[IkmanAd]:
-        """Fetch a page of listings for a category."""
+    async def fetch_listing_page_with_meta(
+        self, category_slug: str, page: int = 1, query: str | None = None
+    ) -> tuple[list[IkmanAd], dict]:
+        """Fetch a page of listings for a category with optional query and return (ads, pagination_dict)."""
         url = f"{IKMAN_BASE_URL}/en/ads/sri-lanka/{category_slug}"
-        params = {}
+        params: dict[str, Any] = {}
         if page > 1:
             params["page"] = page
+        if query and query.strip():
+            params["query"] = query.strip()
 
-        logger.info("fetching_ikman_listing_page", url=url, page=page)
+        logger.info("fetching_ikman_listing_page", url=url, page=page, query=query)
         
         try:
             response = await self.client.get(url, params=params, timeout=10.0)
@@ -58,8 +63,9 @@ class IkmanClient:
             data = self._extract_initial_data(response.text)
             if not data:
                 logger.error("initialData not found on listing page", url=url)
-                return []
+                return [], {}
             
+            pagination = data.get("serp", {}).get("ads", {}).get("data", {}).get("paginationData", {})
             ads_data = data.get("serp", {}).get("ads", {}).get("data", {}).get("ads", [])
             
             ads = []
@@ -72,11 +78,18 @@ class IkmanClient:
                     logger.warning("failed_to_parse_ad", error=str(e), ad_id=ad_dict.get("id"))
             
             await asyncio.sleep(self.delay)
-            return ads
+            return ads, pagination
             
         except httpx.HTTPError as e:
             logger.error("http_error_fetching_listings", error=str(e), url=url)
-            return []
+            return [], {}
+
+    async def fetch_listing_page(
+        self, category_slug: str, page: int = 1, query: str | None = None
+    ) -> list[IkmanAd]:
+        """Fetch a page of listings for a category."""
+        ads, _ = await self.fetch_listing_page_with_meta(category_slug, page=page, query=query)
+        return ads
 
     async def fetch_ad_detail(self, slug: str) -> IkmanAdDetail | None:
         """Fetch full details (including phone number) for a specific ad."""

@@ -959,7 +959,16 @@ export async function updateProspect(id: string, status: string): Promise<Prospe
   return (await response.json()) as Prospect;
 }
 
-export async function startProspectScan(payload: { categories: string[]; pages_per_category: number }): Promise<{ job_id: string }> {
+export interface ProspectScanPayload {
+  categories?: string[];
+  pages_per_category?: number;
+  scan_all?: boolean;
+  keyword?: string;
+  property_category?: "all" | "lands" | "apartments" | "houses" | "commercial";
+  strict_location?: boolean;
+}
+
+export async function startProspectScan(payload: ProspectScanPayload): Promise<{ job_id: string }> {
   const response = await fetch(`${baseUrl()}/admin/prospects/scan`, {
     method: "POST",
     credentials: "include",

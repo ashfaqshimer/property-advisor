@@ -47,8 +47,12 @@ class ProspectRead(ProspectBase):
 
 
 class ScanRequest(BaseModel):
-    categories: list[str] = Field(..., min_length=1)
-    pages_per_category: int = Field(1, ge=1, le=50)
+    categories: list[str] = Field(default_factory=lambda: ["property"])
+    pages_per_category: int | None = Field(default=None, ge=1)
+    scan_all: bool = False
+    keyword: str | None = None
+    property_category: str = "all"  # all, land, apartments, houses, commercial
+    strict_location: bool = True
 
 
 class ProspectList(BaseModel):

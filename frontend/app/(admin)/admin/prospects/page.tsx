@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin } from "lucide-react";
 
 import {
   Prospect,
@@ -59,8 +59,13 @@ export default function ProspectsPage() {
   
   // Scan State
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [scanTab, setScanTab] = useState<"scoped" | "categories">("scoped");
+  const [scanLocationKeyword, setScanLocationKeyword] = useState("");
+  const [scanPropertyCategory, setScanPropertyCategory] = useState<"all" | "lands" | "apartments" | "houses" | "commercial">("all");
+  const [scanStrictLocation, setScanStrictLocation] = useState(true);
+  const [scanAllPages, setScanAllPages] = useState(true);
   const [scanCategories, setScanCategories] = useState<string[]>(["land-for-sale", "houses-for-sale", "apartments-for-sale"]);
-  const [scanPages, setScanPages] = useState(3);
+  const [scanPages, setScanPages] = useState(10);
   
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [scanStatus, setScanStatus] = useState<{ status: string; progress: string; error?: string } | null>(null);
@@ -79,6 +84,7 @@ export default function ProspectsPage() {
   useEffect(() => {
     getCurrentUser().then(setUser).catch(() => {});
   }, []);
+  const isAdminOrRoot = user?.role === "admin" || user?.role === "root";
 
   const [draftLoading, setDraftLoading] = useState<string | null>(null);
   const [draftModalData, setDraftModalData] = useState<any>(null);
@@ -240,22 +246,45 @@ export default function ProspectsPage() {
 
   const handleStartScan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (scanCategories.length === 0) {
-      toast.error("Select at least one category");
-      return;
-    }
-    
-    try {
-      const res = await startProspectScan({
-        categories: scanCategories,
-        pages_per_category: scanPages,
-      });
-      setActiveJobId(res.job_id);
-      setIsScanModalOpen(false);
-      setScanStatus({ status: "running", progress: "Starting..." });
-      toast.info("Scan started in the background");
-    } catch (err) {
-      toast.error("Failed to start scan");
+    if (scanTab === "scoped") {
+      const kw = scanLocationKeyword.trim();
+      if (!kw) {
+        toast.error("Please enter a location keyword");
+        return;
+      }
+      try {
+        const res = await startProspectScan({
+          keyword: kw,
+          property_category: scanPropertyCategory,
+          strict_location: scanStrictLocation,
+          scan_all: scanAllPages,
+          pages_per_category: scanAllPages ? undefined : scanPages,
+        });
+        setActiveJobId(res.job_id);
+        setIsScanModalOpen(false);
+        setScanStatus({ status: "running", progress: `Starting scan for '${kw}'...` });
+        toast.info(`Scanner started for '${kw}'`);
+      } catch (err: any) {
+        toast.error(err.message || "Failed to start scan");
+      }
+    } else {
+      if (scanCategories.length === 0) {
+        toast.error("Select at least one category");
+        return;
+      }
+      
+      try {
+        const res = await startProspectScan({
+          categories: scanCategories,
+          pages_per_category: scanPages,
+        });
+        setActiveJobId(res.job_id);
+        setIsScanModalOpen(false);
+        setScanStatus({ status: "running", progress: "Starting..." });
+        toast.info("Scan started in the background");
+      } catch (err: any) {
+        toast.error(err.message || "Failed to start scan");
+      }
     }
   };
 
@@ -314,14 +343,16 @@ export default function ProspectsPage() {
               <PhoneCall className="h-4 w-4" />
               {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
             </button>
-            <button
-              onClick={() => setIsScanModalOpen(true)}
-              disabled={activeJobId !== null}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
-            >
-              <Search className="h-4 w-4" />
-              {activeJobId ? "Scan Running..." : "New Scan"}
-            </button>
+            {isAdminOrRoot && (
+              <button
+                onClick={() => setIsScanModalOpen(true)}
+                disabled={activeJobId !== null}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
+              >
+                <Search className="h-4 w-4" />
+                {activeJobId ? "Scan Running..." : "New Scan"}
+              </button>
+            )}
           </div>
           {(lastScanAt || lastPhoneFetchAt) && (
             <button 
@@ -721,69 +752,196 @@ export default function ProspectsPage() {
       {/* Scan Modal */}
       {isScanModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1a2923]/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-950 p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-950 p-6 shadow-xl border border-[#dce4df] dark:border-zinc-800">
             <h2 className="text-xl font-semibold text-[#1a2923] dark:text-zinc-200">Start New Scan</h2>
-            <p className="mt-2 text-sm text-[#64736b] dark:text-zinc-400">Configure scan parameters for ikman.lk</p>
+            <p className="mt-1 text-sm text-[#64736b] dark:text-zinc-400">Scan ikman.lk directly for real estate leads.</p>
+
+            {/* Mode Switcher */}
+            <div className="mt-4 flex rounded-lg bg-[#f4f6f4] dark:bg-zinc-900 p-1">
+              <button
+                type="button"
+                onClick={() => setScanTab("scoped")}
+                className={`flex-1 flex items-center justify-center gap-1.5 cursor-pointer rounded-md py-1.5 text-xs font-semibold transition-colors ${
+                  scanTab === "scoped"
+                    ? "bg-white dark:bg-zinc-950 text-[#19352b] dark:text-zinc-200 shadow-sm"
+                    : "text-[#64736b] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-white"
+                }`}
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                Scoped Location Scan
+              </button>
+              <button
+                type="button"
+                onClick={() => setScanTab("categories")}
+                className={`flex-1 flex items-center justify-center gap-1.5 cursor-pointer rounded-md py-1.5 text-xs font-semibold transition-colors ${
+                  scanTab === "categories"
+                    ? "bg-white dark:bg-zinc-950 text-[#19352b] dark:text-zinc-200 shadow-sm"
+                    : "text-[#64736b] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-white"
+                }`}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                Broad Categories
+              </button>
+            </div>
             
-            <form onSubmit={handleStartScan} className="mt-6 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-[#1a2923] dark:text-zinc-200">Categories</label>
-                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2 rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900/50">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">Sales</div>
-                    {CATEGORIES.filter(c => c.id.includes('sale')).map(cat => (
-                      <label key={cat.id} className="flex cursor-pointer items-center gap-2">
-                        <input 
-                          type="checkbox" 
-                          checked={scanCategories.includes(cat.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
-                            else setScanCategories(scanCategories.filter(c => c !== cat.id));
-                          }}
+            <form onSubmit={handleStartScan} className="mt-5 space-y-4">
+              {scanTab === "scoped" ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-[#1a2923] dark:text-zinc-200">
+                      Location / Suburb Keyword <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative mt-2">
+                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#718078] dark:text-zinc-400" />
+                      <input
+                        type="text"
+                        required
+                        value={scanLocationKeyword}
+                        onChange={(e) => setScanLocationKeyword(e.target.value)}
+                        placeholder="e.g. Rajagiriya, Colombo 7, Kandy, Battaramulla…"
+                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 pl-9 pr-3 py-2 text-sm outline-none focus:border-[#28513f] dark:focus:border-emerald-600 placeholder:text-[#a0aba4] dark:placeholder:text-zinc-500 text-[#1a2923] dark:text-zinc-200"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-[#718078] dark:text-zinc-400">
+                      Searches titles and descriptions across ikman for this specific location.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[#1a2923] dark:text-zinc-200">
+                      Property Category
+                    </label>
+                    <select
+                      value={scanPropertyCategory}
+                      onChange={(e) => setScanPropertyCategory(e.target.value as any)}
+                      className="mt-2 w-full cursor-pointer rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#28513f] dark:focus:border-emerald-600 text-[#1a2923] dark:text-zinc-200"
+                    >
+                      <option value="all">All Properties (Default)</option>
+                      <option value="houses">Houses</option>
+                      <option value="apartments">Apartments</option>
+                      <option value="lands">Lands</option>
+                      <option value="commercial">Commercial Property</option>
+                    </select>
+                  </div>
+
+                  <div className="rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900/50">
+                    <label className="flex cursor-pointer items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={scanStrictLocation}
+                        onChange={(e) => setScanStrictLocation(e.target.checked)}
+                        className="mt-0.5 cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-zinc-200 focus:ring-[#19352b]"
+                      />
+                      <div className="text-xs">
+                        <span className="font-semibold text-[#1a2923] dark:text-zinc-200">Strict Location Matching (Recommended)</span>
+                        <p className="mt-0.5 text-[#64736b] dark:text-zinc-400">
+                          Ensures the location keyword is verified in the listing title or detected suburb to filter out description spam.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-[#1a2923] dark:text-zinc-200">
+                        Scan Depth
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={scanAllPages}
+                          onChange={(e) => setScanAllPages(e.target.checked)}
                           className="cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-zinc-200 focus:ring-[#19352b]"
                         />
-                        <span className="text-sm text-[#1a2923] dark:text-zinc-200">{cat.label.replace(' for Sale', '')}</span>
+                        <span className="text-xs font-semibold text-[#19352b] dark:text-emerald-500">
+                          Scan all matching pages
+                        </span>
                       </label>
-                    ))}
+                    </div>
+                    {scanAllPages ? (
+                      <div className="rounded-lg border border-[#dce4df] dark:border-zinc-800 bg-[#f4f6f4] dark:bg-zinc-900/50 p-2.5 text-xs text-[#64736b] dark:text-zinc-400">
+                        Automatically detects the total pages on ikman for this keyword and processes them in safe 3-page chunks with polite pauses between chunks.
+                      </div>
+                    ) : (
+                      <div>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="500"
+                          value={scanPages}
+                          onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
+                          placeholder="e.g. 10"
+                          className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#28513f] dark:focus:border-emerald-600 text-[#1a2923] dark:text-zinc-200"
+                        />
+                        <p className="mt-1 text-xs text-[#718078] dark:text-zinc-400">
+                          25 ads per page (e.g. 10 pages = up to 250 listings).
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-[#1a2923] dark:text-zinc-200">Categories</label>
+                    <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2 rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900/50">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">Sales</div>
+                        {CATEGORIES.filter(c => c.id.includes('sale')).map(cat => (
+                          <label key={cat.id} className="flex cursor-pointer items-center gap-2">
+                            <input 
+                              type="checkbox" 
+                              checked={scanCategories.includes(cat.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
+                                else setScanCategories(scanCategories.filter(c => c !== cat.id));
+                              }}
+                              className="cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-zinc-200 focus:ring-[#19352b]"
+                            />
+                            <span className="text-sm text-[#1a2923] dark:text-zinc-200">{cat.label.replace(' for Sale', '')}</span>
+                          </label>
+                        ))}
+                      </div>
+                      
+                      <div className="space-y-2 rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900/50">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">Rentals</div>
+                        {CATEGORIES.filter(c => c.id.includes('rental')).map(cat => (
+                          <label key={cat.id} className="flex cursor-pointer items-center gap-2">
+                            <input 
+                              type="checkbox" 
+                              checked={scanCategories.includes(cat.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
+                                else setScanCategories(scanCategories.filter(c => c !== cat.id));
+                              }}
+                              className="cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-zinc-200 focus:ring-[#19352b]"
+                            />
+                            <span className="text-sm text-[#1a2923] dark:text-zinc-200">{cat.label.replace(' Rentals', '')}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                   
-                  <div className="space-y-2 rounded-lg border border-[#dce4df] dark:border-zinc-800 p-3 bg-[#f4f6f4] dark:bg-zinc-900/50">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">Rentals</div>
-                    {CATEGORIES.filter(c => c.id.includes('rental')).map(cat => (
-                      <label key={cat.id} className="flex cursor-pointer items-center gap-2">
-                        <input 
-                          type="checkbox" 
-                          checked={scanCategories.includes(cat.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
-                            else setScanCategories(scanCategories.filter(c => c !== cat.id));
-                          }}
-                          className="cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-zinc-200 focus:ring-[#19352b]"
-                        />
-                        <span className="text-sm text-[#1a2923] dark:text-zinc-200">{cat.label.replace(' Rentals', '')}</span>
-                      </label>
-                    ))}
+                  <div>
+                    <label className="block text-sm font-medium text-[#1a2923] dark:text-zinc-200">Pages per Category (Max 50)</label>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="50"
+                      value={scanPages}
+                      onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
+                      className="mt-2 w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#28513f] dark:focus:border-emerald-600 text-[#1a2923] dark:text-zinc-200"
+                    />
                   </div>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-[#1a2923] dark:text-zinc-200">Pages per Category (Max 50)</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="50"
-                  value={scanPages}
-                  onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
-                  className="mt-2 w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                />
-              </div>
+                </>
+              )}
               
               <div className="mt-8 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-[#dce4df] dark:border-zinc-800 pt-5">
                 <button
                   type="button"
                   onClick={() => setIsScanModalOpen(false)}
-                  className="cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-[#718078] dark:text-zinc-400 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900 hover:text-[#1a2923] dark:hover:text-white dark:text-zinc-200 dark:text-zinc-200 w-full sm:w-auto text-center"
+                  className="cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-[#718078] dark:text-zinc-400 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900 hover:text-[#1a2923] dark:hover:text-white dark:text-zinc-200 w-full sm:w-auto text-center"
                 >
                   Cancel
                 </button>

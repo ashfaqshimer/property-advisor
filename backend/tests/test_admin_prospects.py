@@ -137,3 +137,49 @@ def test_prospect_suburb_search_and_enrichment(authenticated_client: TestClient,
     assert prospect.suburb == "Piliyandala"
     assert prospect.suburb_source == "ikman_detail"
     assert prospect.location == "Colombo"
+
+
+def test_is_location_relevant() -> None:
+    from app.api.prospects import is_location_relevant
+    from app.scraper.schemas import IkmanAd
+
+    # Test title match
+    ad1 = IkmanAd(id="1", slug="modern-house-sale", title="Luxury House in Rajagiriya")
+    assert is_location_relevant(ad1, "rajagiriya", None) is True
+    assert is_location_relevant(ad1, "kandy", None) is False
+
+    # Test slug match
+    ad2 = IkmanAd(id="2", slug="apartment-in-battaramulla-for-sale", title="Beautiful 3 Bed Unit")
+    assert is_location_relevant(ad2, "battaramulla", None) is True
+
+    # Test extracted suburb match
+    ad3 = IkmanAd(id="3", slug="house-near-waterfront", title="Spacious family home")
+    assert is_location_relevant(ad3, "Nugegoda", "Nugegoda") is True
+    assert is_location_relevant(ad3, "Negombo", "Nugegoda") is False
+
+    # Test canonical suburb match (e.g. Colombo 03 vs Colombo 3)
+    ad4 = IkmanAd(id="4", slug="sea-view-flat", title="Penthouse Apartment")
+    assert is_location_relevant(ad4, "Colombo 03", "Colombo 3") is True
+
+
+def test_start_scoped_scan_creates_job(authenticated_client: TestClient) -> None:
+    from unittest.mock import patch
+    payload = {
+        "keyword": "Rajagiriya",
+        "property_category": "houses",
+        "pages_per_category": 2,
+        "strict_location": True,
+    }
+    with patch("app.api.prospects._run_scan_job"):
+        resp = authenticated_client.post("/admin/prospects/scan", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "job_id" in data
+
+        # Check status
+        status_resp = authenticated_client.get(f"/admin/prospects/scan/{data['job_id']}/status")
+        assert status_resp.status_code == 200
+        status_data = status_resp.json()
+        assert status_data["status"] == "running"
+        assert "Rajagiriya" in status_data["progress"]
+

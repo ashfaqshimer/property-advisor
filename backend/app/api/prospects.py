@@ -90,6 +90,38 @@ def _update_job_status(job_id: str, status: str, progress: str, error: str | Non
             pass  # invalid uuid
 
 
+def is_location_relevant(ad: Any, keyword: str, extracted_suburb: str | None) -> bool:
+    """Checks if the listing title, slug, or extracted suburb matches the target location keyword."""
+    if not keyword or not keyword.strip():
+        return True
+
+    kw_norm = keyword.strip().lower()
+
+    # 1. Match against extracted suburb (and canonical forms)
+    if extracted_suburb:
+        sub_norm = extracted_suburb.strip().lower()
+        if kw_norm in sub_norm or sub_norm in kw_norm:
+            return True
+        from app.scraper.location_extractor import CANONICAL_MAP
+        canon_sub = CANONICAL_MAP.get(sub_norm, sub_norm).lower()
+        canon_kw = CANONICAL_MAP.get(kw_norm, kw_norm).lower()
+        if canon_kw in canon_sub or canon_sub in canon_kw:
+            return True
+
+    # 2. Match against title
+    title_lower = (getattr(ad, "title", "") or "").lower()
+    if kw_norm in title_lower:
+        return True
+
+    # 3. Match against slug
+    slug_lower = (getattr(ad, "slug", "") or "").lower()
+    kw_slug = kw_norm.replace(" ", "-")
+    if kw_slug in slug_lower or kw_norm in slug_lower:
+        return True
+
+    return False
+
+
 def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int, int]:
     """Synchronous function to save prospects to DB. Returns (found, new_count, known_count)"""
     found = len(ads)
@@ -109,6 +141,20 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
                     db.rollback()
                 continue
                 
+            loc_str = ""
+            if isinstance(ad.location, str):
+                loc_str = ad.location
+            elif ad.location and hasattr(ad.location, "name"):
+                loc_str = ad.location.name or ""
+
+            suburb = extract_suburb(title=ad.title or "", slug=ad.slug or "", district=loc_str)
+            suburb_source = "extracted" if suburb else None
+
+            # Relevance check for scoped searches
+            if request.keyword and request.strict_location:
+                if not is_location_relevant(ad, request.keyword, suburb):
+                    continue
+
             new_count += 1
             classification, confidence, reasons = classify_listing_heuristics(ad)
             
@@ -119,7 +165,7 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             phone_number = None
             poster_name = None
             
-            # Note: Phone numbers are now fetched explicitly via the phone fetch API,
+            # Note: Phone numbers are fetched explicitly via the phone fetch API,
             # not during the initial scan phase.
 
             prop_type = "property"
@@ -129,18 +175,10 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             if "land" in cat_slug: prop_type = "land"
             elif "apartments" in cat_slug: prop_type = "apartment"
             elif "houses" in cat_slug: prop_type = "house"
+            elif "commercial" in cat_slug: prop_type = "commercial"
             
             listing_type = "sale"
             if "rentals" in cat_slug: listing_type = "rent"
-
-            loc_str = ""
-            if isinstance(ad.location, str):
-                loc_str = ad.location
-            elif ad.location and hasattr(ad.location, "name"):
-                loc_str = ad.location.name or ""
-
-            suburb = extract_suburb(title=ad.title or "", slug=ad.slug or "", district=loc_str)
-            suburb_source = "extracted" if suburb else None
 
             geo_target = f"{suburb}, {loc_str}" if suburb and loc_str else (suburb or loc_str)
             lat, lng = None, None
@@ -198,53 +236,115 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
     new_total = 0
     
     semaphore = asyncio.Semaphore(3)
-    
-    async def _fetch_and_save(category: str, page: int) -> tuple[int, int, int]:
-        async with semaphore:
-            _update_job_status(job_id, "running", f"Fetching {category} (page {page}/{request.pages_per_category})")
-            logger.info("scraping_page", category=category, page=page)
-            ads = await client.fetch_listing_page(category, page=page)
-            if not ads:
-                return 0, 0, 0
-            
-            # No detail fetching during the scan phase anymore!
-            # Just directly save to DB in a thread
-            return await asyncio.to_thread(_save_prospects_sync, ads, request)
+
+    # Determine categories to scan based on scoped keyword / category filter
+    target_categories = request.categories
+    if request.keyword and request.keyword.strip():
+        cat_map = {
+            "all": ["property"],
+            "land": ["land"],
+            "lands": ["land"],
+            "houses": ["houses"],
+            "house": ["houses"],
+            "apartments": ["apartments"],
+            "apartment": ["apartments"],
+            "commercial": ["commercial-property"],
+            "commercial-property": ["commercial-property"],
+        }
+        prop_cat = (request.property_category or "all").lower().strip()
+        target_categories = cat_map.get(prop_cat, ["property"])
 
     try:
         pages_processed = 0
-        for category in request.categories:
+        for category in target_categories:
+            kw_label = f" for '{request.keyword}'" if request.keyword else ""
+            
+            # Fetch page 1 first to read exact total listings & pagination count from ikman
+            first_ads, first_meta = await client.fetch_listing_page_with_meta(category, page=1, query=request.keyword)
+            if not first_ads:
+                continue
+
+            total_ads = first_meta.get("total", 0) if isinstance(first_meta, dict) else 0
+            detected_pages = (total_ads + 24) // 25 if total_ads > 0 else 1
+
+            if request.scan_all or not request.pages_per_category:
+                category_target_pages = detected_pages
+            else:
+                category_target_pages = min(request.pages_per_category, detected_pages)
+
+            _update_job_status(
+                job_id,
+                "running",
+                f"Scanning {category}{kw_label} (page 1/{category_target_pages}) [Total {total_ads} available]..."
+            )
+
+            # Save page 1
+            f1, n1, k1 = await asyncio.to_thread(_save_prospects_sync, first_ads, request)
+            found_total += f1
+            new_total += n1
+            pages_processed += 1
+
+            if category_target_pages <= 1:
+                continue
+
+            # Process remaining pages in chunks of 3 with a polite delay between chunks
             chunk_size = 3
-            for chunk_start in range(1, request.pages_per_category + 1, chunk_size):
+            early_exit = False
+            for chunk_start in range(2, category_target_pages + 1, chunk_size):
+                # Polite rate-limit delay between chunks
+                await asyncio.sleep(1.5)
+
                 with SessionLocal() as db:
                     current_job = db.get(ScanJob, uuid.UUID(job_id))
-                    if not current_job or current_job.status == "failed":
+                    if not current_job or current_job.status in ("failed", "cancelled"):
+                        early_exit = True
                         break
-                    
-                chunk_end = min(chunk_start + chunk_size, request.pages_per_category + 1)
+
+                chunk_end = min(chunk_start + chunk_size, category_target_pages + 1)
                 
-                tasks = []
-                for page in range(chunk_start, chunk_end):
-                    tasks.append(_fetch_and_save(category, page))
-                    
+                async def _fetch_page(p: int) -> tuple[int, int, int]:
+                    async with semaphore:
+                        _update_job_status(
+                            job_id,
+                            "running",
+                            f"Fetching {category}{kw_label} (page {p}/{category_target_pages})..."
+                        )
+                        logger.info("scraping_page", category=category, page=p, keyword=request.keyword)
+                        ads, _ = await client.fetch_listing_page_with_meta(category, page=p, query=request.keyword)
+                        if not ads:
+                            return 0, 0, 0
+                        return await asyncio.to_thread(_save_prospects_sync, ads, request)
+
+                tasks = [_fetch_page(p) for p in range(chunk_start, chunk_end)]
                 results = await asyncio.gather(*tasks)
-                
+
                 chunk_all_known = True
                 for (found, new_c, known_c) in results:
                     found_total += found
                     new_total += new_c
                     pages_processed += 1
-                    
                     if found > 0 and known_c < found:
                         chunk_all_known = False
-                        
-                # Early Exit logic
+
+                # Early exit if all ads in this chunk are already known in DB
                 if chunk_all_known and any(found > 0 for (found, new_c, known_c) in results):
-                    logger.info("early_exit_triggered", category=category, at_page=chunk_end-1)
-                    _update_job_status(job_id, "running", f"Early exit for {category}: all ads known up to page {chunk_end-1}.")
+                    logger.info("early_exit_triggered", category=category, at_page=chunk_end - 1)
+                    _update_job_status(
+                        job_id,
+                        "running",
+                        f"Early exit for {category}: all ads known up to page {chunk_end - 1}."
+                    )
                     break
+
+                # If an empty chunk is encountered, stop scanning this category
+                if all(found == 0 for (found, new_c, known_c) in results):
+                    break
+
+            if early_exit:
+                break
                 
-        _update_job_status(job_id, "completed", f"Done. Found {found_total} listings, {new_total} new.")
+        kw_msg = f" for '{request.keyword}'" if request.keyword else ""
+        _update_job_status(job_id, "completed", f"Done{kw_msg}. Scanned {pages_processed} pages, found {found_total} listings, {new_total} new.")
         
     except Exception as e:
         logger.exception("scan_job_failed", error=str(e))
@@ -263,12 +363,15 @@ def start_scan(
     db: DbSession,
     _admin: CurrentStaffUser
 ) -> dict[str, str]:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
     job_id = str(uuid.uuid4())
     new_job = ScanJob(
         id=uuid.UUID(job_id),
         job_type="scan",
         status="running",
-        progress="Starting up...",
+        progress=f"Starting scan{' for ' + request.keyword if request.keyword else ''}...",
         created_by_id=_admin.id,
         created_by_name=_admin.name
     )
