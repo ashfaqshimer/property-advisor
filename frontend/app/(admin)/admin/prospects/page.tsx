@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2 } from "lucide-react";
 
 import {
   Prospect,
@@ -291,9 +292,17 @@ export default function ProspectsPage() {
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     setUpdatingStatusId(id);
     try {
+      const oldProspect = prospects.find(p => p.id === id);
+      const oldStatus = oldProspect?.status;
       const updated = await updateProspect(id, newStatus);
       setProspects(prev => prev.map(p => p.id === id ? updated : p));
-      toast.success("Status updated");
+      if (oldStatus === "discarded" && newStatus !== "discarded") {
+        toast.success(`Prospect restored to active! Status: ${newStatus}`);
+      } else if (oldStatus !== "discarded" && newStatus === "discarded") {
+        toast.info("Prospect moved to discarded");
+      } else {
+        toast.success("Status updated");
+      }
     } catch (err) {
       toast.error("Failed to update status");
     } finally {
@@ -344,51 +353,80 @@ export default function ProspectsPage() {
               {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
             </button>
             {isAdminOrRoot && (
-              <button
-                onClick={() => setIsScanModalOpen(true)}
-                disabled={activeJobId !== null}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
-              >
-                <Search className="h-4 w-4" />
-                {activeJobId ? "Scan Running..." : "New Scan"}
-              </button>
+              <>
+                <Link
+                  href="/admin/scans"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-3.5 py-2 text-sm font-semibold text-[#19352b] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 cursor-pointer w-full sm:w-auto"
+                >
+                  <Compass className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
+                  <span>Scan History</span>
+                </Link>
+                <button
+                  onClick={() => setIsScanModalOpen(true)}
+                  disabled={activeJobId !== null}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
+                >
+                  <Search className="h-4 w-4" />
+                  {activeJobId ? "Scan Running..." : "New Scan"}
+                </button>
+              </>
             )}
           </div>
           {(lastScanAt || lastPhoneFetchAt) && (
-            <button 
-              onClick={() => setShowExactTime(prev => !prev)}
-              className="flex items-center gap-1.5 text-[11px] text-[#64736b] dark:text-zinc-400 pr-1 mt-1 sm:mt-0 cursor-pointer hover:text-[#1a2923] dark:hover:text-white dark:text-zinc-200 dark:text-zinc-200 transition-colors underline decoration-dotted underline-offset-2 decoration-[#cbd8d1]"
-            >
-              <Clock className="h-3 w-3 opacity-70" />
-              <span>
-                {lastScanAt && (
-                  <span title={format(parseISO(lastScanAt), "PPP p")}>
-                    Scanned {showExactTime ? format(parseISO(lastScanAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastScanAt), { addSuffix: true })}
-                    {lastScanBy && ` by ${lastScanBy}`}
-                  </span>
-                )}
-                {lastScanAt && lastPhoneFetchAt && " • "}
-                {lastPhoneFetchAt && (
-                  <span title={format(parseISO(lastPhoneFetchAt), "PPP p")}>
-                    Synced {showExactTime ? format(parseISO(lastPhoneFetchAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastPhoneFetchAt), { addSuffix: true })}
-                    {lastPhoneFetchBy && ` by ${lastPhoneFetchBy}`}
-                  </span>
-                )}
-              </span>
-            </button>
+            <div className="flex items-center gap-2 text-[11px] text-[#64736b] dark:text-zinc-400 pr-1 mt-1 sm:mt-0 flex-wrap justify-center sm:justify-end">
+              <button 
+                onClick={() => setShowExactTime(prev => !prev)}
+                className="flex items-center gap-1.5 cursor-pointer hover:text-[#1a2923] dark:hover:text-white transition-colors underline decoration-dotted underline-offset-2 decoration-[#cbd8d1]"
+              >
+                <Clock className="h-3 w-3 opacity-70" />
+                <span>
+                  {lastScanAt && (
+                    <span title={format(parseISO(lastScanAt), "PPP p")}>
+                      Scanned {showExactTime ? format(parseISO(lastScanAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastScanAt), { addSuffix: true })}
+                      {lastScanBy && ` by ${lastScanBy}`}
+                    </span>
+                  )}
+                  {lastScanAt && lastPhoneFetchAt && " • "}
+                  {lastPhoneFetchAt && (
+                    <span title={format(parseISO(lastPhoneFetchAt), "PPP p")}>
+                      Synced {showExactTime ? format(parseISO(lastPhoneFetchAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastPhoneFetchAt), { addSuffix: true })}
+                      {lastPhoneFetchBy && ` by ${lastPhoneFetchBy}`}
+                    </span>
+                  )}
+                </span>
+              </button>
+              {isAdminOrRoot && (
+                <>
+                  <span>•</span>
+                  <Link
+                    href="/admin/scans?type=phone_fetch"
+                    className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-0.5"
+                  >
+                    <span>Sync Log →</span>
+                  </Link>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
       
       {activeJobId && scanStatus && (
-        <div className="mt-6 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20 p-4">
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20 p-4">
           <div className="flex items-center gap-3">
-            <RefreshCw className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
+            <RefreshCw className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
             <div>
               <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">Scan in progress</h3>
               <p className="text-sm text-blue-600 dark:text-blue-400">{scanStatus.progress}</p>
             </div>
           </div>
+          <Link
+            href={`/admin/scans/${activeJobId}`}
+            className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:underline shrink-0"
+          >
+            <span>Track Outcomes</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
         </div>
       )}
 
@@ -443,6 +481,7 @@ export default function ProspectsPage() {
           <option value="contacted">Contacted</option>
           <option value="ignored">Ignored</option>
           <option value="converted">Converted</option>
+          <option value="discarded">Discarded</option>
         </select>
         {/* Segmented Control for Transaction Type */}
         <div className="flex shrink-0 items-center rounded-lg bg-[#f4f6f4] dark:bg-zinc-900 dark:bg-zinc-900 p-1 w-full sm:w-auto">
@@ -525,24 +564,58 @@ export default function ProspectsPage() {
           ) : prospects.length === 0 ? (
             <div className="p-6 text-center text-[#64736b] dark:text-zinc-400">No prospects found.</div>
           ) : (
-            prospects.map((prospect) => (
-              <div key={prospect.id} className="p-4 flex flex-col gap-3 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900/50">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#64736b] dark:text-zinc-400">
-                    {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
-                  </span>
-                  <select
-                    value={prospect.status}
-                    disabled={updatingStatusId === prospect.id}
-                    onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
-                    className="cursor-pointer rounded border border-[#dce4df] dark:border-zinc-800 bg-[#f8faf8] dark:bg-zinc-900 py-1 pl-2 pr-6 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#28513f] focus:border-[#28513f] disabled:opacity-50"
-                  >
-                    <option value="new">New</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="ignored">Ignored</option>
-                    <option value="converted">Converted</option>
-                  </select>
-                </div>
+            prospects.map((prospect) => {
+              const isDiscarded = prospect.status === "discarded";
+              return (
+                <div
+                  key={prospect.id}
+                  className={`p-4 flex flex-col gap-3 ${
+                    isDiscarded
+                      ? "bg-amber-50/25 dark:bg-amber-950/15 hover:bg-amber-50/40 dark:hover:bg-amber-950/25"
+                      : "hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#64736b] dark:text-zinc-400">
+                        {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
+                      </span>
+                      {isDiscarded && (
+                        <span className="inline-flex items-center rounded bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+                          Discarded{prospect.discard_reason ? `: ${prospect.discard_reason.replace("_", " ")}` : ""}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {isDiscarded && (
+                        <button
+                          onClick={() => handleUpdateStatus(prospect.id, "new")}
+                          disabled={updatingStatusId === prospect.id}
+                          className="cursor-pointer inline-flex items-center gap-1 rounded bg-emerald-600 dark:bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                          title="Restore this prospect to active pipeline"
+                        >
+                          <Undo2 className="h-3 w-3" />
+                          <span>Keep</span>
+                        </button>
+                      )}
+                      <select
+                        value={prospect.status}
+                        disabled={updatingStatusId === prospect.id}
+                        onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
+                        className={`cursor-pointer rounded border py-1 pl-2 pr-6 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#28513f] focus:border-[#28513f] disabled:opacity-50 ${
+                          isDiscarded
+                            ? "border-amber-300 dark:border-amber-700 bg-white dark:bg-zinc-800 text-amber-800 dark:text-amber-300"
+                            : "border-[#dce4df] dark:border-zinc-800 bg-[#f8faf8] dark:bg-zinc-900"
+                        }`}
+                      >
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="ignored">Ignored</option>
+                        <option value="converted">Converted</option>
+                        <option value="discarded">Discarded</option>
+                      </select>
+                    </div>
+                  </div>
                 
                 <div>
                   <div className="flex items-start gap-2">
@@ -590,9 +663,10 @@ export default function ProspectsPage() {
                   )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            );
+          })
+        )}
+      </div>
 
         {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto">
@@ -617,98 +691,134 @@ export default function ProspectsPage() {
                   <td colSpan={6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">No prospects found.</td>
                 </tr>
               ) : (
-                prospects.map((prospect) => (
-                  <tr key={prospect.id} className="hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900/50">
-                    <td className="px-6 py-4 text-[#64736b] dark:text-zinc-400">
-                      {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex max-w-[250px] items-center gap-2">
-                        <span className="truncate font-medium text-[#1a2923] dark:text-zinc-200">{prospect.title}</span>
-                        {prospect.ikman_url && (
-                          <a href={prospect.ikman_url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-blue-600 hover:text-blue-800">
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[#64736b] dark:text-zinc-400">
-                        <span>{prospect.property_type}</span>
-                        <span>•</span>
-                        <span>{prospect.listing_type}</span>
-                        <span>•</span>
-                        {prospect.suburb ? (
-                          <span
-                            className="inline-flex items-center gap-1 font-medium text-[#1a2923] dark:text-zinc-200"
-                            title={
-                              prospect.suburb_source === "ikman_detail"
-                                ? "Verified location from Ikman ad detail"
-                                : "Inferred from ad title"
-                            }
-                          >
-                            {prospect.suburb_source === "ikman_detail" ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                            ) : (
-                              <Sparkles className="h-3 w-3 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
-                            )}
-                            <span>{prospect.suburb}</span>
-                            {prospect.location && prospect.location.toLowerCase() !== prospect.suburb.toLowerCase() && (
-                              <span className="font-normal text-[#64736b] dark:text-zinc-400">({prospect.location})</span>
-                            )}
-                          </span>
-                        ) : (
-                          <span>{prospect.location}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 font-medium text-[#1a2923] dark:text-zinc-200">
-                      {prospect.price || "-"}
-                    </td>
-                    <td className="px-6 py-4">
-                      {prospect.phone_number ? (
-                        <div className="font-medium text-[#1a2923] dark:text-zinc-200">{prospect.phone_number}</div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 italic">Not fetched</span>
-                          {prospect.classification === "owner" && (
-                            <button 
-                              onClick={() => handleFetchSinglePhone(prospect.id)}
-                              disabled={fetchingPhoneId === prospect.id}
-                              className="inline-flex items-center gap-1 rounded bg-[#f4f6f4] dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer disabled:cursor-default"
-                            >
-                              {fetchingPhoneId === prospect.id && <RefreshCw className="h-3 w-3 animate-spin" />}
-                              {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}
-                            </button>
+                prospects.map((prospect) => {
+                  const isDiscarded = prospect.status === "discarded";
+                  return (
+                    <tr
+                      key={prospect.id}
+                      className={`transition ${
+                        isDiscarded
+                          ? "bg-amber-50/25 dark:bg-amber-950/15 hover:bg-amber-50/40 dark:hover:bg-amber-950/25"
+                          : "hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900/50"
+                      }`}
+                    >
+                      <td className="px-6 py-4 text-[#64736b] dark:text-zinc-400">
+                        {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex max-w-[250px] items-center gap-2">
+                          <span className="truncate font-medium text-[#1a2923] dark:text-zinc-200">{prospect.title}</span>
+                          {prospect.ikman_url && (
+                            <a href={prospect.ikman_url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-blue-600 hover:text-blue-800">
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
                           )}
                         </div>
-                      )}
-                      <div className="mt-1 text-xs text-[#64736b] dark:text-zinc-400">{prospect.poster_name || "-"}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <select
-                        value={prospect.status}
-                        disabled={updatingStatusId === prospect.id}
-                        onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
-                        className="cursor-pointer rounded border border-[#dce4df] dark:border-zinc-800 bg-[#f8faf8] dark:bg-zinc-900 py-1 pl-2 pr-6 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#28513f] focus:border-[#28513f] disabled:opacity-50"
-                      >
-                        <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="ignored">Ignored</option>
-                        <option value="converted">Converted</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {["root", "admin"].includes(user?.role ?? "") && prospect.status !== "converted" && (
-                        <button
-                          onClick={() => handleGenerateDraft(prospect)}
-                          disabled={draftLoading === prospect.id}
-                          className="inline-flex items-center gap-1 rounded bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default"
-                        >
-                          {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[#64736b] dark:text-zinc-400">
+                          <span>{prospect.property_type}</span>
+                          <span>•</span>
+                          <span>{prospect.listing_type}</span>
+                          <span>•</span>
+                          {prospect.suburb ? (
+                            <span
+                              className="inline-flex items-center gap-1 font-medium text-[#1a2923] dark:text-zinc-200"
+                              title={
+                                prospect.suburb_source === "ikman_detail"
+                                  ? "Verified location from Ikman ad detail"
+                                  : "Inferred from ad title"
+                              }
+                            >
+                              {prospect.suburb_source === "ikman_detail" ? (
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              ) : (
+                                <Sparkles className="h-3 w-3 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
+                              )}
+                              <span>{prospect.suburb}</span>
+                              {prospect.location && prospect.location.toLowerCase() !== prospect.suburb.toLowerCase() && (
+                                <span className="font-normal text-[#64736b] dark:text-zinc-400">({prospect.location})</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span>{prospect.location}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-medium text-[#1a2923] dark:text-zinc-200">
+                        {prospect.price || "-"}
+                      </td>
+                      <td className="px-6 py-4">
+                        {prospect.phone_number ? (
+                          <div className="font-medium text-[#1a2923] dark:text-zinc-200">{prospect.phone_number}</div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 italic">Not fetched</span>
+                            {prospect.classification === "owner" && (
+                              <button 
+                                onClick={() => handleFetchSinglePhone(prospect.id)}
+                                disabled={fetchingPhoneId === prospect.id}
+                                className="inline-flex items-center gap-1 rounded bg-[#f4f6f4] dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer disabled:cursor-default"
+                              >
+                                {fetchingPhoneId === prospect.id && <RefreshCw className="h-3 w-3 animate-spin" />}
+                                {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <div className="mt-1 text-xs text-[#64736b] dark:text-zinc-400">{prospect.poster_name || "-"}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={prospect.status}
+                            disabled={updatingStatusId === prospect.id}
+                            onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
+                            className={`cursor-pointer rounded border py-1 pl-2 pr-6 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#28513f] focus:border-[#28513f] disabled:opacity-50 ${
+                              isDiscarded
+                                ? "border-amber-300 dark:border-amber-700 bg-white dark:bg-zinc-800 text-amber-800 dark:text-amber-300"
+                                : "border-[#dce4df] dark:border-zinc-800 bg-[#f8faf8] dark:bg-zinc-900"
+                            }`}
+                          >
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="ignored">Ignored</option>
+                            <option value="converted">Converted</option>
+                            <option value="discarded">Discarded</option>
+                          </select>
+                          {isDiscarded && (
+                            <span className="inline-flex items-center rounded bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+                              {prospect.discard_reason ? prospect.discard_reason.replace("_", " ") : "location mismatch"}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {isDiscarded ? (
+                            <button
+                              onClick={() => handleUpdateStatus(prospect.id, "new")}
+                              disabled={updatingStatusId === prospect.id}
+                              className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 dark:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 dark:hover:bg-emerald-600 transition disabled:opacity-50"
+                              title="Restore this prospect to active pipeline"
+                            >
+                              <Undo2 className="h-3.5 w-3.5" />
+                              <span>Keep</span>
+                            </button>
+                          ) : (
+                            ["root", "admin"].includes(user?.role ?? "") && prospect.status !== "converted" && (
+                              <button
+                                onClick={() => handleGenerateDraft(prospect)}
+                                disabled={draftLoading === prospect.id}
+                                className="inline-flex items-center gap-1 rounded bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default"
+                              >
+                                {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

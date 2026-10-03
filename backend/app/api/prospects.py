@@ -3,7 +3,9 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+import csv
+import io
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy import delete, select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -20,6 +22,8 @@ from app.schemas.prospect import (
     ProspectUpdate,
     ScanRequest,
     ProspectList,
+    ScanJobRead,
+    ScanJobList,
 )
 from app.scraper.classifier import classify_listing_heuristics
 from app.scraper.ikman_client import IkmanClient, IKMAN_BASE_URL
@@ -76,7 +80,19 @@ def _enrich_location_from_detail(db: Session, prospect: Prospect, detail: Any) -
     return changed
 
 
-def _update_job_status(job_id: str, status: str, progress: str, error: str | None = None) -> None:
+def _update_job_status(
+    job_id: str,
+    status: str,
+    progress: str,
+    error: str | None = None,
+    pages_scanned: int | None = None,
+    total_pages: int | None = None,
+    total_found: int | None = None,
+    new_count: int | None = None,
+    updated_count: int | None = None,
+    filtered_count: int | None = None,
+    duration_seconds: float | None = None,
+) -> None:
     with SessionLocal() as db:
         try:
             job = db.get(ScanJob, uuid.UUID(job_id))
@@ -85,6 +101,20 @@ def _update_job_status(job_id: str, status: str, progress: str, error: str | Non
                 job.progress = progress
                 if error is not None:
                     job.error = error
+                if pages_scanned is not None:
+                    job.pages_scanned = pages_scanned
+                if total_pages is not None:
+                    job.total_pages = total_pages
+                if total_found is not None:
+                    job.total_found = total_found
+                if new_count is not None:
+                    job.new_count = new_count
+                if updated_count is not None:
+                    job.updated_count = updated_count
+                if filtered_count is not None:
+                    job.filtered_count = filtered_count
+                if duration_seconds is not None:
+                    job.duration_seconds = duration_seconds
                 db.commit()
         except ValueError:
             pass  # invalid uuid
@@ -122,11 +152,16 @@ def is_location_relevant(ad: Any, keyword: str, extracted_suburb: str | None) ->
     return False
 
 
-def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int, int]:
-    """Synchronous function to save prospects to DB. Returns (found, new_count, known_count)"""
+def _save_prospects_sync(
+    ads: list[Any],
+    request: ScanRequest,
+    scan_job_id: uuid.UUID | None = None
+) -> tuple[int, int, int, int]:
+    """Synchronous function to save prospects to DB. Returns (found, new_count, known_count, filtered_count)"""
     found = len(ads)
     new_count = 0
     known_count = 0
+    filtered_count = 0
     with SessionLocal() as db:
         for ad in ads:
             stmt = select(Prospect).where(Prospect.ikman_ad_id == ad.id)
@@ -150,15 +185,22 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             suburb = extract_suburb(title=ad.title or "", slug=ad.slug or "", district=loc_str)
             suburb_source = "extracted" if suburb else None
 
+            is_discarded = False
+            discard_reason = None
+
             # Relevance check for scoped searches
             if request.keyword and request.strict_location:
                 if not is_location_relevant(ad, request.keyword, suburb):
-                    continue
+                    is_discarded = True
+                    discard_reason = "location_mismatch"
+                    filtered_count += 1
 
-            new_count += 1
+            if not is_discarded:
+                new_count += 1
+
             classification, confidence, reasons = classify_listing_heuristics(ad)
             
-            if classification == "broker":
+            if classification == "broker" and not is_discarded:
                 new_count -= 1
                 continue
                         
@@ -204,11 +246,13 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
                 confidence=confidence,
                 classification_reasons=reasons,
                 classification_method="heuristic",
-                status="new",
+                status="discarded" if is_discarded else "new",
+                discard_reason=discard_reason,
                 is_member=ad.isMember,
                 is_auth_dealer=ad.isAuthDealer,
                 membership_level=ad.membershipLevel,
-                shop_name=ad.shopName
+                shop_name=ad.shopName,
+                first_scan_job_id=scan_job_id,
             )
             db.add(new_prospect)
             try:
@@ -216,7 +260,10 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
             except IntegrityError:
                 db.rollback()
                 # Race condition: another concurrent task just inserted this ad!
-                new_count -= 1
+                if not is_discarded:
+                    new_count -= 1
+                else:
+                    filtered_count -= 1
                 known_count += 1
                 existing_after = db.execute(select(Prospect).where(Prospect.ikman_ad_id == ad.id)).scalar_one_or_none()
                 if existing_after:
@@ -226,15 +273,26 @@ def _save_prospects_sync(ads: list[Any], request: ScanRequest) -> tuple[int, int
                     except Exception:
                         db.rollback()
             
-    return found, new_count, known_count
+    return found, new_count, known_count, filtered_count
 
 
 async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
     """Background task to run the scraper with concurrency and early exit."""
     client = IkmanClient(delay=1.0)
+    start_time = asyncio.get_event_loop().time()
     found_total = 0
     new_total = 0
+    known_total = 0
+    filtered_total = 0
+    pages_processed = 0
+    total_target_pages = 0
     
+    scan_job_uuid: uuid.UUID | None = None
+    try:
+        scan_job_uuid = uuid.UUID(job_id)
+    except ValueError:
+        pass
+
     semaphore = asyncio.Semaphore(3)
 
     # Determine categories to scan based on scoped keyword / category filter
@@ -255,7 +313,6 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
         target_categories = cat_map.get(prop_cat, ["property"])
 
     try:
-        pages_processed = 0
         for category in target_categories:
             kw_label = f" for '{request.keyword}'" if request.keyword else ""
             
@@ -272,16 +329,22 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
             else:
                 category_target_pages = min(request.pages_per_category, detected_pages)
 
+            total_target_pages += category_target_pages
+
             _update_job_status(
                 job_id,
                 "running",
-                f"Scanning {category}{kw_label} (page 1/{category_target_pages}) [Total {total_ads} available]..."
+                f"Scanning {category}{kw_label} (page 1/{category_target_pages}) [Total {total_ads} available]...",
+                pages_scanned=pages_processed,
+                total_pages=total_target_pages,
             )
 
             # Save page 1
-            f1, n1, k1 = await asyncio.to_thread(_save_prospects_sync, first_ads, request)
+            f1, n1, k1, fl1 = await asyncio.to_thread(_save_prospects_sync, first_ads, request, scan_job_uuid)
             found_total += f1
             new_total += n1
+            known_total += k1
+            filtered_total += fl1
             pages_processed += 1
 
             if category_target_pages <= 1:
@@ -302,32 +365,40 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
 
                 chunk_end = min(chunk_start + chunk_size, category_target_pages + 1)
                 
-                async def _fetch_page(p: int) -> tuple[int, int, int]:
+                async def _fetch_page(p: int) -> tuple[int, int, int, int]:
                     async with semaphore:
                         _update_job_status(
                             job_id,
                             "running",
-                            f"Fetching {category}{kw_label} (page {p}/{category_target_pages})..."
+                            f"Fetching {category}{kw_label} (page {p}/{category_target_pages})...",
+                            pages_scanned=pages_processed,
+                            total_pages=total_target_pages,
+                            total_found=found_total,
+                            new_count=new_total,
+                            updated_count=known_total,
+                            filtered_count=filtered_total,
                         )
                         logger.info("scraping_page", category=category, page=p, keyword=request.keyword)
                         ads, _ = await client.fetch_listing_page_with_meta(category, page=p, query=request.keyword)
                         if not ads:
-                            return 0, 0, 0
-                        return await asyncio.to_thread(_save_prospects_sync, ads, request)
+                            return 0, 0, 0, 0
+                        return await asyncio.to_thread(_save_prospects_sync, ads, request, scan_job_uuid)
 
                 tasks = [_fetch_page(p) for p in range(chunk_start, chunk_end)]
                 results = await asyncio.gather(*tasks)
 
                 chunk_all_known = True
-                for (found, new_c, known_c) in results:
+                for (found, new_c, known_c, fl_c) in results:
                     found_total += found
                     new_total += new_c
+                    known_total += known_c
+                    filtered_total += fl_c
                     pages_processed += 1
                     if found > 0 and known_c < found:
                         chunk_all_known = False
 
                 # Early exit if all ads in this chunk are already known in DB
-                if chunk_all_known and any(found > 0 for (found, new_c, known_c) in results):
+                if chunk_all_known and any(found > 0 for (found, new_c, known_c, fl_c) in results):
                     logger.info("early_exit_triggered", category=category, at_page=chunk_end - 1)
                     _update_job_status(
                         job_id,
@@ -337,21 +408,46 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
                     break
 
                 # If an empty chunk is encountered, stop scanning this category
-                if all(found == 0 for (found, new_c, known_c) in results):
+                if all(found == 0 for (found, new_c, known_c, fl_c) in results):
                     break
 
             if early_exit:
                 break
                 
+        elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
         kw_msg = f" for '{request.keyword}'" if request.keyword else ""
-        _update_job_status(job_id, "completed", f"Done{kw_msg}. Scanned {pages_processed} pages, found {found_total} listings, {new_total} new.")
+        _update_job_status(
+            job_id,
+            "completed",
+            f"Done{kw_msg}. Scanned {pages_processed} pages, found {found_total} listings ({new_total} new, {filtered_total} filtered).",
+            pages_scanned=pages_processed,
+            total_pages=total_target_pages,
+            total_found=found_total,
+            new_count=new_total,
+            updated_count=known_total,
+            filtered_count=filtered_total,
+            duration_seconds=elapsed,
+        )
         
     except Exception as e:
         logger.exception("scan_job_failed", error=str(e))
         error_msg = str(e)
         if "[SQL:" in error_msg:
             error_msg = error_msg.split("[SQL:")[0].strip()
-        _update_job_status(job_id, "failed", f"Failed: {error_msg}", error=error_msg)
+        elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
+        _update_job_status(
+            job_id,
+            "failed",
+            f"Failed: {error_msg}",
+            error=error_msg,
+            pages_scanned=pages_processed,
+            total_pages=total_target_pages,
+            total_found=found_total,
+            new_count=new_total,
+            updated_count=known_total,
+            filtered_count=filtered_total,
+            duration_seconds=elapsed,
+        )
     finally:
         await client.close()
 
@@ -372,6 +468,8 @@ def start_scan(
         job_type="scan",
         status="running",
         progress=f"Starting scan{' for ' + request.keyword if request.keyword else ''}...",
+        keyword=request.keyword,
+        property_category=request.property_category,
         created_by_id=_admin.id,
         created_by_name=_admin.name
     )
@@ -463,8 +561,9 @@ def get_active_jobs(
     return active
 
 
-async def _run_phone_fetch_job(job_id: str) -> None:
+async def _run_phone_fetch_job(job_id: str, target_scan_job_id: uuid.UUID | None = None) -> None:
     client = IkmanClient(delay=1.0)
+    start_time = asyncio.get_event_loop().time()
     
     try:
         with SessionLocal() as db:
@@ -472,9 +571,20 @@ async def _run_phone_fetch_job(job_id: str) -> None:
                 Prospect.classification == "owner",
                 Prospect.phone_number == None
             )
+            if target_scan_job_id:
+                stmt = stmt.where(Prospect.first_scan_job_id == target_scan_job_id)
+
             prospects = db.execute(stmt).scalars().all()
             if not prospects:
-                _update_job_status(job_id, "completed", "No owners found missing phone numbers.")
+                elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
+                _update_job_status(
+                    job_id,
+                    "completed",
+                    "No owners found missing phone numbers.",
+                    total_found=0,
+                    new_count=0,
+                    duration_seconds=elapsed,
+                )
                 return
                 
             processed = 0
@@ -482,10 +592,17 @@ async def _run_phone_fetch_job(job_id: str) -> None:
             for prospect in prospects:
                 with SessionLocal() as check_db:
                     current_job = check_db.get(ScanJob, uuid.UUID(job_id))
-                    if not current_job or current_job.status == "failed":
+                    if not current_job or current_job.status in ("failed", "cancelled"):
                         break
                     
-                _update_job_status(job_id, "running", f"Fetching phone for {prospect.title} ({processed}/{len(prospects)})")
+                _update_job_status(
+                    job_id,
+                    "running",
+                    f"Fetching phone for {prospect.title} ({processed}/{len(prospects)})",
+                    total_found=len(prospects),
+                    pages_scanned=processed,
+                    new_count=found_phones,
+                )
                 if prospect.ikman_slug:
                     detail = await client.fetch_ad_detail(prospect.ikman_slug)
                     if detail:
@@ -500,11 +617,27 @@ async def _run_phone_fetch_job(job_id: str) -> None:
                 
                 processed += 1
                 
-        _update_job_status(job_id, "completed", f"Done. Found {found_phones} phone numbers out of {processed} prospects.")
+        elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
+        _update_job_status(
+            job_id,
+            "completed",
+            f"Done. Found {found_phones} phone numbers out of {processed} prospects.",
+            total_found=processed,
+            pages_scanned=processed,
+            new_count=found_phones,
+            duration_seconds=elapsed,
+        )
         
     except Exception as e:
         logger.exception("phone_job_failed", error=str(e))
-        _update_job_status(job_id, "failed", f"Failed: {str(e)}", error=str(e))
+        elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
+        _update_job_status(
+            job_id,
+            "failed",
+            f"Failed: {str(e)}",
+            error=str(e),
+            duration_seconds=elapsed,
+        )
     finally:
         await client.close()
 
@@ -544,6 +677,189 @@ def get_phone_fetch_status(
         return {"status": job.status, "progress": job.progress, "error": job.error}
     except ValueError:
         return {"status": "not_found"}
+
+
+@admin_router.get("/scans", response_model=ScanJobList)
+def list_scan_jobs(
+    db: DbSession,
+    _admin: CurrentStaffUser,
+    job_type: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> Any:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
+    stmt = select(ScanJob)
+    if job_type:
+        stmt = stmt.where(ScanJob.job_type == job_type)
+    
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = db.execute(count_stmt).scalar_one()
+
+    stmt = stmt.order_by(ScanJob.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    items = db.execute(stmt).scalars().all()
+    total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
+
+
+@admin_router.get("/scans/{job_id}", response_model=ScanJobRead)
+def get_scan_job_detail(
+    job_id: uuid.UUID,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> Any:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
+    job = db.get(ScanJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Scan job not found")
+    return job
+
+
+@admin_router.get("/scans/{job_id}/prospects", response_model=ProspectList)
+def list_scan_job_prospects(
+    job_id: uuid.UUID,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+    status: str | None = None,
+    property_type: str | None = None,
+    listing_type: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> Any:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
+    stmt = select(Prospect).where(Prospect.first_scan_job_id == job_id)
+    if status:
+        stmt = stmt.where(Prospect.status == status)
+    if property_type:
+        stmt = stmt.where(Prospect.property_type == property_type)
+    if listing_type:
+        stmt = stmt.where(Prospect.listing_type == listing_type)
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = db.execute(count_stmt).scalar_one()
+
+    stmt = stmt.order_by(Prospect.first_seen_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    items = db.execute(stmt).scalars().all()
+    total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
+
+
+@admin_router.post("/scans/{job_id}/fetch-phones")
+def start_scan_job_phone_fetch(
+    job_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> dict[str, str]:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
+    parent_job = db.get(ScanJob, job_id)
+    if not parent_job:
+        raise HTTPException(status_code=404, detail="Scan job not found")
+
+    new_phone_job_id = str(uuid.uuid4())
+    new_job = ScanJob(
+        id=uuid.UUID(new_phone_job_id),
+        job_type="phone_fetch",
+        status="running",
+        progress=f"Fetching phones for scan {str(job_id)[:8]}...",
+        keyword=parent_job.keyword,
+        property_category=parent_job.property_category,
+        created_by_id=_admin.id,
+        created_by_name=_admin.name
+    )
+    db.add(new_job)
+    db.commit()
+
+    background_tasks.add_task(_run_phone_fetch_job, new_phone_job_id, target_scan_job_id=job_id)
+    return {"job_id": new_phone_job_id}
+
+
+@admin_router.get("/scans/{job_id}/export")
+def export_scan_prospects_csv(
+    job_id: uuid.UUID,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> Response:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
+    job = db.get(ScanJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Scan job not found")
+
+    stmt = select(Prospect).where(Prospect.first_scan_job_id == job_id).order_by(Prospect.first_seen_at.desc())
+    prospects = db.execute(stmt).scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID",
+        "Title",
+        "Price",
+        "Property Type",
+        "Listing Type",
+        "Location",
+        "Suburb",
+        "Phone Number",
+        "Poster Name",
+        "Classification",
+        "Confidence",
+        "Status",
+        "Ikman URL",
+        "Discovered At",
+    ])
+
+    for p in prospects:
+        writer.writerow([
+            str(p.id),
+            p.title or "",
+            p.price or "",
+            p.property_type or "",
+            p.listing_type or "",
+            p.location or "",
+            p.suburb or "",
+            p.phone_number or "",
+            p.poster_name or "",
+            p.classification or "",
+            f"{p.confidence:.2f}" if p.confidence is not None else "",
+            p.status or "",
+            p.ikman_url or "",
+            p.first_seen_at.isoformat() if p.first_seen_at else "",
+        ])
+
+    csv_content = output.getvalue()
+    slug_name = job.keyword.replace(" ", "_") if job.keyword else "all"
+    filename = f"scan_{slug_name}_{str(job.id)[:8]}.csv"
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache",
+        }
+    )
 
 
 @admin_router.post("/{id}/fetch-phone", response_model=ProspectRead)
@@ -687,6 +1003,9 @@ def list_prospects(
 
     if status:
         stmt = stmt.where(Prospect.status == status)
+    else:
+        stmt = stmt.where(Prospect.status != "discarded")
+
     if property_type:
         stmt = stmt.where(Prospect.property_type == property_type)
     if listing_type:
@@ -774,7 +1093,24 @@ def update_prospect(
         raise HTTPException(status_code=404, detail="Prospect not found")
         
     if prospect_update.status is not None:
+        old_status = prospect.status
         prospect.status = prospect_update.status
+        if old_status == "discarded" and prospect.status != "discarded":
+            prospect.discard_reason = None
+            if prospect.first_scan_job_id:
+                scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                if scan_job:
+                    scan_job.new_count = (scan_job.new_count or 0) + 1
+                    scan_job.filtered_count = max(0, (scan_job.filtered_count or 0) - 1)
+        elif old_status != "discarded" and prospect.status == "discarded":
+            if prospect.first_scan_job_id:
+                scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                if scan_job:
+                    scan_job.new_count = max(0, (scan_job.new_count or 0) - 1)
+                    scan_job.filtered_count = (scan_job.filtered_count or 0) + 1
+
+    if prospect_update.discard_reason is not None:
+        prospect.discard_reason = prospect_update.discard_reason
         
     db.commit()
     db.refresh(prospect)

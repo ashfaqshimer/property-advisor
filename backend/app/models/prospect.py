@@ -2,9 +2,9 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import Boolean, DateTime, SmallInteger, String, Text, Uuid, func, Float
+from sqlalchemy import Boolean, DateTime, SmallInteger, String, Text, Uuid, func, Float, ForeignKey
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.db.base import Base
@@ -61,6 +61,13 @@ class Prospect(Base):
     is_auth_dealer: Mapped[bool] = mapped_column(Boolean, default=False)
     membership_level: Mapped[str] = mapped_column(String(16), default="free")
     shop_name: Mapped[str | None] = mapped_column(String(256))
+
+    # Provenance
+    first_scan_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("scan_jobs.id"), nullable=True, index=True
+    )
+    discard_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    first_scan_job = relationship("ScanJob", back_populates="prospects", foreign_keys=[first_scan_job_id])
 
     def __repr__(self) -> str:
         return f"<Prospect {self.id!s}>"

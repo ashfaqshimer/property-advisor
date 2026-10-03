@@ -28,6 +28,8 @@ class ProspectBase(BaseModel):
     is_auth_dealer: bool = False
     membership_level: str = "free"
     shop_name: str | None = None
+    first_scan_job_id: UUID | None = None
+    discard_reason: str | None = None
 
 
 class ProspectCreate(ProspectBase):
@@ -36,6 +38,7 @@ class ProspectCreate(ProspectBase):
 
 class ProspectUpdate(BaseModel):
     status: str | None = None
+    discard_reason: str | None = None
 
 
 class ProspectRead(ProspectBase):
@@ -57,6 +60,36 @@ class ScanRequest(BaseModel):
 
 class ProspectList(BaseModel):
     items: list[ProspectRead]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class ScanJobRead(BaseModel):
+    id: UUID
+    job_type: str
+    status: str
+    progress: str
+    error: str | None = None
+    keyword: str | None = None
+    property_category: str | None = None
+    pages_scanned: int = 0
+    total_pages: int = 0
+    total_found: int = 0
+    new_count: int = 0
+    updated_count: int = 0
+    filtered_count: int = 0
+    duration_seconds: float | None = None
+    created_by_name: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ScanJobList(BaseModel):
+    items: list[ScanJobRead]
     total: int
     page: int
     page_size: int

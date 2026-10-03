@@ -915,6 +915,8 @@ export type Prospect = {
   confidence: number;
   status: string;
   first_seen_at: string;
+  first_scan_job_id?: string | null;
+  discard_reason?: string | null;
 };
 
 export type PaginatedProspects = {
@@ -924,6 +926,34 @@ export type PaginatedProspects = {
   page_size: number;
   total_pages: number;
 };
+
+export interface ScanJob {
+  id: string;
+  job_type: string;
+  status: string;
+  progress: string;
+  error?: string | null;
+  keyword?: string | null;
+  property_category?: string | null;
+  pages_scanned: number;
+  total_pages: number;
+  total_found: number;
+  new_count: number;
+  updated_count: number;
+  filtered_count: number;
+  duration_seconds?: number | null;
+  created_by_name?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedScanJobs {
+  items: ScanJob[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
 
 export async function getProspects(filters?: { status?: string; property_type?: string; listing_type?: string; page?: number; page_size?: number; q?: string }): Promise<PaginatedProspects> {
   const params = new URLSearchParams();
@@ -1035,6 +1065,67 @@ export async function getBulkPhoneFetchStatus(jobId: string): Promise<{ status: 
   });
   if (!response.ok) throw new ChatError("unexpected", `Bulk phone fetch status failed (${response.status}).`, response.status);
   return (await response.json()) as { status: string; progress: string; error?: string };
+}
+
+export async function getScanJobs(page = 1, pageSize = 20, jobType?: string): Promise<PaginatedScanJobs> {
+  const params = new URLSearchParams();
+  params.append("page", page.toString());
+  params.append("page_size", pageSize.toString());
+  if (jobType) params.append("job_type", jobType);
+
+  const response = await fetch(`${baseUrl()}/admin/prospects/scans?${params.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Scan jobs fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as PaginatedScanJobs;
+}
+
+export async function getScanJob(id: string): Promise<ScanJob> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/scans/${id}`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Scan job fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as ScanJob;
+}
+
+export async function getScanJobProspects(
+  jobId: string,
+  page = 1,
+  pageSize = 50,
+  filters?: { status?: string; property_type?: string; listing_type?: string }
+): Promise<PaginatedProspects> {
+  const params = new URLSearchParams();
+  params.append("page", page.toString());
+  params.append("page_size", pageSize.toString());
+  if (filters?.status) params.append("status", filters.status);
+  if (filters?.property_type) params.append("property_type", filters.property_type);
+  if (filters?.listing_type) params.append("listing_type", filters.listing_type);
+
+  const response = await fetch(`${baseUrl()}/admin/prospects/scans/${jobId}/prospects?${params.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Scan prospects fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as PaginatedProspects;
+}
+
+export async function startScanPhoneFetch(jobId: string): Promise<{ job_id: string }> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/scans/${jobId}/fetch-phones`, {
+    method: "POST",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Scan phone fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as { job_id: string };
+}
+
+export function getScanExportUrl(jobId: string): string {
+  return `${baseUrl()}/admin/prospects/scans/${jobId}/export`;
 }
 
 export async function updatePropertyContact(
