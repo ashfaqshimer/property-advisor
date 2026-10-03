@@ -22,6 +22,7 @@ import {
   getCurrentUser,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
+import { SourceBadge } from "../../../../components/admin/SourceBadge";
 
 export default function ProspectsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -29,6 +30,7 @@ export default function ProspectsPage() {
   
   // Filters & Pagination
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterSource, setFilterSource] = useState<string>("");
   const [transactionType, setTransactionType] = useState<"sale" | "rent">("sale");
   const [propertyType, setPropertyType] = useState<string>("all");
   const [page, setPage] = useState<number>(1);
@@ -485,6 +487,15 @@ export default function ProspectsPage() {
           <option value="converted">Converted</option>
           <option value="discarded">Discarded</option>
         </select>
+        <select
+          value={filterSource}
+          onChange={(e) => setFilterSource(e.target.value)}
+          className="cursor-pointer rounded-lg border border-[#cbd8d1] dark:border-zinc-700 px-3 py-1.5 text-sm outline-none focus:border-[#28513f] w-full sm:w-auto"
+        >
+          <option value="">All Portals</option>
+          <option value="ikman">ikman.lk</option>
+          <option value="lpw">LankaPropertyWeb</option>
+        </select>
         {/* Segmented Control for Transaction Type */}
         <div className="flex shrink-0 items-center rounded-lg bg-[#f4f6f4] dark:bg-zinc-900 dark:bg-zinc-900 p-1 w-full sm:w-auto">
           <button
@@ -566,7 +577,9 @@ export default function ProspectsPage() {
           ) : prospects.length === 0 ? (
             <div className="p-6 text-center text-[#64736b] dark:text-zinc-400">No prospects found.</div>
           ) : (
-            prospects.map((prospect) => {
+            prospects
+              .filter((p) => !filterSource || (p.source || "ikman").toLowerCase() === filterSource.toLowerCase())
+              .map((prospect) => {
               const isDiscarded = prospect.status === "discarded";
               return (
                 <div
@@ -578,10 +591,11 @@ export default function ProspectsPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-[#64736b] dark:text-zinc-400">
                         {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
                       </span>
+                      <SourceBadge source={prospect.source} url={prospect.ikman_url} />
                       {isDiscarded && (
                         <span className="inline-flex items-center rounded bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
                           Discarded{prospect.discard_reason ? `: ${prospect.discard_reason.replace("_", " ")}` : ""}
@@ -693,7 +707,9 @@ export default function ProspectsPage() {
                   <td colSpan={6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">No prospects found.</td>
                 </tr>
               ) : (
-                prospects.map((prospect) => {
+                prospects
+                  .filter((p) => !filterSource || (p.source || "ikman").toLowerCase() === filterSource.toLowerCase())
+                  .map((prospect) => {
                   const isDiscarded = prospect.status === "discarded";
                   return (
                     <tr
@@ -705,7 +721,10 @@ export default function ProspectsPage() {
                       }`}
                     >
                       <td className="px-6 py-4 text-[#64736b] dark:text-zinc-400">
-                        {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
+                        <div>{format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}</div>
+                        <div className="mt-1">
+                          <SourceBadge source={prospect.source} url={prospect.ikman_url} />
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex max-w-[250px] items-center gap-2">

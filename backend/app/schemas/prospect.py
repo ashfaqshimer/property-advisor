@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProspectBase(BaseModel):
+    source: str = "ikman"
     ikman_ad_id: str
     ikman_url: str
     ikman_slug: str
@@ -50,6 +51,7 @@ class ProspectRead(ProspectBase):
 
 
 class ScanRequest(BaseModel):
+    source: str = "ikman"
     categories: list[str] = Field(default_factory=lambda: ["property"])
     pages_per_category: int | None = Field(default=None, ge=1)
     scan_all: bool = False
@@ -68,6 +70,7 @@ class ProspectList(BaseModel):
 
 class ScanJobRead(BaseModel):
     id: UUID
+    source: str = "ikman"
     job_type: str
     status: str
     progress: str

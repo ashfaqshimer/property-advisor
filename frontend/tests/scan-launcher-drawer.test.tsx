@@ -101,13 +101,17 @@ describe("ScanLauncherDrawer", () => {
     await waitFor(() => {
       expect(api.startProspectScan).toHaveBeenCalledWith(
         expect.objectContaining({
+          source: "ikman",
           keyword: "Colombo 7",
           property_category: "all",
           strict_location: true,
           scan_all: true,
         })
       );
-      expect(handleScanStarted).toHaveBeenCalledWith("test-job-123", { keyword: "Colombo 7" });
+      expect(handleScanStarted).toHaveBeenCalledWith("test-job-123", {
+        keyword: "Colombo 7",
+        source: "ikman",
+      });
       expect(handleClose).toHaveBeenCalled();
     });
   });

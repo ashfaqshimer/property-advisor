@@ -40,6 +40,7 @@ import {
   updateProspect,
   stopScanJob,
 } from "../../../../../lib/api";
+import { SourceBadge } from "../../../../../components/admin/SourceBadge";
 
 export default function ScanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -374,6 +375,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                   {job.property_category}
                 </span>
               )}
+              <SourceBadge source={job.source} />
               {getStatusBadge(job.status)}
             </div>
 
@@ -612,6 +614,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                           <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:text-zinc-300 uppercase">
                             {p.listing_type}
                           </span>
+                          <SourceBadge source={p.source} url={p.ikman_url} />
                           {isDiscarded && (
                             <span className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
                               <Filter className="h-3 w-3" /> Discard: {p.discard_reason ? p.discard_reason.replace("_", " ") : "location mismatch"}
@@ -746,15 +749,18 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                         }`}
                       >
                         <td className="px-5 py-4 max-w-sm">
-                          <a
-                            href={p.ikman_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-semibold text-[#1a2923] dark:text-zinc-100 hover:text-[#19352b] dark:hover:text-emerald-400 flex items-center gap-1.5 group"
-                          >
-                            <span className="line-clamp-2">{p.title}</span>
-                            <ExternalLink className="h-3.5 w-3.5 text-[#64736b] group-hover:text-[#19352b] dark:group-hover:text-emerald-400 shrink-0 opacity-60" />
-                          </a>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <a
+                              href={p.ikman_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-semibold text-[#1a2923] dark:text-zinc-100 hover:text-[#19352b] dark:hover:text-emerald-400 flex items-center gap-1.5 group"
+                            >
+                              <span className="line-clamp-2">{p.title}</span>
+                              <ExternalLink className="h-3.5 w-3.5 text-[#64736b] group-hover:text-[#19352b] dark:group-hover:text-emerald-400 shrink-0 opacity-60" />
+                            </a>
+                            <SourceBadge source={p.source} url={p.ikman_url} />
+                          </div>
                           {isDiscarded && (
                             <span className="mt-1 inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300">
                               <Filter className="h-3 w-3" /> Filtered: {p.discard_reason ? p.discard_reason.replace("_", " ") : "location mismatch"}

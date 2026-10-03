@@ -899,6 +899,7 @@ export async function createPropertyContact(
 
 export type Prospect = {
   id: string;
+  source?: string;
   ikman_url: string;
   title: string;
   price: string;
@@ -929,6 +930,7 @@ export type PaginatedProspects = {
 
 export interface ScanJob {
   id: string;
+  source?: string;
   job_type: string;
   status: string;
   progress: string;
@@ -990,6 +992,7 @@ export async function updateProspect(id: string, status: string): Promise<Prospe
 }
 
 export interface ProspectScanPayload {
+  source?: string;
   categories?: string[];
   pages_per_category?: number;
   scan_all?: boolean;

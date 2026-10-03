@@ -26,6 +26,7 @@ import {
 
 import { ScanJob, getScanJobs, stopScanJob, AuthUser, getCurrentUser } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
+import { SourceBadge } from "../../../../components/admin/SourceBadge";
 
 function ScanHistoryContent() {
   const searchParams = useSearchParams();
@@ -468,6 +469,7 @@ function ScanHistoryContent() {
                             • {job.property_category}
                           </span>
                         )}
+                        <SourceBadge source={job.source || "ikman"} />
                       </div>
                       <p className="mt-1 text-[11px] text-[#64736b] dark:text-zinc-400">
                         {formatDistanceToNow(createdDate, { addSuffix: true })} • by {job.created_by_name || "System"}
@@ -643,8 +645,10 @@ function ScanHistoryContent() {
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-[#64736b] dark:text-zinc-400 capitalize mt-0.5">
-                          {job.property_category ? `Category: ${job.property_category}` : "All Categories"}
+                        <div className="text-xs text-[#64736b] dark:text-zinc-400 capitalize mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span>{job.property_category ? `Category: ${job.property_category}` : "All Categories"}</span>
+                          <span>•</span>
+                          <SourceBadge source={job.source || "ikman"} />
                         </div>
                       </td>
 
