@@ -92,6 +92,7 @@ export default function ProspectsPage() {
   }, []);
   const isAdminOrRoot = user?.role === "admin" || user?.role === "root";
 
+  const [telegramAgentConfigured, setTelegramAgentConfigured] = useState(false);
   const [selectedProspectIds, setSelectedProspectIds] = useState<Set<string>>(new Set());
   const [isAssigning, setIsAssigning] = useState(false);
 
@@ -121,6 +122,11 @@ export default function ProspectsPage() {
       const ids = Array.from(selectedProspectIds);
       const result = await createFieldAssignments(ids);
       toast.success(`Dispatched ${result.length} prospect(s) to agent on Telegram.`);
+      setProspects((prev) =>
+        prev.map((p) =>
+          selectedProspectIds.has(p.id) ? { ...p, assignment_status: "pending" } : p
+        )
+      );
       setSelectedProspectIds(new Set());
     } catch (err: any) {
       toast.error(err.message || "Failed to dispatch assignments to agent.");
@@ -135,6 +141,11 @@ export default function ProspectsPage() {
       const result = await createFieldAssignments([prospectId]);
       if (result.length > 0) {
         toast.success("Dispatched to agent on Telegram.");
+        setProspects((prev) =>
+          prev.map((p) =>
+            p.id === prospectId ? { ...p, assignment_status: "pending" } : p
+          )
+        );
       } else {
         toast.info("This prospect already has an active assignment.");
       }
@@ -220,6 +231,9 @@ export default function ProspectsPage() {
       });
       setProspects(data.items);
       setTotalPages(data.total_pages);
+      if (typeof data.telegram_agent_configured === "boolean") {
+        setTelegramAgentConfigured(data.telegram_agent_configured);
+      }
     } catch (err) {
       toast.error("Failed to load prospects");
     } finally {
@@ -703,7 +717,7 @@ export default function ProspectsPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {isAdminOrRoot && (
+                      {isAdminOrRoot && telegramAgentConfigured && (
                         <button
                           type="button"
                           onClick={() => toggleSelectProspect(prospect.id)}
@@ -804,17 +818,59 @@ export default function ProspectsPage() {
                       )}
                     </div>
                   )}
-                  {isAdminOrRoot && !isTerminal && (
+                  {isAdminOrRoot && telegramAgentConfigured && !isTerminal && (
                     <div className="pt-2 border-t border-[#dce4df] dark:border-zinc-800 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSingleAssign(prospect.id)}
-                        disabled={isAssigning}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 py-1.5 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
-                      >
-                        <Send className="h-3 w-3" />
-                        <span>Dispatch to Agent</span>
-                      </button>
+                      {prospect.assignment_status === "pending" ? (
+                        <div className="flex-1 flex items-center justify-center gap-1.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+                          <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                          <span>Assigned (Awaiting Response)</span>
+                        </div>
+                      ) : prospect.assignment_status === "interested" ? (
+                        <div className="flex-1 flex items-center justify-center gap-1.5 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 py-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>Agent Outcome: Interested</span>
+                        </div>
+                      ) : prospect.assignment_status === "not_interested" ? (
+                        <div className="flex-1 flex items-center justify-center gap-1.5 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 py-1.5 text-xs font-medium text-red-800 dark:text-red-300">
+                          <span>Agent Outcome: Not Interested</span>
+                        </div>
+                      ) : prospect.assignment_status === "no_answer" ? (
+                        <div className="flex-1 flex items-center justify-between gap-2">
+                          <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">Outcome: No Answer</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSingleAssign(prospect.id)}
+                            disabled={isAssigning}
+                            className="inline-flex items-center gap-1 rounded bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-3 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                          >
+                            <Send className="h-3 w-3" />
+                            <span>Re-assign</span>
+                          </button>
+                        </div>
+                      ) : prospect.assignment_status === "callback_later" ? (
+                        <div className="flex-1 flex items-center justify-between gap-2">
+                          <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Outcome: Call Back Later</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSingleAssign(prospect.id)}
+                            disabled={isAssigning}
+                            className="inline-flex items-center gap-1 rounded bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-3 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                          >
+                            <Send className="h-3 w-3" />
+                            <span>Re-assign</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSingleAssign(prospect.id)}
+                          disabled={isAssigning}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 py-1.5 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                        >
+                          <Send className="h-3 w-3" />
+                          <span>Dispatch to Agent</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -829,7 +885,7 @@ export default function ProspectsPage() {
           <table className="w-full whitespace-nowrap text-left text-sm">
             <thead className="bg-[#f4f6f4] dark:bg-zinc-900 dark:bg-zinc-900 text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-zinc-400">
               <tr>
-                {isAdminOrRoot && (
+                {isAdminOrRoot && telegramAgentConfigured && (
                   <th className="w-10 px-4 py-4">
                     <button
                       type="button"
@@ -856,11 +912,11 @@ export default function ProspectsPage() {
             <tbody className="divide-y divide-[#dce4df] dark:divide-zinc-800">
               {loading ? (
                 <tr>
-                  <td colSpan={isAdminOrRoot ? 7 : 6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">Loading prospects...</td>
+                  <td colSpan={isAdminOrRoot && telegramAgentConfigured ? 7 : 6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">Loading prospects...</td>
                 </tr>
               ) : prospects.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdminOrRoot ? 7 : 6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">No prospects found.</td>
+                  <td colSpan={isAdminOrRoot && telegramAgentConfigured ? 7 : 6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">No prospects found.</td>
                 </tr>
               ) : (
                 prospects
@@ -882,7 +938,7 @@ export default function ProspectsPage() {
                           : "hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900/50"
                       }`}
                     >
-                      {isAdminOrRoot && (
+                      {isAdminOrRoot && telegramAgentConfigured && (
                         <td className="w-10 px-4 py-4">
                           <button
                             type="button"
@@ -1006,16 +1062,81 @@ export default function ProspectsPage() {
                           ) : (
                             ["root", "admin"].includes(user?.role ?? "") && !isTerminal && (
                               <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSingleAssign(prospect.id)}
-                                  disabled={isAssigning}
-                                  className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
-                                  title="Dispatch to agent via Telegram"
-                                >
-                                  <Send className="h-3 w-3" />
-                                  <span>Assign</span>
-                                </button>
+                                {telegramAgentConfigured && (
+                                  prospect.assignment_status === "pending" ? (
+                                    <span
+                                      className="inline-flex items-center gap-1 rounded border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300"
+                                      title="Dispatched to agent — awaiting response"
+                                    >
+                                      <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                      <span>Assigned</span>
+                                    </span>
+                                  ) : prospect.assignment_status === "interested" ? (
+                                    <span
+                                      className="inline-flex items-center gap-1 rounded border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-300"
+                                      title="Agent outcome: Interested"
+                                    >
+                                      <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                      <span>Interested</span>
+                                    </span>
+                                  ) : prospect.assignment_status === "not_interested" ? (
+                                    <span
+                                      className="inline-flex items-center gap-1 rounded border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/30 px-2.5 py-1 text-xs font-medium text-red-800 dark:text-red-300"
+                                      title="Agent outcome: Not Interested"
+                                    >
+                                      <span>Not Interested</span>
+                                    </span>
+                                  ) : prospect.assignment_status === "no_answer" ? (
+                                    <div className="flex items-center gap-1">
+                                      <span
+                                        className="inline-flex items-center gap-1 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                                        title="Agent outcome: No Answer"
+                                      >
+                                        <span>No Answer</span>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSingleAssign(prospect.id)}
+                                        disabled={isAssigning}
+                                        className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                                        title="Re-assign to agent"
+                                      >
+                                        <Send className="h-3 w-3" />
+                                        <span>Re-assign</span>
+                                      </button>
+                                    </div>
+                                  ) : prospect.assignment_status === "callback_later" ? (
+                                    <div className="flex items-center gap-1">
+                                      <span
+                                        className="inline-flex items-center gap-1 rounded border border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300"
+                                        title="Agent outcome: Call Back Later"
+                                      >
+                                        <span>Call Later</span>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSingleAssign(prospect.id)}
+                                        disabled={isAssigning}
+                                        className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                                        title="Re-assign to agent"
+                                      >
+                                        <Send className="h-3 w-3" />
+                                        <span>Re-assign</span>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSingleAssign(prospect.id)}
+                                      disabled={isAssigning}
+                                      className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                                      title="Dispatch to agent via Telegram"
+                                    >
+                                      <Send className="h-3 w-3" />
+                                      <span>Assign</span>
+                                    </button>
+                                  )
+                                )}
                                 <button
                                   onClick={() => handleGenerateDraft(prospect)}
                                   disabled={draftLoading === prospect.id}
@@ -1072,7 +1193,7 @@ export default function ProspectsPage() {
       </div>
 
       {/* Floating Bulk Action Bar */}
-      {selectedProspectIds.size > 0 && isAdminOrRoot && (
+      {selectedProspectIds.size > 0 && isAdminOrRoot && telegramAgentConfigured && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 sm:gap-4 rounded-2xl bg-[#19352b] dark:bg-emerald-950 border border-emerald-600/40 text-white px-4 sm:px-6 py-3 shadow-2xl backdrop-blur-md max-w-[92vw]">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-zinc-950">

@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, MessageSquare, Phone } from "lucide-react";
+import { ExternalLink, RefreshCw, MessageSquare, Phone, Send } from "lucide-react";
 import {
   FieldAssignment,
   PaginatedFieldAssignments,
   getFieldAssignments,
+  resendFieldAssignment,
 } from "../../../../lib/api";
 
 const STATUS_CONFIG: Record<
@@ -67,9 +68,32 @@ function StatusBadge({ status }: { status: string }) {
 export default function AssignmentsPage() {
   const [data, setData] = useState<PaginatedFieldAssignments | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
+
+  const handleResend = async (assignmentId: string) => {
+    setResendingId(assignmentId);
+    try {
+      const updated = await resendFieldAssignment(assignmentId);
+      toast.success("Assignment resent to Telegram agent.");
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((item) =>
+                item.id === assignmentId ? { ...item, ...updated } : item
+              ),
+            }
+          : null
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to resend assignment.");
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const fetchAssignments = async () => {
     setLoading(true);
@@ -208,7 +232,9 @@ export default function AssignmentsPage() {
                   <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#718078] dark:text-zinc-400">
                     Assigned
                   </th>
-                  <th className="px-4 py-3" />
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[#718078] dark:text-zinc-400">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#edf1ee] dark:divide-zinc-800">
@@ -284,19 +310,30 @@ export default function AssignmentsPage() {
                       </span>
                     </td>
 
-                    {/* Link to ikman */}
-                    <td className="px-4 py-3">
-                      {a.prospect_ikman_url && (
-                        <a
-                          href={a.prospect_ikman_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-zinc-200 transition"
-                          title="View on ikman"
+                    {/* Actions */}
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-2 justify-end">
+                        <button
+                          onClick={() => handleResend(a.id)}
+                          disabled={resendingId === a.id}
+                          title="Resend to Telegram agent"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1 text-xs font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-700 transition disabled:opacity-50"
                         >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      )}
+                          <Send className={`h-3 w-3 ${resendingId === a.id ? "animate-pulse" : ""}`} />
+                          <span>{resendingId === a.id ? "Sending…" : "Resend"}</span>
+                        </button>
+                        {a.prospect_ikman_url && (
+                          <a
+                            href={a.prospect_ikman_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 rounded text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-zinc-200 transition"
+                            title="View on ikman"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

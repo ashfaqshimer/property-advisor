@@ -182,3 +182,45 @@ def get_assignment(
     if not a:
         raise HTTPException(status_code=404, detail="Assignment not found.")
     return _assignment_to_read(a)
+
+
+@router.post("/{assignment_id}/resend", response_model=FieldAssignmentRead)
+def resend_assignment(
+    assignment_id: uuid.UUID,
+    db: DbSession,
+    current_user: CurrentStaffUser,
+) -> FieldAssignmentRead:
+    """Resend a prospect assignment card to the agent on Telegram."""
+    if current_user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Only root and admin users can resend field assignments.")
+
+    assignment = db.get(FieldAssignment, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found.")
+
+    prospect = assignment.prospect
+    if not prospect:
+        raise HTTPException(status_code=400, detail="Associated prospect not found.")
+
+    message_id = send_assignment_message(
+        assignment_id=str(assignment.id),
+        poster_name=prospect.poster_name,
+        phone_number=prospect.phone_number,
+        title=prospect.title,
+        location=prospect.location,
+        price=prospect.price,
+        property_type=prospect.property_type,
+        listing_type=prospect.listing_type,
+        classification=prospect.classification,
+        confidence=prospect.confidence,
+        ikman_url=prospect.ikman_url,
+    )
+
+    if message_id:
+        assignment.telegram_message_id = message_id
+    assignment.updated_at = func.now()
+    db.commit()
+    db.refresh(assignment)
+
+    logger.info("field_assignment_resent", assignment_id=str(assignment_id), message_id=message_id)
+    return _assignment_to_read(assignment)

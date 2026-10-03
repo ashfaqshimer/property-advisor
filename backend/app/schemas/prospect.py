@@ -46,6 +46,7 @@ class ProspectRead(ProspectBase):
     id: UUID
     first_seen_at: datetime
     last_seen_at: datetime
+    assignment_status: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -66,6 +67,7 @@ class ProspectList(BaseModel):
     page: int
     page_size: int
     total_pages: int
+    telegram_agent_configured: bool = False
 
 
 class ScanJobRead(BaseModel):

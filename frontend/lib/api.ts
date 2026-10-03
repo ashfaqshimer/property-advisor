@@ -985,6 +985,7 @@ export type Prospect = {
   first_seen_at: string;
   first_scan_job_id?: string | null;
   discard_reason?: string | null;
+  assignment_status?: string | null;
 };
 
 export type PaginatedProspects = {
@@ -993,6 +994,7 @@ export type PaginatedProspects = {
   page: number;
   page_size: number;
   total_pages: number;
+  telegram_agent_configured?: boolean;
 };
 
 export interface ScanJob {
@@ -1344,4 +1346,25 @@ export async function getFieldAssignments(filters?: {
   if (!response.ok) throw new ChatError("unexpected", `Assignments fetch failed (${response.status}).`, response.status);
   return (await response.json()) as PaginatedFieldAssignments;
 }
+
+export async function resendFieldAssignment(assignmentId: string): Promise<FieldAssignment> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/admin/field-assignments/${assignmentId}/resend`,
+    {
+      method: "POST",
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    let detail = `Resend failed (${response.status}).`;
+    try {
+      const p = await response.json();
+      if (p.detail) detail = p.detail;
+    } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return (await response.json()) as FieldAssignment;
+}
+
 

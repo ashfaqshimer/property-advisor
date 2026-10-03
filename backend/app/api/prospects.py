@@ -13,7 +13,9 @@ from sqlalchemy.orm.attributes import flag_modified
 import structlog
 
 from app.auth import CurrentStaffUser
+from app.config import get_settings
 from app.db.session import SessionLocal, get_db
+from app.models.field_assignment import FieldAssignment
 from app.models.prospect import Prospect
 from app.schemas.auth import StaffRole
 from app.models.scan_job import ScanJob
@@ -819,6 +821,29 @@ def get_scan_job_detail(
     return job
 
 
+def _attach_assignment_status(db: Session, prospects: list[Prospect]) -> list[ProspectRead]:
+    if not prospects:
+        return []
+    prospect_ids = [p.id for p in prospects]
+    assignments = db.scalars(
+        select(FieldAssignment)
+        .where(FieldAssignment.prospect_id.in_(prospect_ids))
+        .order_by(FieldAssignment.created_at.desc())
+    ).all()
+
+    status_map: dict[uuid.UUID, str] = {}
+    for a in assignments:
+        if a.prospect_id and a.prospect_id not in status_map:
+            status_map[a.prospect_id] = a.status
+
+    reads: list[ProspectRead] = []
+    for p in prospects:
+        r = ProspectRead.model_validate(p)
+        r.assignment_status = status_map.get(p.id)
+        reads.append(r)
+    return reads
+
+
 @admin_router.get("/scans/{job_id}/prospects", response_model=ProspectList)
 def list_scan_job_prospects(
     job_id: uuid.UUID,
@@ -848,12 +873,16 @@ def list_scan_job_prospects(
     items = db.execute(stmt).scalars().all()
     total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
 
+    settings = get_settings()
+    tg_configured = bool(settings.telegram_bot_token.strip() and settings.telegram_agent_chat_id.strip())
+
     return {
-        "items": items,
+        "items": _attach_assignment_status(db, items),
         "total": total,
         "page": page,
         "page_size": page_size,
         "total_pages": total_pages,
+        "telegram_agent_configured": tg_configured,
     }
 
 
@@ -1157,12 +1186,15 @@ def list_prospects(
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = db.execute(count_stmt).scalar_one()
         items = db.execute(stmt.limit(100)).scalars().all()
+        settings = get_settings()
+        tg_configured = bool(settings.telegram_bot_token.strip() and settings.telegram_agent_chat_id.strip())
         return {
-            "items": items,
+            "items": _attach_assignment_status(db, items),
             "total": total,
             "page": 1,
             "page_size": 100,
             "total_pages": 1,
+            "telegram_agent_configured": tg_configured,
         }
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -1175,12 +1207,16 @@ def list_prospects(
 
     total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
 
+    settings = get_settings()
+    tg_configured = bool(settings.telegram_bot_token.strip() and settings.telegram_agent_chat_id.strip())
+
     return {
-        "items": items,
+        "items": _attach_assignment_status(db, items),
         "total": total,
         "page": page,
         "page_size": page_size,
         "total_pages": total_pages,
+        "telegram_agent_configured": tg_configured,
     }
 
 
