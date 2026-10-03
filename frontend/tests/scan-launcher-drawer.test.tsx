@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { ScanLauncherDrawer } from "@/components/admin/ScanLauncherDrawer";
+import { ScanLauncherDrawer, DEFAULT_PRESETS } from "@/components/admin/ScanLauncherDrawer";
 import * as api from "@/lib/api";
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -9,8 +9,12 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return {
     ...actual,
     startProspectScan: vi.fn(),
+    getScanPresets: vi.fn().mockResolvedValue([]),
+    saveScanPreset: vi.fn(),
+    deleteScanPreset: vi.fn(),
   };
 });
+
 
 describe("ScanLauncherDrawer", () => {
   beforeEach(() => {
@@ -111,9 +115,29 @@ describe("ScanLauncherDrawer", () => {
       expect(handleScanStarted).toHaveBeenCalledWith("test-job-123", {
         keyword: "Colombo 7",
         source: "ikman",
+        autoFetchPhones: false,
       });
       expect(handleClose).toHaveBeenCalled();
     });
+  });
+
+  it("applies a saved scan preset when clicked", () => {
+    render(
+      <ScanLauncherDrawer
+        isOpen={true}
+        onClose={vi.fn()}
+        onScanStarted={vi.fn()}
+      />
+    );
+
+    const presetBtn = screen.getByRole("button", { name: "Rajagiriya Lands" });
+    fireEvent.click(presetBtn);
+
+    const input = screen.getByPlaceholderText(/e\.g\. Rajagiriya/i) as HTMLInputElement;
+    expect(input.value).toBe("Rajagiriya");
+
+    const categorySelect = screen.getByRole("combobox") as HTMLSelectElement;
+    expect(categorySelect.value).toBe("lands");
   });
 
   it("calls onClose when cancel or close button is clicked", () => {
@@ -137,4 +161,54 @@ describe("ScanLauncherDrawer", () => {
 
     expect(handleClose).toHaveBeenCalledTimes(2);
   });
+
+  it("saves a new preset using saveScanPreset", async () => {
+    const handlePresetsChanged = vi.fn();
+    vi.mocked(api.saveScanPreset).mockResolvedValueOnce([
+      ...DEFAULT_PRESETS,
+      {
+        id: "preset-custom-1",
+        name: "Dehiwala Beachfront",
+        keyword: "Dehiwala",
+        property_category: "apartments",
+        strict_location: true,
+        scan_all: true,
+        source: "ikman",
+        is_default: false,
+      },
+    ]);
+
+    render(
+      <ScanLauncherDrawer
+        isOpen={true}
+        onClose={vi.fn()}
+        onScanStarted={vi.fn()}
+        onPresetsChanged={handlePresetsChanged}
+      />
+    );
+
+    const dehiwalaPill = screen.getByRole("button", { name: "Dehiwala" });
+    fireEvent.click(dehiwalaPill);
+
+    const saveCurrentBtn = screen.getByRole("button", { name: /save current/i });
+    fireEvent.click(saveCurrentBtn);
+
+    const nameInput = screen.getByPlaceholderText(/preset name/i);
+    fireEvent.change(nameInput, { target: { value: "Dehiwala Beachfront" } });
+
+    const saveBtn = screen.getByRole("button", { name: "Save" });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(api.saveScanPreset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Dehiwala Beachfront",
+          keyword: "Dehiwala",
+          source: "ikman",
+        })
+      );
+      expect(handlePresetsChanged).toHaveBeenCalled();
+    });
+  });
 });
+

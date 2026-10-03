@@ -38,6 +38,9 @@ def get_site_configuration(db: DbSession) -> SiteConfiguration:
         )
     if config.scanner_settings:
         settings = dict(config.scanner_settings)
+        if "presets" not in settings or settings.get("presets") is None:
+            from app.schemas.site_configuration import DEFAULT_SCAN_PRESETS
+            settings["presets"] = DEFAULT_SCAN_PRESETS
         if not settings.get("enabled"):
             settings["next_run_at"] = None
         else:
@@ -45,6 +48,9 @@ def get_site_configuration(db: DbSession) -> SiteConfiguration:
             if next_run:
                 settings["next_run_at"] = next_run.isoformat()
         config.scanner_settings = settings
+    else:
+        from app.schemas.site_configuration import DEFAULT_SCAN_PRESETS
+        config.scanner_settings = {"presets": DEFAULT_SCAN_PRESETS}
     return config
 
 

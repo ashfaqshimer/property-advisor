@@ -214,11 +214,23 @@ export type AdminLead = {
 export type StringConfigField = { value: string | null; show: boolean };
 export type ListConfigField = { values: string[]; show: boolean };
 
+export interface ScanPreset {
+  id: string;
+  name: string;
+  keyword: string;
+  property_category: "all" | "lands" | "apartments" | "houses" | "commercial";
+  strict_location: boolean;
+  scan_all: boolean;
+  source: string;
+  is_default?: boolean;
+}
+
 export type ScannerSettingsConfigField = {
   enabled: boolean;
   frequency_hours: number;
   pages_to_scan: number;
   property_types: string[];
+  presets?: ScanPreset[];
   last_run_at?: string | null;
   last_run_status?: string | null;
   next_run_at?: string | null;
@@ -262,6 +274,47 @@ export async function updateSiteConfiguration(payload: SiteConfigurationUpdate):
   if (!response.ok) throw new ChatError("unexpected", `Site config update failed (${response.status}).`, response.status);
   return (await response.json()) as SiteConfiguration;
 }
+
+export async function getScanPresets(): Promise<ScanPreset[]> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/presets`, {
+    method: "GET",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to fetch presets (${response.status}).`, response.status);
+  }
+  return (await response.json()) as ScanPreset[];
+}
+
+export async function saveScanPreset(preset: ScanPreset): Promise<ScanPreset[]> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/presets`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(preset),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to save preset (${response.status}).`, response.status);
+  }
+  return (await response.json()) as ScanPreset[];
+}
+
+export async function deleteScanPreset(presetId: string): Promise<ScanPreset[]> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/presets/${encodeURIComponent(presetId)}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to delete preset (${response.status}).`, response.status);
+  }
+  return (await response.json()) as ScanPreset[];
+}
+
 
 export type AuthUser = {
   id: string;

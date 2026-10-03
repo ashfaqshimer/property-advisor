@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy import delete, select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 import structlog
 
 from app.auth import CurrentStaffUser
@@ -17,6 +18,7 @@ from app.models.prospect import Prospect
 from app.schemas.auth import StaffRole
 from app.models.scan_job import ScanJob
 from app.models.site_configuration import SiteConfiguration
+from app.schemas.site_configuration import DEFAULT_SCAN_PRESETS, ScanPresetConfig
 from app.schemas.prospect import (
     ProspectRead,
     ProspectUpdate,
@@ -1209,3 +1211,72 @@ def purge_old_prospects(
     db.commit()
     
     return {"status": "ok", "deleted_count": result.rowcount, "retention_days": retention_days}
+
+
+@admin_router.get("/presets", response_model=list[ScanPresetConfig])
+def get_scan_presets(
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> list[dict[str, Any]]:
+    """Retrieve configured scan presets from site_configuration."""
+    config = db.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
+    if not config or not config.scanner_settings:
+        return [dict(p) for p in DEFAULT_SCAN_PRESETS]
+    presets = config.scanner_settings.get("presets")
+    if presets is None:
+        return [dict(p) for p in DEFAULT_SCAN_PRESETS]
+    return presets
+
+
+@admin_router.post("/presets", response_model=list[ScanPresetConfig])
+def save_scan_preset(
+    preset: ScanPresetConfig,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> list[dict[str, Any]]:
+    """Add or update a scan preset in site_configuration."""
+    config = db.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
+    if not config:
+        config = SiteConfiguration(scanner_settings={"presets": list(DEFAULT_SCAN_PRESETS)})
+        db.add(config)
+        db.flush()
+
+    settings = dict(config.scanner_settings or {})
+    current_presets: list[dict[str, Any]] = list(settings.get("presets") or DEFAULT_SCAN_PRESETS)
+
+    new_preset_data = preset.model_dump()
+    existing_idx = next((i for i, p in enumerate(current_presets) if p.get("id") == preset.id), None)
+    if existing_idx is not None:
+        current_presets[existing_idx] = new_preset_data
+    else:
+        current_presets.append(new_preset_data)
+
+    settings["presets"] = current_presets
+    config.scanner_settings = settings
+    flag_modified(config, "scanner_settings")
+    db.commit()
+    db.refresh(config)
+    return current_presets
+
+
+@admin_router.delete("/presets/{preset_id}", response_model=list[ScanPresetConfig])
+def delete_scan_preset(
+    preset_id: str,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> list[dict[str, Any]]:
+    """Delete a scan preset by ID from site_configuration."""
+    config = db.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
+    if not config:
+        return [dict(p) for p in DEFAULT_SCAN_PRESETS if p.get("id") != preset_id]
+
+    settings = dict(config.scanner_settings or {})
+    current_presets: list[dict[str, Any]] = list(settings.get("presets") or DEFAULT_SCAN_PRESETS)
+    updated_presets = [p for p in current_presets if p.get("id") != preset_id]
+
+    settings["presets"] = updated_presets
+    config.scanner_settings = settings
+    flag_modified(config, "scanner_settings")
+    db.commit()
+    db.refresh(config)
+    return updated_presets

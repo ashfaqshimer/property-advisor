@@ -15,14 +15,71 @@ class ListConfigField(BaseModel):
     show: bool = True
 
 
+class ScanPresetConfig(BaseModel):
+    id: str
+    name: str
+    keyword: str = ""
+    property_category: str = "all"
+    strict_location: bool = True
+    scan_all: bool = True
+    source: str = "ikman"
+    is_default: bool = False
+
+
+DEFAULT_SCAN_PRESETS: list[dict[str, Any]] = [
+    {
+        "id": "colombo-7-houses",
+        "name": "Colombo 7 Houses",
+        "keyword": "Colombo 7",
+        "property_category": "houses",
+        "strict_location": True,
+        "scan_all": True,
+        "source": "ikman",
+        "is_default": True,
+    },
+    {
+        "id": "rajagiriya-lands",
+        "name": "Rajagiriya Lands",
+        "keyword": "Rajagiriya",
+        "property_category": "lands",
+        "strict_location": True,
+        "scan_all": True,
+        "source": "ikman",
+        "is_default": True,
+    },
+    {
+        "id": "colombo-apts",
+        "name": "Colombo 3 & 4 Apts",
+        "keyword": "Kollupitiya",
+        "property_category": "apartments",
+        "strict_location": True,
+        "scan_all": True,
+        "source": "ikman",
+        "is_default": True,
+    },
+    {
+        "id": "battaramulla-homes",
+        "name": "Battaramulla Homes",
+        "keyword": "Battaramulla",
+        "property_category": "houses",
+        "strict_location": True,
+        "scan_all": True,
+        "source": "ikman",
+        "is_default": True,
+    },
+]
+
+
 class ScannerSettingsConfigField(BaseModel):
     enabled: bool = False
     frequency_hours: int = Field(default=24, description="Must be 6, 12, 18, or 24")
     pages_to_scan: int = Field(default=5, ge=1, le=50)
     property_types: list[str] = Field(default_factory=lambda: ["house", "apartment"])
+    presets: list[ScanPresetConfig] = Field(default_factory=list)
     last_run_at: datetime | None = None
     last_run_status: str | None = None
     next_run_at: datetime | None = None
+
 
 
 class SiteConfigurationBase(BaseModel):

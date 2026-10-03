@@ -22,9 +22,18 @@ import {
   Search,
   PhoneCall,
   Square,
+  Bookmark,
 } from "lucide-react";
 
-import { ScanJob, getScanJobs, stopScanJob, AuthUser, getCurrentUser } from "../../../../lib/api";
+import {
+  ScanJob,
+  getScanJobs,
+  stopScanJob,
+  AuthUser,
+  getCurrentUser,
+  getScanPresets,
+  ScanPreset,
+} from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
 
@@ -43,10 +52,18 @@ function ScanHistoryContent() {
   const [filterType, setFilterType] = useState<string>(initialType);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isScanDrawerOpen, setIsScanDrawerOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<ScanPreset | null>(null);
+  const [presets, setPresets] = useState<ScanPreset[]>([]);
 
   useEffect(() => {
     getCurrentUser().then(setUser).catch(() => {});
+    getScanPresets()
+      .then((p) => {
+        if (Array.isArray(p)) setPresets(p);
+      })
+      .catch(() => {});
   }, []);
+
 
   // Open drawer if navigated with ?new=1 or ?new=true
   useEffect(() => {
@@ -207,6 +224,35 @@ function ScanHistoryContent() {
           </button>
         </div>
       </div>
+
+      {/* Quick Presets Bar */}
+      <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 pt-1 text-xs [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+        <span className="font-bold text-[#718078] dark:text-zinc-400 text-[11px] uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+          <Bookmark className="h-3 w-3 text-[#19352b] dark:text-emerald-400" /> Presets:
+        </span>
+        {presets.map((preset) => (
+          <button
+            key={preset.id}
+            onClick={() => {
+              setSelectedPreset(preset);
+              setIsScanDrawerOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1 text-xs font-medium text-[#1a2923] dark:text-zinc-200 hover:border-[#19352b] hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition cursor-pointer"
+          >
+            <span>{preset.name}</span>
+          </button>
+        ))}
+        <button
+          onClick={() => {
+            setSelectedPreset(null);
+            setIsScanDrawerOpen(true);
+          }}
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#cbd8d1] dark:border-zinc-700 bg-transparent px-2.5 py-1 text-xs font-medium text-[#64736b] dark:text-zinc-400 hover:border-[#19352b] hover:text-[#19352b] dark:hover:text-zinc-200 transition cursor-pointer"
+        >
+          <span>+ Custom Scan</span>
+        </button>
+      </div>
+
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -744,7 +790,12 @@ function ScanHistoryContent() {
       {/* Drawer */}
       <ScanLauncherDrawer
         isOpen={isScanDrawerOpen}
-        onClose={() => setIsScanDrawerOpen(false)}
+        onClose={() => {
+          setIsScanDrawerOpen(false);
+          setSelectedPreset(null);
+        }}
+        initialPreset={selectedPreset}
+        onPresetsChanged={setPresets}
         onScanStarted={() => {
           fetchJobs();
         }}
