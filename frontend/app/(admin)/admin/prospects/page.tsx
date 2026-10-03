@@ -532,7 +532,9 @@ export default function ProspectsPage() {
           <option value="">All Statuses</option>
           <option value="new">New</option>
           <option value="contacted">Contacted</option>
-          <option value="ignored">Ignored</option>
+          <option value="unavailable">Unavailable</option>
+          <option value="agent_no_deal">Agent – No Deal</option>
+          <option value="agent_co_broke">Agent – Co-broke</option>
           <option value="converted">Converted</option>
           <option value="discarded">Discarded</option>
         </select>
@@ -630,12 +632,15 @@ export default function ProspectsPage() {
               .filter((p) => !filterSource || (p.source || "ikman").toLowerCase() === filterSource.toLowerCase())
               .map((prospect) => {
               const isDiscarded = prospect.status === "discarded";
+              const isTerminal = ["discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke"].includes(prospect.status);
               return (
                 <div
                   key={prospect.id}
                   className={`p-4 flex flex-col gap-3 ${
                     isDiscarded
                       ? "bg-amber-50/25 dark:bg-amber-950/15 hover:bg-amber-50/40 dark:hover:bg-amber-950/25"
+                      : isTerminal
+                      ? "bg-zinc-50/50 dark:bg-zinc-900/50 opacity-70 hover:opacity-90"
                       : "hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900/50"
                   }`}
                 >
@@ -675,7 +680,9 @@ export default function ProspectsPage() {
                       >
                         <option value="new">New</option>
                         <option value="contacted">Contacted</option>
-                        <option value="ignored">Ignored</option>
+                        <option value="unavailable">Unavailable</option>
+                        <option value="agent_no_deal">Agent – No Deal</option>
+                        <option value="agent_co_broke">Agent – Co-broke</option>
                         <option value="converted">Converted</option>
                         <option value="discarded">Discarded</option>
                       </select>
@@ -760,12 +767,15 @@ export default function ProspectsPage() {
                   .filter((p) => !filterSource || (p.source || "ikman").toLowerCase() === filterSource.toLowerCase())
                   .map((prospect) => {
                   const isDiscarded = prospect.status === "discarded";
+                  const isTerminal = ["discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke"].includes(prospect.status);
                   return (
                     <tr
                       key={prospect.id}
                       className={`transition ${
                         isDiscarded
                           ? "bg-amber-50/25 dark:bg-amber-950/15 hover:bg-amber-50/40 dark:hover:bg-amber-950/25"
+                          : isTerminal
+                          ? "bg-zinc-50/50 dark:bg-zinc-900/30 opacity-70 hover:opacity-90"
                           : "hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900/50"
                       }`}
                     >
@@ -850,7 +860,9 @@ export default function ProspectsPage() {
                           >
                             <option value="new">New</option>
                             <option value="contacted">Contacted</option>
-                            <option value="ignored">Ignored</option>
+                            <option value="unavailable">Unavailable</option>
+                            <option value="agent_no_deal">Agent – No Deal</option>
+                            <option value="agent_co_broke">Agent – Co-broke</option>
                             <option value="converted">Converted</option>
                             <option value="discarded">Discarded</option>
                           </select>
@@ -874,7 +886,7 @@ export default function ProspectsPage() {
                               <span>Keep</span>
                             </button>
                           ) : (
-                            ["root", "admin"].includes(user?.role ?? "") && prospect.status !== "converted" && (
+                            ["root", "admin"].includes(user?.role ?? "") && !isTerminal && (
                               <button
                                 onClick={() => handleGenerateDraft(prospect)}
                                 disabled={draftLoading === prospect.id}

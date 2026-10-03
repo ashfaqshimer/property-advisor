@@ -1069,7 +1069,13 @@ async def generate_property_draft(
         
         draft_dict["contact_name"] = prospect.poster_name
         draft_dict["contact_phone"] = prospect.phone_number
-        draft_dict["contact_type"] = prospect.classification
+        # agent_co_broke prospects convert with contact_type="agent" regardless of
+        # what the scanner classified them as, since we confirmed they are agents
+        # who are willing to share commission.
+        if prospect.status == "agent_co_broke":
+            draft_dict["contact_type"] = "agent"
+        else:
+            draft_dict["contact_type"] = prospect.classification
         
         draft_dict["source_platform"] = "ikman.lk"
         draft_dict["source_url"] = prospect.ikman_url
@@ -1093,12 +1099,15 @@ def list_prospects(
     page: int = 1,
     page_size: int = 50,
 ) -> Any:
-    stmt = select(Prospect).where(Prospect.classification == "owner")
+    stmt = select(Prospect)
+
+    # Terminal statuses that are hidden from the default working list.
+    TERMINAL_STATUSES = ("discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke")
 
     if status:
         stmt = stmt.where(Prospect.status == status)
     else:
-        stmt = stmt.where(Prospect.status != "discarded")
+        stmt = stmt.where(Prospect.status.notin_(TERMINAL_STATUSES))
 
     if property_type:
         stmt = stmt.where(Prospect.property_type == property_type)
@@ -1189,14 +1198,18 @@ def update_prospect(
     if prospect_update.status is not None:
         old_status = prospect.status
         prospect.status = prospect_update.status
-        if old_status == "discarded" and prospect.status != "discarded":
+        # Scan job counter adjustments: only "discarded" moves prospects into the
+        # filtered bucket. All other terminal statuses (unavailable, agent_no_deal,
+        # agent_co_broke, converted) are outcomes of active prospects and leave
+        # the scan counters unchanged.
+        if old_status == "discarded" and prospect_update.status != "discarded":
             prospect.discard_reason = None
             if prospect.first_scan_job_id:
                 scan_job = db.get(ScanJob, prospect.first_scan_job_id)
                 if scan_job:
                     scan_job.new_count = (scan_job.new_count or 0) + 1
                     scan_job.filtered_count = max(0, (scan_job.filtered_count or 0) - 1)
-        elif old_status != "discarded" and prospect.status == "discarded":
+        elif old_status != "discarded" and prospect_update.status == "discarded":
             if prospect.first_scan_job_id:
                 scan_job = db.get(ScanJob, prospect.first_scan_job_id)
                 if scan_job:

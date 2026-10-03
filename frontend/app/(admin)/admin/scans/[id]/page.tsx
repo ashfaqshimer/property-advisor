@@ -595,6 +595,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
             <div className="grid grid-cols-1 gap-3 md:hidden">
               {filteredProspects.map((p) => {
                 const isDiscarded = p.status === "discarded";
+                const isTerminal = ["discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke"].includes(p.status);
 
                 return (
                   <div
@@ -602,6 +603,8 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                     className={`rounded-xl border p-4 shadow-sm space-y-3 transition ${
                       isDiscarded
                         ? "border-amber-200 dark:border-amber-900/60 bg-amber-50/30 dark:bg-amber-950/10"
+                        : isTerminal
+                        ? "border-[#dce4df] dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900 opacity-70"
                         : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900"
                     }`}
                   >
@@ -644,11 +647,13 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                             : "border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-800"
                         }`}
                       >
-                        <option value="discarded">Discarded</option>
                         <option value="new">New</option>
                         <option value="contacted">Contacted</option>
-                        <option value="ignored">Ignored</option>
+                        <option value="unavailable">Unavailable</option>
+                        <option value="agent_no_deal">Agent – No Deal</option>
+                        <option value="agent_co_broke">Agent – Co-broke</option>
                         <option value="converted">Converted</option>
+                        <option value="discarded">Discarded</option>
                       </select>
                     </div>
 
@@ -701,7 +706,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                             <Undo2 className="h-3.5 w-3.5" />
                             <span>Keep</span>
                           </button>
-                        ) : (
+                        ) : !isTerminal && (
                           <button
                             onClick={() => handleGenerateDraft(p)}
                             disabled={draftLoading === p.id}
@@ -738,6 +743,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                 <tbody className="divide-y divide-[#dce4df] dark:divide-zinc-800">
                   {filteredProspects.map((p) => {
                     const isDiscarded = p.status === "discarded";
+                    const isTerminal = ["discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke"].includes(p.status);
 
                     return (
                       <tr
@@ -826,11 +832,13 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                                 : "border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-800"
                             }`}
                           >
-                            <option value="discarded">Discarded</option>
                             <option value="new">New</option>
                             <option value="contacted">Contacted</option>
-                            <option value="ignored">Ignored</option>
+                            <option value="unavailable">Unavailable</option>
+                            <option value="agent_no_deal">Agent – No Deal</option>
+                            <option value="agent_co_broke">Agent – Co-broke</option>
                             <option value="converted">Converted</option>
+                            <option value="discarded">Discarded</option>
                           </select>
                         </td>
 
@@ -846,7 +854,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                                 <Undo2 className="h-3.5 w-3.5" />
                                 <span>Keep</span>
                               </button>
-                            ) : (
+                            ) : !isTerminal && (
                               <button
                                 onClick={() => handleGenerateDraft(p)}
                                 disabled={draftLoading === p.id}
