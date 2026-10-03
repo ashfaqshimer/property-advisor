@@ -27,6 +27,7 @@ from app.schemas.prospect import (
 )
 from app.scraper.classifier import classify_listing_heuristics
 from app.scraper.ikman_client import IkmanClient, IKMAN_BASE_URL
+from app.scraper.ikman_locations import resolve_ikman_location_slug
 from app.scraper.location_extractor import extract_suburb
 from app.agent.client import get_gemini_extractor_client
 from app.schemas.extractor import ExtractedPropertyDraft, GeminiPropertyExtraction
@@ -158,7 +159,8 @@ def is_location_relevant(ad: Any, keyword: str, extracted_suburb: str | None) ->
 def _save_prospects_sync(
     ads: list[Any],
     request: ScanRequest,
-    scan_job_id: uuid.UUID | None = None
+    scan_job_id: uuid.UUID | None = None,
+    native_location_slug: str | None = None,
 ) -> tuple[int, int, int, int]:
     """Synchronous function to save prospects to DB. Returns (found, new_count, known_count, filtered_count)"""
     found = len(ads)
@@ -192,7 +194,15 @@ def _save_prospects_sync(
             discard_reason = None
 
             # Relevance check for scoped searches
-            if request.keyword and request.strict_location:
+            if native_location_slug:
+                # Listing was fetched natively via Ikman's location route (/ads/{loc_slug}/{category})
+                # Ikman guarantees location membership, so no keyword mismatch discard is needed.
+                if not suburb:
+                    from app.scraper.location_extractor import BROAD_DISTRICTS
+                    if native_location_slug.lower() not in BROAD_DISTRICTS:
+                        suburb = native_location_slug.replace("-", " ").title()
+                        suburb_source = "ikman_location"
+            elif request.keyword and request.strict_location:
                 if not is_location_relevant(ad, request.keyword, suburb):
                     is_discarded = True
                     discard_reason = "location_mismatch"
@@ -298,6 +308,10 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
 
     semaphore = asyncio.Semaphore(3)
 
+    # Check if keyword resolves to a native Ikman location slug
+    native_loc_slug = resolve_ikman_location_slug(request.keyword) if request.keyword else None
+    query_param = None if native_loc_slug else request.keyword
+
     # Determine categories to scan based on scoped keyword / category filter
     target_categories = request.categories
     if request.keyword and request.keyword.strip():
@@ -318,9 +332,13 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
     try:
         for category in target_categories:
             kw_label = f" for '{request.keyword}'" if request.keyword else ""
+            if native_loc_slug:
+                kw_label += f" [native: {native_loc_slug}]"
             
             # Fetch page 1 first to read exact total listings & pagination count from ikman
-            first_ads, first_meta = await client.fetch_listing_page_with_meta(category, page=1, query=request.keyword)
+            first_ads, first_meta = await client.fetch_listing_page_with_meta(
+                category, page=1, query=query_param, location_slug=native_loc_slug
+            )
             if not first_ads:
                 continue
 
@@ -343,7 +361,9 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
             )
 
             # Save page 1
-            f1, n1, k1, fl1 = await asyncio.to_thread(_save_prospects_sync, first_ads, request, scan_job_uuid)
+            f1, n1, k1, fl1 = await asyncio.to_thread(
+                _save_prospects_sync, first_ads, request, scan_job_uuid, native_loc_slug
+            )
             found_total += f1
             new_total += n1
             known_total += k1
@@ -381,11 +401,21 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
                             updated_count=known_total,
                             filtered_count=filtered_total,
                         )
-                        logger.info("scraping_page", category=category, page=p, keyword=request.keyword)
-                        ads, _ = await client.fetch_listing_page_with_meta(category, page=p, query=request.keyword)
+                        logger.info(
+                            "scraping_page",
+                            category=category,
+                            page=p,
+                            keyword=request.keyword,
+                            native_location=native_loc_slug,
+                        )
+                        ads, _ = await client.fetch_listing_page_with_meta(
+                            category, page=p, query=query_param, location_slug=native_loc_slug
+                        )
                         if not ads:
                             return 0, 0, 0, 0
-                        return await asyncio.to_thread(_save_prospects_sync, ads, request, scan_job_uuid)
+                        return await asyncio.to_thread(
+                            _save_prospects_sync, ads, request, scan_job_uuid, native_loc_slug
+                        )
 
                 tasks = [_fetch_page(p) for p in range(chunk_start, chunk_end)]
                 results = await asyncio.gather(*tasks)

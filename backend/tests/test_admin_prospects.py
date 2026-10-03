@@ -183,3 +183,86 @@ def test_start_scoped_scan_creates_job(authenticated_client: TestClient) -> None
         assert status_data["status"] == "running"
         assert "Rajagiriya" in status_data["progress"]
 
+
+def test_resolve_ikman_location_slug() -> None:
+    from app.scraper.ikman_locations import resolve_ikman_location_slug
+
+    # Exact official slugs & names
+    assert resolve_ikman_location_slug("Dehiwala") == "dehiwala"
+    assert resolve_ikman_location_slug("dehiwala") == "dehiwala"
+    assert resolve_ikman_location_slug("Rajagiriya") == "rajagiriya"
+    assert resolve_ikman_location_slug("Colombo 6") == "colombo-6"
+    assert resolve_ikman_location_slug("Galle") == "galle"
+
+    # Aliases & common misspellings
+    assert resolve_ikman_location_slug("dehiwela") == "dehiwala"
+    assert resolve_ikman_location_slug("thalawathugoda") == "talawatugoda"
+    assert resolve_ikman_location_slug("wellawatte") == "colombo-6"
+    assert resolve_ikman_location_slug("kollupitiya") == "colombo-3"
+    assert resolve_ikman_location_slug("colpetty") == "colombo-3"
+    assert resolve_ikman_location_slug("bambalapitiya") == "colombo-4"
+    assert resolve_ikman_location_slug("havelock town") == "colombo-5"
+    assert resolve_ikman_location_slug("mt lavinia") == "mount-lavinia"
+
+    # Unmapped location falls back to None
+    assert resolve_ikman_location_slug("Custom Private Road") is None
+    assert resolve_ikman_location_slug(None) is None
+    assert resolve_ikman_location_slug("") is None
+
+
+def test_save_prospects_with_native_location(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    from contextlib import contextmanager
+    from app.api.prospects import _save_prospects_sync
+    from app.models.prospect import Prospect
+    from app.schemas.prospect import ScanRequest
+    from app.scraper.schemas import IkmanAd
+
+    @contextmanager
+    def mock_session():
+        yield db_session
+
+    monkeypatch.setattr("app.api.prospects.SessionLocal", mock_session)
+    monkeypatch.setattr("app.api.prospects.geocode_location", lambda db, target: (6.85, 79.86))
+
+    # Ad without "Dehiwala" in title
+    ad_native = IkmanAd(
+        id="ikman-native-1",
+        slug="modern-luxury-house-for-sale",
+        title="Modern Luxury House for Sale",
+        location="Colombo",
+    )
+    request = ScanRequest(keyword="dehiwela", strict_location=True)
+
+    # 1. Saved with native location: should NOT be discarded
+    found, new_c, known_c, fl_c = _save_prospects_sync(
+        [ad_native], request, native_location_slug="dehiwala"
+    )
+    assert found == 1
+    assert new_c == 1
+    assert fl_c == 0
+
+    prospect = db_session.query(Prospect).filter_by(ikman_ad_id="ikman-native-1").first()
+    assert prospect is not None
+    assert prospect.status == "new"
+    assert prospect.suburb == "Dehiwala"
+    assert prospect.suburb_source == "ikman_location"
+
+    # 2. Ad without native location matching keyword: should be discarded as location_mismatch
+    ad_fallback = IkmanAd(
+        id="ikman-fallback-1",
+        slug="panadura-house-near-colombo",
+        title="House in Panadura easy access to Colombo",
+        location="Kalutara",
+    )
+    req_fallback = ScanRequest(keyword="dehiwela", strict_location=True)
+    found2, new_c2, known_c2, fl_c2 = _save_prospects_sync(
+        [ad_fallback], req_fallback, native_location_slug=None
+    )
+    assert found2 == 1
+    assert fl_c2 == 1
+    prospect2 = db_session.query(Prospect).filter_by(ikman_ad_id="ikman-fallback-1").first()
+    assert prospect2 is not None
+    assert prospect2.status == "discarded"
+    assert prospect2.discard_reason == "location_mismatch"
+
+

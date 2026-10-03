@@ -44,17 +44,22 @@ class IkmanClient:
             return None
 
     async def fetch_listing_page_with_meta(
-        self, category_slug: str, page: int = 1, query: str | None = None
+        self,
+        category_slug: str,
+        page: int = 1,
+        query: str | None = None,
+        location_slug: str | None = None,
     ) -> tuple[list[IkmanAd], dict]:
-        """Fetch a page of listings for a category with optional query and return (ads, pagination_dict)."""
-        url = f"{IKMAN_BASE_URL}/en/ads/sri-lanka/{category_slug}"
+        """Fetch a page of listings for a category with optional query and location slug."""
+        loc = location_slug.strip() if location_slug and location_slug.strip() else "sri-lanka"
+        url = f"{IKMAN_BASE_URL}/en/ads/{loc}/{category_slug}"
         params: dict[str, Any] = {}
         if page > 1:
             params["page"] = page
         if query and query.strip():
             params["query"] = query.strip()
 
-        logger.info("fetching_ikman_listing_page", url=url, page=page, query=query)
+        logger.info("fetching_ikman_listing_page", url=url, page=page, query=query, location=loc)
         
         try:
             response = await self.client.get(url, params=params, timeout=10.0)
@@ -85,10 +90,16 @@ class IkmanClient:
             return [], {}
 
     async def fetch_listing_page(
-        self, category_slug: str, page: int = 1, query: str | None = None
+        self,
+        category_slug: str,
+        page: int = 1,
+        query: str | None = None,
+        location_slug: str | None = None,
     ) -> list[IkmanAd]:
         """Fetch a page of listings for a category."""
-        ads, _ = await self.fetch_listing_page_with_meta(category_slug, page=page, query=query)
+        ads, _ = await self.fetch_listing_page_with_meta(
+            category_slug, page=page, query=query, location_slug=location_slug
+        )
         return ads
 
     async def fetch_ad_detail(self, slug: str) -> IkmanAdDetail | None:
