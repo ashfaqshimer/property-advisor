@@ -23,6 +23,7 @@ from app.models.site_configuration import SiteConfiguration
 from app.models.prospect import Prospect
 from app.models.scan_job import ScanJob
 from app.models.location_cache import LocationCache
+from app.models.field_assignment import FieldAssignment
 
 __all__ = [
     "StaffSession",
@@ -44,4 +45,5 @@ __all__ = [
     "Prospect",
     "ScanJob",
     "LocationCache",
+    "FieldAssignment",
 ]

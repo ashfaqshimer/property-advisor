@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, Bookmark } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, CheckSquare, Send, Bookmark } from "lucide-react";
 
 import {
   Prospect,
@@ -22,6 +22,7 @@ import {
   getCurrentUser,
   getScanPresets,
   ScanPreset,
+  createFieldAssignments,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
@@ -90,6 +91,59 @@ export default function ProspectsPage() {
     getCurrentUser().then(setUser).catch(() => {});
   }, []);
   const isAdminOrRoot = user?.role === "admin" || user?.role === "root";
+
+  const [selectedProspectIds, setSelectedProspectIds] = useState<Set<string>>(new Set());
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  const toggleSelectProspect = (id: string) => {
+    setSelectedProspectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const visible = prospects.filter((p) => !filterSource || (p.source || "ikman").toLowerCase() === filterSource.toLowerCase());
+    const allSelected = visible.length > 0 && visible.every((p) => selectedProspectIds.has(p.id));
+    if (allSelected) {
+      setSelectedProspectIds(new Set());
+    } else {
+      setSelectedProspectIds(new Set(visible.map((p) => p.id)));
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (selectedProspectIds.size === 0) return;
+    setIsAssigning(true);
+    try {
+      const ids = Array.from(selectedProspectIds);
+      const result = await createFieldAssignments(ids);
+      toast.success(`Dispatched ${result.length} prospect(s) to agent on Telegram.`);
+      setSelectedProspectIds(new Set());
+    } catch (err: any) {
+      toast.error(err.message || "Failed to dispatch assignments to agent.");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleSingleAssign = async (prospectId: string) => {
+    setIsAssigning(true);
+    try {
+      const result = await createFieldAssignments([prospectId]);
+      if (result.length > 0) {
+        toast.success("Dispatched to agent on Telegram.");
+      } else {
+        toast.info("This prospect already has an active assignment.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to dispatch assignment to agent.");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
 
   const [draftLoading, setDraftLoading] = useState<string | null>(null);
   const [draftModalData, setDraftModalData] = useState<any>(null);
@@ -633,11 +687,14 @@ export default function ProspectsPage() {
               .map((prospect) => {
               const isDiscarded = prospect.status === "discarded";
               const isTerminal = ["discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke"].includes(prospect.status);
+              const isSelected = selectedProspectIds.has(prospect.id);
               return (
                 <div
                   key={prospect.id}
                   className={`p-4 flex flex-col gap-3 ${
-                    isDiscarded
+                    isSelected
+                      ? "bg-emerald-50/60 dark:bg-emerald-950/30 ring-1 ring-emerald-500/30"
+                      : isDiscarded
                       ? "bg-amber-50/25 dark:bg-amber-950/15 hover:bg-amber-50/40 dark:hover:bg-amber-950/25"
                       : isTerminal
                       ? "bg-zinc-50/50 dark:bg-zinc-900/50 opacity-70 hover:opacity-90"
@@ -646,6 +703,20 @@ export default function ProspectsPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {isAdminOrRoot && (
+                        <button
+                          type="button"
+                          onClick={() => toggleSelectProspect(prospect.id)}
+                          className="p-1 -ml-1 text-[#64736b] hover:text-[#19352b] dark:text-zinc-400 dark:hover:text-emerald-400 cursor-pointer"
+                          title={isSelected ? "Deselect" : "Select for agent assignment"}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                        </button>
+                      )}
                       <span className="text-xs text-[#64736b] dark:text-zinc-400">
                         {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
                       </span>
@@ -733,6 +804,19 @@ export default function ProspectsPage() {
                       )}
                     </div>
                   )}
+                  {isAdminOrRoot && !isTerminal && (
+                    <div className="pt-2 border-t border-[#dce4df] dark:border-zinc-800 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSingleAssign(prospect.id)}
+                        disabled={isAssigning}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 py-1.5 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                      >
+                        <Send className="h-3 w-3" />
+                        <span>Dispatch to Agent</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -745,6 +829,22 @@ export default function ProspectsPage() {
           <table className="w-full whitespace-nowrap text-left text-sm">
             <thead className="bg-[#f4f6f4] dark:bg-zinc-900 dark:bg-zinc-900 text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-zinc-400">
               <tr>
+                {isAdminOrRoot && (
+                  <th className="w-10 px-4 py-4">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllOnPage}
+                      className="flex items-center text-[#718078] hover:text-[#19352b] dark:text-zinc-400 dark:hover:text-emerald-400 cursor-pointer"
+                      title="Select or deselect all on page"
+                    >
+                      {prospects.length > 0 && prospects.every((p) => selectedProspectIds.has(p.id)) ? (
+                        <CheckSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </button>
+                  </th>
+                )}
                 <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4">Title / Location</th>
                 <th className="px-6 py-4">Price</th>
@@ -756,11 +856,11 @@ export default function ProspectsPage() {
             <tbody className="divide-y divide-[#dce4df] dark:divide-zinc-800">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">Loading prospects...</td>
+                  <td colSpan={isAdminOrRoot ? 7 : 6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">Loading prospects...</td>
                 </tr>
               ) : prospects.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">No prospects found.</td>
+                  <td colSpan={isAdminOrRoot ? 7 : 6} className="px-6 py-8 text-center text-[#64736b] dark:text-zinc-400">No prospects found.</td>
                 </tr>
               ) : (
                 prospects
@@ -768,17 +868,35 @@ export default function ProspectsPage() {
                   .map((prospect) => {
                   const isDiscarded = prospect.status === "discarded";
                   const isTerminal = ["discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke"].includes(prospect.status);
+                  const isSelected = selectedProspectIds.has(prospect.id);
                   return (
                     <tr
                       key={prospect.id}
                       className={`transition ${
-                        isDiscarded
+                        isSelected
+                          ? "bg-emerald-50/60 dark:bg-emerald-950/30"
+                          : isDiscarded
                           ? "bg-amber-50/25 dark:bg-amber-950/15 hover:bg-amber-50/40 dark:hover:bg-amber-950/25"
                           : isTerminal
                           ? "bg-zinc-50/50 dark:bg-zinc-900/30 opacity-70 hover:opacity-90"
                           : "hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 dark:bg-zinc-900/50"
                       }`}
                     >
+                      {isAdminOrRoot && (
+                        <td className="w-10 px-4 py-4">
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectProspect(prospect.id)}
+                            className="flex items-center text-[#64736b] hover:text-[#19352b] dark:text-zinc-400 dark:hover:text-emerald-400 cursor-pointer"
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Square className="h-4 w-4" />
+                            )}
+                          </button>
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-[#64736b] dark:text-zinc-400">
                         <div>{format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}</div>
                         <div className="mt-1">
@@ -887,13 +1005,25 @@ export default function ProspectsPage() {
                             </button>
                           ) : (
                             ["root", "admin"].includes(user?.role ?? "") && !isTerminal && (
-                              <button
-                                onClick={() => handleGenerateDraft(prospect)}
-                                disabled={draftLoading === prospect.id}
-                                className="inline-flex items-center gap-1 rounded bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default"
-                              >
-                                {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSingleAssign(prospect.id)}
+                                  disabled={isAssigning}
+                                  className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                                  title="Dispatch to agent via Telegram"
+                                >
+                                  <Send className="h-3 w-3" />
+                                  <span>Assign</span>
+                                </button>
+                                <button
+                                  onClick={() => handleGenerateDraft(prospect)}
+                                  disabled={draftLoading === prospect.id}
+                                  className="inline-flex items-center gap-1 rounded bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default"
+                                >
+                                  {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
+                                </button>
+                              </div>
                             )
                           )}
                         </div>
@@ -940,6 +1070,37 @@ export default function ProspectsPage() {
           </div>
         )}
       </div>
+
+      {/* Floating Bulk Action Bar */}
+      {selectedProspectIds.size > 0 && isAdminOrRoot && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 sm:gap-4 rounded-2xl bg-[#19352b] dark:bg-emerald-950 border border-emerald-600/40 text-white px-4 sm:px-6 py-3 shadow-2xl backdrop-blur-md max-w-[92vw]">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-zinc-950">
+              {selectedProspectIds.size}
+            </span>
+            <span className="text-xs sm:text-sm font-medium">
+              selected
+            </span>
+          </div>
+          <div className="h-4 w-px bg-white/20" />
+          <button
+            type="button"
+            onClick={() => setSelectedProspectIds(new Set())}
+            className="text-xs text-white/70 hover:text-white transition cursor-pointer"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkAssign}
+            disabled={isAssigning}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold px-3 sm:px-4 py-1.5 text-xs shadow transition disabled:opacity-50 cursor-pointer"
+          >
+            <Send className="h-3.5 w-3.5" />
+            <span>{isAssigning ? "Sending..." : "Dispatch to Agent"}</span>
+          </button>
+        </div>
+      )}
 
       {/* Scan Launcher Drawer */}
       <ScanLauncherDrawer

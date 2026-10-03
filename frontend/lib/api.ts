@@ -1270,3 +1270,78 @@ export async function generatePropertyDraft(id: string): Promise<any> {
   }
   return await response.json();
 }
+
+// ── Field Assignments ──────────────────────────────────────────────────────
+
+export type FieldAssignment = {
+  id: string;
+  prospect_id: string | null;
+  assigned_by_id: string | null;
+  status: "pending" | "no_answer" | "interested" | "not_interested" | "callback_later";
+  notes: string | null;
+  telegram_message_id: number | null;
+  awaiting_notes: boolean;
+  created_at: string;
+  updated_at: string;
+  // Flattened prospect fields
+  prospect_title: string | null;
+  prospect_location: string | null;
+  prospect_price: string | null;
+  prospect_property_type: string | null;
+  prospect_listing_type: string | null;
+  prospect_poster_name: string | null;
+  prospect_phone_number: string | null;
+  prospect_classification: string | null;
+  prospect_confidence: number | null;
+  prospect_ikman_url: string | null;
+  prospect_status: string | null;
+};
+
+export type PaginatedFieldAssignments = {
+  items: FieldAssignment[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+};
+
+export async function createFieldAssignments(prospectIds: string[]): Promise<FieldAssignment[]> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/admin/field-assignments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ prospect_ids: prospectIds }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    let detail = `Assignment creation failed (${response.status}).`;
+    try { const p = await response.json(); if (p.detail) detail = p.detail; } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return (await response.json()) as FieldAssignment[];
+}
+
+export async function getFieldAssignments(filters?: {
+  status?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<PaginatedFieldAssignments> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.page) params.set("page", String(filters.page));
+  if (filters?.page_size) params.set("page_size", String(filters.page_size));
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/admin/field-assignments?${params}`,
+    {
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) throw new ChatError("unexpected", `Assignments fetch failed (${response.status}).`, response.status);
+  return (await response.json()) as PaginatedFieldAssignments;
+}
+

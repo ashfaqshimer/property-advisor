@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     telegram_chat_id: str = ""
     telegram_leads_thread_id: int | None = None
     telegram_alerts_thread_id: int | None = None
+    telegram_agent_chat_id: str = ""   # Agent's personal DM chat_id for field dispatch
+    telegram_webhook_secret: str = ""  # Optional: validates incoming webhook requests
 
     @property
     def cloudinary_configured(self) -> bool:

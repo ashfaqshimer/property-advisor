@@ -77,6 +77,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
           {["root", "admin"].includes(user.role) && (
             <>
               <Link href="/admin/scans" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/scans") ? "bg-white/12 text-white dark:text-zinc-200" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white dark:text-zinc-200"}`}>Scanner Hub</Link>
+              <Link href="/admin/assignments" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/assignments") ? "bg-white/12 text-white dark:text-zinc-200" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white dark:text-zinc-200"}`}>Assignments</Link>
               <Link href="/admin/users" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/users") ? "bg-white/12 text-white dark:text-zinc-200" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white dark:text-zinc-200"}`}>Users</Link>
               <Link href="/admin/site-configuration" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/site-configuration") ? "bg-white/12 text-white dark:text-zinc-200" : "text-[#b6c9c0] hover:bg-white/8 hover:text-white dark:text-zinc-200"}`}>Site Config</Link>
             </>
