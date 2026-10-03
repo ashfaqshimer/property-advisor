@@ -49,6 +49,7 @@ export const DEFAULT_PRESETS: ScanPreset[] = [
     id: "colombo-7-houses",
     name: "Colombo 7 Houses",
     keyword: "Colombo 7",
+    categories: ["houses"],
     property_category: "houses",
     strict_location: true,
     scan_all: true,
@@ -59,6 +60,7 @@ export const DEFAULT_PRESETS: ScanPreset[] = [
     id: "rajagiriya-lands",
     name: "Rajagiriya Lands",
     keyword: "Rajagiriya",
+    categories: ["lands"],
     property_category: "lands",
     strict_location: true,
     scan_all: true,
@@ -69,6 +71,7 @@ export const DEFAULT_PRESETS: ScanPreset[] = [
     id: "colombo-apts",
     name: "Colombo 3 & 4 Apts",
     keyword: "Kollupitiya",
+    categories: ["apartments"],
     property_category: "apartments",
     strict_location: true,
     scan_all: true,
@@ -79,6 +82,7 @@ export const DEFAULT_PRESETS: ScanPreset[] = [
     id: "battaramulla-homes",
     name: "Battaramulla Homes",
     keyword: "Battaramulla",
+    categories: ["houses"],
     property_category: "houses",
     strict_location: true,
     scan_all: true,
@@ -108,9 +112,13 @@ export function ScanLauncherDrawer({
   const [scanTab, setScanTab] = useState<"scoped" | "categories">("scoped");
   const [selectedSource, setSelectedSource] = useState<string>("ikman");
   const [scanLocationKeyword, setScanLocationKeyword] = useState("");
+  const [scopedCategories, setScopedCategories] = useState<string[]>([
+    "houses",
+    "apartments",
+  ]);
   const [scanPropertyCategory, setScanPropertyCategory] = useState<
-    "all" | "lands" | "apartments" | "houses" | "commercial"
-  >("all");
+    "all" | "lands" | "apartments" | "houses" | "commercial" | string
+  >("houses,apartments");
   const [scanStrictLocation, setScanStrictLocation] = useState(true);
   const [scanAllPages, setScanAllPages] = useState(true);
   const [scanCategories, setScanCategories] = useState<string[]>([
@@ -154,7 +162,14 @@ export function ScanLauncherDrawer({
   useEffect(() => {
     if (initialPreset && isOpen) {
       if (initialPreset.keyword) setScanLocationKeyword(initialPreset.keyword);
-      if (initialPreset.property_category) setScanPropertyCategory(initialPreset.property_category);
+      const cats =
+        initialPreset.categories && initialPreset.categories.length > 0
+          ? initialPreset.categories
+          : initialPreset.property_category && initialPreset.property_category !== "all"
+            ? initialPreset.property_category.split(",")
+            : [];
+      setScopedCategories(cats);
+      setScanPropertyCategory(initialPreset.property_category || (cats.length > 0 ? cats.join(",") : "all"));
       if (initialPreset.strict_location !== undefined) setScanStrictLocation(initialPreset.strict_location);
       if (initialPreset.scan_all !== undefined) setScanAllPages(initialPreset.scan_all);
       if (initialPreset.source) setSelectedSource(initialPreset.source);
@@ -185,7 +200,14 @@ export function ScanLauncherDrawer({
   const handleApplyPreset = (preset: ScanPreset) => {
     setScanTab("scoped");
     setScanLocationKeyword(preset.keyword);
-    setScanPropertyCategory(preset.property_category);
+    const cats =
+      preset.categories && preset.categories.length > 0
+        ? preset.categories
+        : preset.property_category && preset.property_category !== "all"
+          ? preset.property_category.split(",")
+          : [];
+    setScopedCategories(cats);
+    setScanPropertyCategory(preset.property_category || (cats.length > 0 ? cats.join(",") : "all"));
     setScanStrictLocation(preset.strict_location);
     setScanAllPages(preset.scan_all);
     setSelectedSource(preset.source || "ikman");
@@ -209,7 +231,13 @@ export function ScanLauncherDrawer({
       id: `preset-${Date.now()}`,
       name,
       keyword: scanLocationKeyword.trim(),
-      property_category: scanPropertyCategory,
+      categories: scopedCategories.length > 0 ? scopedCategories : ["all"],
+      property_category:
+        scopedCategories.length === 1
+          ? (scopedCategories[0] as any)
+          : scopedCategories.length > 1
+            ? scopedCategories.join(",")
+            : "all",
       strict_location: scanStrictLocation,
       scan_all: scanAllPages,
       source: selectedSource,
@@ -259,7 +287,13 @@ export function ScanLauncherDrawer({
         const res = await startProspectScan({
           source: selectedSource,
           keyword: kw,
-          property_category: scanPropertyCategory,
+          categories: scopedCategories.length > 0 ? scopedCategories : ["property"],
+          property_category:
+            scopedCategories.length === 1
+              ? (scopedCategories[0] as any)
+              : scopedCategories.length > 1
+                ? scopedCategories.join(",")
+                : "all",
           strict_location: scanStrictLocation,
           scan_all: scanAllPages,
           pages_per_category: scanAllPages ? undefined : scanPages,
@@ -585,23 +619,61 @@ export function ScanLauncherDrawer({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#1a2923] dark:text-zinc-200">
-                    Property Category
-                  </label>
-                  <select
-                    value={scanPropertyCategory}
-                    onChange={(e) => {
-                      setScanPropertyCategory(e.target.value as any);
-                      setActivePresetId(null);
-                    }}
-                    className="mt-1.5 w-full cursor-pointer rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
-                  >
-                    <option value="all">All Properties (Default)</option>
-                    <option value="houses">Houses</option>
-                    <option value="apartments">Apartments</option>
-                    <option value="lands">Lands</option>
-                    <option value="commercial">Commercial Property</option>
-                  </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-semibold text-[#1a2923] dark:text-zinc-200">
+                      Target Property Categories
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScopedCategories([]);
+                        setActivePresetId(null);
+                      }}
+                      className="text-[11px] text-[#64736b] dark:text-zinc-400 hover:text-[#19352b] dark:hover:text-emerald-400 cursor-pointer"
+                    >
+                      Reset (All)
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: "houses", label: "Houses" },
+                      { id: "apartments", label: "Apartments" },
+                      { id: "lands", label: "Lands" },
+                      { id: "commercial", label: "Commercial" },
+                    ].map((cat) => {
+                      const isChecked = scopedCategories.includes(cat.id);
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            const next = isChecked
+                              ? scopedCategories.filter((c) => c !== cat.id)
+                              : [...scopedCategories, cat.id];
+                            setScopedCategories(next);
+                            setActivePresetId(null);
+                          }}
+                          className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-2.5 text-xs font-semibold cursor-pointer transition ${
+                            isChecked
+                              ? "border-[#19352b] dark:border-emerald-600 bg-[#eef3f0] dark:bg-emerald-950/40 text-[#19352b] dark:text-emerald-300 font-bold"
+                              : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#1a2923] dark:text-zinc-300 hover:border-[#19352b]/40"
+                          }`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              isChecked ? "bg-[#19352b] dark:bg-emerald-400" : "bg-transparent border border-zinc-400"
+                            }`}
+                          />
+                          <span>{cat.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-[#64736b] dark:text-zinc-400">
+                    {scopedCategories.length === 0
+                      ? "All property types included."
+                      : `Selected: ${scopedCategories.join(" & ")}`}
+                  </p>
                 </div>
 
                 {/* Strict Location Matching */}

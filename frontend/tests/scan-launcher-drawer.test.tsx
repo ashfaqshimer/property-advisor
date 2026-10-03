@@ -107,7 +107,6 @@ describe("ScanLauncherDrawer", () => {
         expect.objectContaining({
           source: "ikman",
           keyword: "Colombo 7",
-          property_category: "all",
           strict_location: true,
           scan_all: true,
         })
@@ -136,8 +135,7 @@ describe("ScanLauncherDrawer", () => {
     const input = screen.getByPlaceholderText(/e\.g\. Rajagiriya/i) as HTMLInputElement;
     expect(input.value).toBe("Rajagiriya");
 
-    const categorySelect = screen.getByRole("combobox") as HTMLSelectElement;
-    expect(categorySelect.value).toBe("lands");
+    expect(screen.getByText(/Selected: lands/i)).toBeInTheDocument();
   });
 
   it("calls onClose when cancel or close button is clicked", () => {

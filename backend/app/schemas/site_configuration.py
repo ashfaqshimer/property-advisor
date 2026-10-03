@@ -15,22 +15,39 @@ class ListConfigField(BaseModel):
     show: bool = True
 
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
 class ScanPresetConfig(BaseModel):
     id: str
     name: str
     keyword: str = ""
-    property_category: str = "all"
+    categories: list[str] = Field(default_factory=list)
+    property_category: str | None = None
     strict_location: bool = True
     scan_all: bool = True
     source: str = "ikman"
     is_default: bool = False
 
+    @model_validator(mode="before")
+    @classmethod
+    def populate_categories(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            cats = data.get("categories")
+            prop_cat = data.get("property_category")
+            if not cats and prop_cat:
+                data["categories"] = [prop_cat]
+            elif cats and not prop_cat:
+                data["property_category"] = cats[0] if len(cats) == 1 else "multiple"
+        return data
+
 
 DEFAULT_SCAN_PRESETS: list[dict[str, Any]] = [
     {
         "id": "colombo-7-houses",
-        "name": "Colombo 7 Houses",
+        "name": "Colombo 7 Residential",
         "keyword": "Colombo 7",
+        "categories": ["houses", "apartments"],
         "property_category": "houses",
         "strict_location": True,
         "scan_all": True,
@@ -39,8 +56,9 @@ DEFAULT_SCAN_PRESETS: list[dict[str, Any]] = [
     },
     {
         "id": "rajagiriya-lands",
-        "name": "Rajagiriya Lands",
+        "name": "Rajagiriya Lands & Commercial",
         "keyword": "Rajagiriya",
+        "categories": ["lands", "commercial"],
         "property_category": "lands",
         "strict_location": True,
         "scan_all": True,
@@ -49,8 +67,9 @@ DEFAULT_SCAN_PRESETS: list[dict[str, Any]] = [
     },
     {
         "id": "colombo-apts",
-        "name": "Colombo 3 & 4 Apts",
+        "name": "Colombo 3 & 4 Apartments",
         "keyword": "Kollupitiya",
+        "categories": ["apartments"],
         "property_category": "apartments",
         "strict_location": True,
         "scan_all": True,
@@ -59,8 +78,9 @@ DEFAULT_SCAN_PRESETS: list[dict[str, Any]] = [
     },
     {
         "id": "battaramulla-homes",
-        "name": "Battaramulla Homes",
+        "name": "Battaramulla Residencies",
         "keyword": "Battaramulla",
+        "categories": ["houses", "apartments"],
         "property_category": "houses",
         "strict_location": True,
         "scan_all": True,

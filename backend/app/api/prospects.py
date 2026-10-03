@@ -315,21 +315,30 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
     query_param = None if native_loc_slug else request.keyword
 
     # Determine categories to scan based on scoped keyword / category filter
-    target_categories = request.categories
-    if request.keyword and request.keyword.strip():
-        cat_map = {
-            "all": ["property"],
-            "land": ["land"],
-            "lands": ["land"],
-            "houses": ["houses"],
-            "house": ["houses"],
-            "apartments": ["apartments"],
-            "apartment": ["apartments"],
-            "commercial": ["commercial-property"],
-            "commercial-property": ["commercial-property"],
-        }
+    cat_slug_map = {
+        "all": "property",
+        "property": "property",
+        "land": "land",
+        "lands": "land",
+        "houses": "houses",
+        "house": "houses",
+        "apartments": "apartments",
+        "apartment": "apartments",
+        "commercial": "commercial-property",
+        "commercial-property": "commercial-property",
+    }
+    if request.categories and request.categories != ["property"]:
+        resolved_cats: list[str] = []
+        for c in request.categories:
+            c_slug = cat_slug_map.get(c.lower().strip(), c)
+            if c_slug not in resolved_cats:
+                resolved_cats.append(c_slug)
+        target_categories = resolved_cats if resolved_cats else ["property"]
+    elif request.keyword and request.keyword.strip():
         prop_cat = (request.property_category or "all").lower().strip()
-        target_categories = cat_map.get(prop_cat, ["property"])
+        target_categories = [cat_slug_map.get(prop_cat, "property")]
+    else:
+        target_categories = request.categories or ["property"]
 
     try:
         for category in target_categories:
@@ -508,13 +517,18 @@ def start_scan(
         raise HTTPException(status_code=403, detail="Admin or Root access required")
 
     job_id = str(uuid.uuid4())
+    category_summary = (
+        ", ".join(request.categories)
+        if request.categories and request.categories != ["property"]
+        else (request.property_category or "all")
+    )
     new_job = ScanJob(
         id=uuid.UUID(job_id),
         job_type="scan",
         status="running",
         progress=f"Starting scan{' for ' + request.keyword if request.keyword else ''}...",
         keyword=request.keyword,
-        property_category=request.property_category,
+        property_category=category_summary,
         created_by_id=_admin.id,
         created_by_name=_admin.name
     )

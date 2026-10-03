@@ -77,9 +77,10 @@ function ScanHistoryContent() {
   // New preset form in presets tab
   const [newPresetName, setNewPresetName] = useState("");
   const [newPresetKeyword, setNewPresetKeyword] = useState("");
-  const [newPresetCategory, setNewPresetCategory] = useState<
-    "all" | "lands" | "apartments" | "houses" | "commercial"
-  >("all");
+  const [newPresetCategories, setNewPresetCategories] = useState<string[]>([
+    "houses",
+    "apartments",
+  ]);
   const [newPresetSource, setNewPresetSource] = useState("ikman");
 
   const isRootOrAdmin = user?.role === "root" || user?.role === "admin";
@@ -145,7 +146,11 @@ function ScanHistoryContent() {
       id: `preset-${Date.now()}`,
       name: newPresetName.trim(),
       keyword: newPresetKeyword.trim(),
-      property_category: newPresetCategory,
+      categories: newPresetCategories.length > 0 ? newPresetCategories : ["all"],
+      property_category:
+        newPresetCategories.length === 1
+          ? (newPresetCategories[0] as any)
+          : (newPresetCategories.length > 1 ? newPresetCategories.join(",") : "all"),
       strict_location: true,
       scan_all: true,
       source: newPresetSource,
@@ -1295,9 +1300,26 @@ function ScanHistoryContent() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-[#64736b] dark:text-zinc-400 mt-0.5">
-                          Target Location: <span className="font-semibold text-[#1a2923] dark:text-zinc-300">"{preset.keyword}"</span> • Category: <span className="capitalize font-medium">{preset.property_category}</span>
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap text-xs text-[#64736b] dark:text-zinc-400 mt-1">
+                          <span>
+                            Target: <span className="font-semibold text-[#1a2923] dark:text-zinc-300">"{preset.keyword}"</span>
+                          </span>
+                          <span>•</span>
+                          <span className="font-medium">Categories:</span>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {(preset.categories && preset.categories.length > 0
+                              ? preset.categories
+                              : [preset.property_category || "all"]
+                            ).map((c) => (
+                              <span
+                                key={c}
+                                className="rounded bg-[#f4f6f4] dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-semibold capitalize text-[#19352b] dark:text-zinc-300 border border-[#dce4df] dark:border-zinc-700"
+                              >
+                                {c}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -1361,21 +1383,45 @@ function ScanHistoryContent() {
                     className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                    Property Category
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1.5">
+                    Target Property Categories (Multi-Select)
                   </label>
-                  <select
-                    value={newPresetCategory}
-                    onChange={(e) => setNewPresetCategory(e.target.value as any)}
-                    className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
-                  >
-                    <option value="all">All Properties</option>
-                    <option value="houses">Houses</option>
-                    <option value="apartments">Apartments</option>
-                    <option value="lands">Lands</option>
-                    <option value="commercial">Commercial</option>
-                  </select>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "houses", label: "Houses" },
+                      { id: "apartments", label: "Apartments" },
+                      { id: "lands", label: "Lands" },
+                      { id: "commercial", label: "Commercial" },
+                    ].map((cat) => {
+                      const isSelected = newPresetCategories.includes(cat.id);
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setNewPresetCategories((prev) =>
+                              prev.includes(cat.id)
+                                ? prev.filter((c) => c !== cat.id)
+                                : [...prev, cat.id]
+                            );
+                          }}
+                          className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                            isSelected
+                              ? "border-[#19352b] dark:border-emerald-600 bg-[#eef3f0] dark:bg-emerald-950/40 text-[#19352b] dark:text-emerald-300"
+                              : "border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 text-[#1a2923] dark:text-zinc-300 hover:border-[#19352b]/50"
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-[11px] text-[#64736b] dark:text-zinc-400">
+                    {newPresetCategories.length === 0
+                      ? "None selected — scans all property types in the area."
+                      : `Selected: ${newPresetCategories.join(", ")}`}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">

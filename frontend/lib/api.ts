@@ -218,7 +218,8 @@ export interface ScanPreset {
   id: string;
   name: string;
   keyword: string;
-  property_category: "all" | "lands" | "apartments" | "houses" | "commercial";
+  categories?: string[];
+  property_category?: "all" | "lands" | "apartments" | "houses" | "commercial" | string;
   strict_location: boolean;
   scan_all: boolean;
   source: string;
