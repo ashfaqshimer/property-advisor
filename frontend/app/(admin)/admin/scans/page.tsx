@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 import { ScanJob, getScanJobs, stopScanJob, AuthUser, getCurrentUser } from "../../../../lib/api";
+import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 
 function ScanHistoryContent() {
   const searchParams = useSearchParams();
@@ -40,10 +41,19 @@ function ScanHistoryContent() {
   const [totalJobs, setTotalJobs] = useState(0);
   const [filterType, setFilterType] = useState<string>(initialType);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isScanDrawerOpen, setIsScanDrawerOpen] = useState(false);
 
   useEffect(() => {
     getCurrentUser().then(setUser).catch(() => {});
   }, []);
+
+  // Open drawer if navigated with ?new=1 or ?new=true
+  useEffect(() => {
+    const isNew = searchParams.get("new");
+    if (isNew === "true" || isNew === "1") {
+      setIsScanDrawerOpen(true);
+    }
+  }, [searchParams]);
 
   // Sync state if URL param changes
   useEffect(() => {
@@ -187,13 +197,13 @@ function ScanHistoryContent() {
             <span>Refresh</span>
           </button>
 
-          <Link
-            href="/admin/prospects"
+          <button
+            onClick={() => setIsScanDrawerOpen(true)}
             className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 transition"
           >
             <Plus className="h-4 w-4" />
             <span>New Scan</span>
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -340,12 +350,21 @@ function ScanHistoryContent() {
               ? "Trigger 'Sync Phone Numbers' from the Prospects page or inside any scan drilldown to view automated contact sync outcomes here."
               : "Launch your first scoped property scan to start seeing automated discovery outcomes and metrics here."}
           </p>
-          <Link
-            href="/admin/prospects"
-            className="cursor-pointer mt-4 inline-flex items-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#132820] dark:hover:bg-emerald-600 transition"
-          >
-            <Plus className="h-4 w-4" /> Go to Prospects
-          </Link>
+          {isPhoneTab ? (
+            <Link
+              href="/admin/prospects"
+              className="cursor-pointer mt-4 inline-flex items-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#132820] dark:hover:bg-emerald-600 transition"
+            >
+              <PhoneCall className="h-4 w-4" /> Go to Prospects
+            </Link>
+          ) : (
+            <button
+              onClick={() => setIsScanDrawerOpen(true)}
+              className="cursor-pointer mt-4 inline-flex items-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#132820] dark:hover:bg-emerald-600 transition"
+            >
+              <Plus className="h-4 w-4" /> Start New Scan
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -717,6 +736,15 @@ function ScanHistoryContent() {
           )}
         </div>
       )}
+
+      {/* Drawer */}
+      <ScanLauncherDrawer
+        isOpen={isScanDrawerOpen}
+        onClose={() => setIsScanDrawerOpen(false)}
+        onScanStarted={() => {
+          fetchJobs();
+        }}
+      />
     </div>
   );
 }
