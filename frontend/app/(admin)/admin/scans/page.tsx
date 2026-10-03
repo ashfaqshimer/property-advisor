@@ -27,6 +27,7 @@ import {
   MapPin,
   Trash2,
   ShieldAlert,
+  RotateCcw,
 } from "lucide-react";
 
 import {
@@ -38,6 +39,7 @@ import {
   getScanPresets,
   saveScanPreset,
   deleteScanPreset,
+  resetScanPresets,
   ScanPreset,
   SiteConfiguration,
   getSiteConfiguration,
@@ -167,6 +169,17 @@ function ScanHistoryContent() {
       toast.info("Preset deleted");
     } catch (err: any) {
       toast.error(err.message || "Failed to delete preset");
+    }
+  };
+
+  const handleResetPresets = async () => {
+    if (!window.confirm("Reset all presets to system defaults?")) return;
+    try {
+      const restored = await resetScanPresets();
+      setPresets(restored);
+      toast.success("Restored system default presets");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reset presets");
     }
   };
 
@@ -1243,9 +1256,20 @@ function ScanHistoryContent() {
                 </p>
               </div>
 
-              <span className="rounded-full bg-[#f4f6f4] dark:bg-zinc-800 px-3 py-1 text-xs font-semibold text-[#19352b] dark:text-zinc-300">
-                {presets.length} Presets
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetPresets}
+                  className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition"
+                  title="Restore default recommended presets"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 text-[#64736b] dark:text-zinc-400" />
+                  <span>Reset Defaults</span>
+                </button>
+                <span className="rounded-full bg-[#f4f6f4] dark:bg-zinc-800 px-3 py-1 text-xs font-semibold text-[#19352b] dark:text-zinc-300">
+                  {presets.length} Presets
+                </span>
+              </div>
             </div>
 
             <div className="mt-6 space-y-2.5">
@@ -1289,16 +1313,15 @@ function ScanHistoryContent() {
                         Launch
                       </button>
 
-                      {!preset.is_default && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePresetFromTab(preset.id)}
-                          className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition"
-                          title="Delete preset"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePresetFromTab(preset.id)}
+                        className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-transparent hover:border-rose-200 dark:hover:border-rose-900/60 bg-transparent hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2 py-1 text-xs font-medium text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 transition"
+                        title={`Delete preset "${preset.name}"`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Delete</span>
+                      </button>
                     </div>
                   </div>
                 ))

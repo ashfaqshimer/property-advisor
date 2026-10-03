@@ -382,15 +382,13 @@ export function ScanLauncherDrawer({
                     }`}
                   >
                     <span>{preset.name}</span>
-                    {!preset.is_default && (
-                      <span
-                        onClick={(e) => handleDeletePreset(preset.id, e)}
-                        className="rounded-full p-0.5 hover:bg-black/20 text-xs opacity-60 hover:opacity-100"
-                        title="Delete custom preset"
-                      >
-                        <X className="h-3 w-3" />
-                      </span>
-                    )}
+                    <span
+                      onClick={(e) => handleDeletePreset(preset.id, e)}
+                      className="rounded-full p-0.5 hover:bg-black/20 text-xs opacity-60 hover:opacity-100"
+                      title="Delete preset"
+                    >
+                      <X className="h-3 w-3" />
+                    </span>
                   </button>
                 );
               })}

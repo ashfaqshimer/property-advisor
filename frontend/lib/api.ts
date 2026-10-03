@@ -315,6 +315,19 @@ export async function deleteScanPreset(presetId: string): Promise<ScanPreset[]> 
   return (await response.json()) as ScanPreset[];
 }
 
+export async function resetScanPresets(): Promise<ScanPreset[]> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/presets/reset`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to reset presets (${response.status}).`, response.status);
+  }
+  return (await response.json()) as ScanPreset[];
+}
+
 
 export type AuthUser = {
   id: string;

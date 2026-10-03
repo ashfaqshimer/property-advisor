@@ -1280,3 +1280,24 @@ def delete_scan_preset(
     db.commit()
     db.refresh(config)
     return updated_presets
+
+
+@admin_router.post("/presets/reset", response_model=list[ScanPresetConfig])
+def reset_scan_presets(
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> list[dict[str, Any]]:
+    """Reset scan presets to default system presets."""
+    config = db.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
+    if not config:
+        config = SiteConfiguration(scanner_settings={"presets": list(DEFAULT_SCAN_PRESETS)})
+        db.add(config)
+    else:
+        settings = dict(config.scanner_settings or {})
+        settings["presets"] = list(DEFAULT_SCAN_PRESETS)
+        config.scanner_settings = settings
+        flag_modified(config, "scanner_settings")
+    db.commit()
+    db.refresh(config)
+    return config.scanner_settings.get("presets", list(DEFAULT_SCAN_PRESETS))
+
