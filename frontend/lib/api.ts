@@ -1020,6 +1020,16 @@ export async function getScanStatus(jobId: string): Promise<{ status: string; pr
   return (await response.json()) as { status: string; progress: string; error?: string };
 }
 
+export async function stopScanJob(jobId: string): Promise<{ status: string; message: string }> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/scan/${jobId}/stop`, {
+    method: "POST",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Stop scan failed (${response.status}).`, response.status);
+  return (await response.json()) as { status: string; message: string };
+}
+
 export async function getActiveJobs(): Promise<{ 
   scan: string | null; 
   phone_fetch: string | null;

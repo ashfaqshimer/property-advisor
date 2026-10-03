@@ -97,6 +97,9 @@ def _update_job_status(
         try:
             job = db.get(ScanJob, uuid.UUID(job_id))
             if job:
+                # If job was marked as cancelled, prevent background worker from reverting it to 'running'
+                if job.status == "cancelled" and status == "running":
+                    return
                 job.status = status
                 job.progress = progress
                 if error is not None:
@@ -416,10 +419,20 @@ async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
                 
         elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
         kw_msg = f" for '{request.keyword}'" if request.keyword else ""
+        with SessionLocal() as db:
+            current_job = db.get(ScanJob, uuid.UUID(job_id))
+            is_cancelled = current_job and current_job.status == "cancelled"
+
+        final_status = "cancelled" if is_cancelled else "completed"
+        final_progress = (
+            f"Stopped by user{kw_msg}. Scanned {pages_processed} pages, found {found_total} listings ({new_total} new, {filtered_total} filtered)."
+            if is_cancelled
+            else f"Done{kw_msg}. Scanned {pages_processed} pages, found {found_total} listings ({new_total} new, {filtered_total} filtered)."
+        )
         _update_job_status(
             job_id,
-            "completed",
-            f"Done{kw_msg}. Scanned {pages_processed} pages, found {found_total} listings ({new_total} new, {filtered_total} filtered).",
+            final_status,
+            final_progress,
             pages_scanned=pages_processed,
             total_pages=total_target_pages,
             total_found=found_total,
@@ -493,6 +506,31 @@ def get_scan_status(
         return {"status": job.status, "progress": job.progress, "error": job.error}
     except ValueError:
         return {"status": "not_found"}
+
+
+@admin_router.post("/scan/{job_id}/stop")
+def stop_scan_job(
+    job_id: str,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> dict[str, str]:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
+    try:
+        job = db.get(ScanJob, uuid.UUID(job_id))
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        if job.status != "running":
+            return {"status": job.status, "message": f"Job is not running (currently {job.status})"}
+
+        job.status = "cancelled"
+        job.progress = "Stopping..."
+        db.commit()
+        return {"status": "cancelled", "message": "Scan stop requested"}
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job ID")
 
 
 @admin_router.get("/scan/active")
@@ -618,10 +656,20 @@ async def _run_phone_fetch_job(job_id: str, target_scan_job_id: uuid.UUID | None
                 processed += 1
                 
         elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
+        with SessionLocal() as db:
+            current_job = db.get(ScanJob, uuid.UUID(job_id))
+            is_cancelled = current_job and current_job.status == "cancelled"
+
+        final_status = "cancelled" if is_cancelled else "completed"
+        final_progress = (
+            f"Stopped by user. Found {found_phones} phone numbers out of {processed} prospects."
+            if is_cancelled
+            else f"Done. Found {found_phones} phone numbers out of {processed} prospects."
+        )
         _update_job_status(
             job_id,
-            "completed",
-            f"Done. Found {found_phones} phone numbers out of {processed} prospects.",
+            final_status,
+            final_progress,
             total_found=processed,
             pages_scanned=processed,
             new_count=found_phones,

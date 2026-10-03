@@ -21,9 +21,10 @@ import {
   RefreshCw,
   Search,
   PhoneCall,
+  Square,
 } from "lucide-react";
 
-import { ScanJob, getScanJobs, AuthUser, getCurrentUser } from "../../../../lib/api";
+import { ScanJob, getScanJobs, stopScanJob, AuthUser, getCurrentUser } from "../../../../lib/api";
 
 function ScanHistoryContent() {
   const searchParams = useSearchParams();
@@ -122,6 +123,12 @@ function ScanHistoryContent() {
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> In Progress
           </span>
         );
+      case "cancelled":
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+            <Square className="h-3 w-3 fill-current" /> Stopped
+          </span>
+        );
       case "failed":
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 dark:bg-rose-950/60 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
@@ -134,6 +141,18 @@ function ScanHistoryContent() {
             {status}
           </span>
         );
+    }
+  };
+
+  const handleStopJob = async (jobId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await stopScanJob(jobId);
+      toast.info("Job stop requested");
+      fetchJobs(true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to stop job");
     }
   };
 
@@ -391,8 +410,17 @@ function ScanHistoryContent() {
                       </div>
                     </div>
 
-                    <div className="mt-2 text-xs text-[#64736b] dark:text-zinc-400 line-clamp-2 italic">
-                      {job.progress}
+                    <div className="mt-2 flex items-center justify-between text-xs">
+                      <span className="text-[#64736b] dark:text-zinc-400 line-clamp-1 italic">{job.progress}</span>
+                      {job.status === "running" && (
+                        <button
+                          onClick={(e) => handleStopJob(job.id, e)}
+                          className="cursor-pointer inline-flex items-center gap-1 rounded bg-rose-600 dark:bg-rose-700 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-rose-700 transition shrink-0 ml-2"
+                        >
+                          <Square className="h-2.5 w-2.5 fill-current" />
+                          <span>Stop</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -459,7 +487,18 @@ function ScanHistoryContent() {
 
                   <div className="mt-3 flex items-center justify-between text-xs font-semibold text-[#19352b] dark:text-emerald-400 pt-1">
                     <span>View Prospects & Outcomes</span>
-                    <ChevronRight className="h-4 w-4" />
+                    <div className="flex items-center gap-1.5">
+                      {job.status === "running" && (
+                        <button
+                          onClick={(e) => handleStopJob(job.id, e)}
+                          className="cursor-pointer inline-flex items-center gap-1 rounded bg-rose-600 dark:bg-rose-700 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-rose-700 transition"
+                        >
+                          <Square className="h-2.5 w-2.5 fill-current" />
+                          <span>Stop</span>
+                        </button>
+                      )}
+                      <ChevronRight className="h-4 w-4" />
+                    </div>
                   </div>
                 </Link>
               );
@@ -548,8 +587,19 @@ function ScanHistoryContent() {
                           {formatDistanceToNow(createdDate, { addSuffix: true })}
                         </td>
 
-                        <td className="px-5 py-4 text-xs text-[#64736b] dark:text-zinc-400 max-w-xs truncate" title={job.progress}>
-                          {job.progress}
+                        <td className="px-5 py-4 text-xs text-[#64736b] dark:text-zinc-400">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="max-w-xs truncate" title={job.progress}>{job.progress}</span>
+                            {job.status === "running" && (
+                              <button
+                                onClick={(e) => handleStopJob(job.id, e)}
+                                className="cursor-pointer inline-flex items-center gap-1 rounded border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/60 px-2 py-1 text-xs font-semibold text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition shrink-0"
+                              >
+                                <Square className="h-3 w-3 fill-current" />
+                                <span>Stop</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -616,14 +666,25 @@ function ScanHistoryContent() {
                       </td>
 
                       <td className="px-5 py-4 text-right">
-                        <Link
-                          href={`/admin/scans/${job.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[#dce4df] dark:border-zinc-700 px-2.5 py-1.5 text-xs font-semibold text-[#19352b] dark:text-emerald-400 hover:bg-[#19352b] hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white transition"
-                        >
-                          <span>Review</span>
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          {job.status === "running" && (
+                            <button
+                              onClick={(e) => handleStopJob(job.id, e)}
+                              className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/60 px-2.5 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition"
+                            >
+                              <Square className="h-3 w-3 fill-current" />
+                              <span>Stop</span>
+                            </button>
+                          )}
+                          <Link
+                            href={`/admin/scans/${job.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[#dce4df] dark:border-zinc-700 px-2.5 py-1.5 text-xs font-semibold text-[#19352b] dark:text-emerald-400 hover:bg-[#19352b] hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white transition"
+                          >
+                            <span>Review</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );

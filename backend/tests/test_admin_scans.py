@@ -213,3 +213,36 @@ def test_discarded_prospect_restore_lifecycle(authenticated_client: TestClient, 
     assert job.new_count == 3
     assert job.filtered_count == 7
 
+
+def test_stop_running_scan_job(authenticated_client: TestClient, db_session: Session) -> None:
+    job_id = uuid.uuid4()
+    job = ScanJob(
+        id=job_id,
+        job_type="scan",
+        status="running",
+        progress="Scanning page 2/10...",
+        keyword="Kandy",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    # Active jobs endpoint should show it
+    active_res = authenticated_client.get("/admin/prospects/scan/active")
+    assert active_res.status_code == 200
+    assert active_res.json()["scan"] == str(job_id)
+
+    # Stop scan
+    stop_res = authenticated_client.post(f"/admin/prospects/scan/{job_id}/stop")
+    assert stop_res.status_code == 200
+    assert stop_res.json()["status"] == "cancelled"
+
+    # Verify job status in DB
+    db_session.refresh(job)
+    assert job.status == "cancelled"
+
+    # Active jobs endpoint should no longer show it as running
+    active_after = authenticated_client.get("/admin/prospects/scan/active")
+    assert active_after.status_code == 200
+    assert active_after.json()["scan"] is None
+
+

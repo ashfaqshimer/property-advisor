@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   RefreshCw,
   Undo2,
+  Square,
 } from "lucide-react";
 
 import {
@@ -37,6 +38,7 @@ import {
   createProperty,
   createPropertyContact,
   updateProspect,
+  stopScanJob,
 } from "../../../../../lib/api";
 
 export default function ScanDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -88,10 +90,38 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
     }
   }, [jobId, page]);
 
+  const [isStoppingScan, setIsStoppingScan] = useState(false);
+
   useEffect(() => {
     fetchJobData();
     fetchProspectsData();
   }, [fetchJobData, fetchProspectsData]);
+
+  // Polling for scan progress if active
+  useEffect(() => {
+    if (job?.status !== "running") return;
+
+    const interval = setInterval(() => {
+      fetchJobData();
+      fetchProspectsData();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [job?.status, fetchJobData, fetchProspectsData]);
+
+  const handleStopScan = async () => {
+    setIsStoppingScan(true);
+    try {
+      await stopScanJob(jobId);
+      toast.info("Scan stop requested");
+      fetchJobData();
+      fetchProspectsData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to stop scan");
+    } finally {
+      setIsStoppingScan(false);
+    }
+  };
 
   // Polling for scoped phone fetch
   useEffect(() => {
@@ -280,6 +310,41 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
   const createdDate = parseISO(job.created_at);
   const isScoped = !!job.keyword;
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Completed
+          </span>
+        );
+      case "running":
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 text-xs font-semibold text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-800 animate-pulse">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> In Progress
+          </span>
+        );
+      case "cancelled":
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/60 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+            <Square className="h-3 w-3 fill-current" /> Stopped
+          </span>
+        );
+      case "failed":
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 dark:bg-rose-950/60 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+            <AlertCircle className="h-3.5 w-3.5" /> Failed
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+            {status}
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Navigation & Header */}
@@ -309,6 +374,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                   {job.property_category}
                 </span>
               )}
+              {getStatusBadge(job.status)}
             </div>
 
             <p className="mt-1 text-xs sm:text-sm text-[#64736b] dark:text-zinc-400">
@@ -318,6 +384,17 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
+            {job.status === "running" && (
+              <button
+                onClick={handleStopScan}
+                disabled={isStoppingScan}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-rose-600 dark:bg-rose-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-rose-700 dark:hover:bg-rose-600 transition disabled:opacity-50"
+              >
+                <Square className="h-4 w-4 fill-current" />
+                <span>{isStoppingScan ? "Stopping..." : "Stop Scan"}</span>
+              </button>
+            )}
+
             <button
               onClick={handleExportCSV}
               className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2 text-xs sm:text-sm font-semibold text-[#1a2923] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition"
@@ -345,6 +422,24 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
             )}
           </div>
         </div>
+
+        {/* Live scan in progress banner */}
+        {job.status === "running" && (
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
+              <span className="font-medium">{job.progress || "Scan in progress..."}</span>
+            </div>
+            <button
+              onClick={handleStopScan}
+              disabled={isStoppingScan}
+              className="cursor-pointer inline-flex items-center gap-1 rounded bg-rose-600 dark:bg-rose-700 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50 shrink-0 self-start sm:self-auto"
+            >
+              <Square className="h-3 w-3 fill-current" />
+              <span>{isStoppingScan ? "Stopping..." : "Stop Scan"}</span>
+            </button>
+          </div>
+        )}
 
         {/* Live status alert if phone fetching is in progress */}
         {isFetchingPhones && phoneFetchStatus && (

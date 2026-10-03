@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2 } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square } from "lucide-react";
 
 import {
   Prospect,
@@ -12,6 +12,7 @@ import {
   updateProspect,
   startProspectScan,
   getScanStatus,
+  stopScanJob,
   fetchProspectPhone,
   startBulkPhoneFetch,
   getBulkPhoneFetchStatus,
@@ -70,9 +71,11 @@ export default function ProspectsPage() {
   
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [scanStatus, setScanStatus] = useState<{ status: string; progress: string; error?: string } | null>(null);
+  const [isStoppingScan, setIsStoppingScan] = useState(false);
 
   const [activePhoneJobId, setActivePhoneJobId] = useState<string | null>(null);
   const [phoneJobStatus, setPhoneJobStatus] = useState<{ status: string; progress: string; error?: string } | null>(null);
+  const [isStoppingPhoneJob, setIsStoppingPhoneJob] = useState(false);
   const [fetchingPhoneId, setFetchingPhoneId] = useState<string | null>(null);
 
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
@@ -201,12 +204,14 @@ export default function ProspectsPage() {
       try {
         const status = await getScanStatus(activeJobId);
         setScanStatus(status);
-        if (status.status === "completed" || status.status === "failed") {
+        if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
           setActiveJobId(null);
           fetchProspects();
           refreshActiveJobs();
           if (status.status === "completed") {
             toast.success("Scan completed successfully");
+          } else if (status.status === "cancelled") {
+            toast.info("Scan stopped");
           } else {
             toast.error(`Scan failed: ${status.error}`);
           }
@@ -227,12 +232,14 @@ export default function ProspectsPage() {
       try {
         const status = await getBulkPhoneFetchStatus(activePhoneJobId);
         setPhoneJobStatus(status);
-        if (status.status === "completed" || status.status === "failed") {
+        if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
           setActivePhoneJobId(null);
           fetchProspects();
           refreshActiveJobs();
           if (status.status === "completed") {
             toast.success("Bulk phone fetch completed");
+          } else if (status.status === "cancelled") {
+            toast.info("Bulk phone fetch stopped");
           } else {
             toast.error(`Bulk phone fetch failed: ${status.error}`);
           }
@@ -307,6 +314,32 @@ export default function ProspectsPage() {
       toast.error("Failed to update status");
     } finally {
       setUpdatingStatusId(null);
+    }
+  };
+
+  const handleStopScan = async () => {
+    if (!activeJobId) return;
+    setIsStoppingScan(true);
+    try {
+      await stopScanJob(activeJobId);
+      toast.info("Scan stop requested");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to stop scan");
+    } finally {
+      setIsStoppingScan(false);
+    }
+  };
+
+  const handleStopPhoneJob = async () => {
+    if (!activePhoneJobId) return;
+    setIsStoppingPhoneJob(true);
+    try {
+      await stopScanJob(activePhoneJobId);
+      toast.info("Phone sync stop requested");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to stop phone sync");
+    } finally {
+      setIsStoppingPhoneJob(false);
     }
   };
 
@@ -420,24 +453,51 @@ export default function ProspectsPage() {
               <p className="text-sm text-blue-600 dark:text-blue-400">{scanStatus.progress}</p>
             </div>
           </div>
-          <Link
-            href={`/admin/scans/${activeJobId}`}
-            className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:underline shrink-0"
-          >
-            <span>Track Outcomes</span>
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={handleStopScan}
+              disabled={isStoppingScan}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-rose-600 dark:bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-700 dark:hover:bg-rose-600 transition disabled:opacity-50"
+            >
+              <Square className="h-3 w-3 fill-current" />
+              <span>{isStoppingScan ? "Stopping..." : "Stop Scan"}</span>
+            </button>
+            <Link
+              href={`/admin/scans/${activeJobId}`}
+              className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:underline"
+            >
+              <span>Track Outcomes</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
       )}
 
       {activePhoneJobId && phoneJobStatus && (
-        <div className="mt-6 rounded-lg border border-orange-200 dark:border-orange-900/50 bg-orange-50 dark:bg-orange-900/20 p-4">
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-orange-200 dark:border-orange-900/50 bg-orange-50 dark:bg-orange-900/20 p-4">
           <div className="flex items-center gap-3">
-            <RefreshCw className="h-5 w-5 animate-spin text-orange-600 dark:text-orange-400" />
+            <RefreshCw className="h-5 w-5 animate-spin text-orange-600 dark:text-orange-400 shrink-0" />
             <div>
               <h3 className="text-sm font-medium text-orange-800 dark:text-orange-300">Bulk Phone Fetch in progress</h3>
               <p className="text-sm text-orange-600 dark:text-orange-400">{phoneJobStatus.progress}</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={handleStopPhoneJob}
+              disabled={isStoppingPhoneJob}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-rose-600 dark:bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-700 dark:hover:bg-rose-600 transition disabled:opacity-50"
+            >
+              <Square className="h-3 w-3 fill-current" />
+              <span>{isStoppingPhoneJob ? "Stopping..." : "Stop Sync"}</span>
+            </button>
+            <Link
+              href="/admin/scans?type=phone_fetch"
+              className="inline-flex items-center gap-1 text-xs font-bold text-orange-700 dark:text-orange-300 hover:underline"
+            >
+              <span>View Log</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
       )}
