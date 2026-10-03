@@ -355,7 +355,7 @@ export default function ProspectsPage() {
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-3.5 py-2 text-sm font-semibold text-[#19352b] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 cursor-pointer w-full sm:w-auto"
                 >
                   <Compass className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
-                  <span>Scan History</span>
+                  <span>Scanner Hub</span>
                 </Link>
                 <button
                   onClick={() => setIsScanModalOpen(true)}

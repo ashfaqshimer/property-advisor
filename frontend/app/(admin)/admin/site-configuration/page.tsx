@@ -3,17 +3,16 @@
 import { FormEvent, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-
-import { Bookmark, Plus, Trash2, MapPin } from "lucide-react";
+import Link from "next/link";
+import { Compass } from "lucide-react";
 
 import { 
   getCurrentUser,
   getSiteConfiguration,
   updateSiteConfiguration,
   type SiteConfiguration,
-  type ScanPreset,
 } from "../../../../lib/api";
-import { SourceBadge } from "../../../../components/admin/SourceBadge";
+
 
 function ConfigField({
   label,
@@ -110,53 +109,6 @@ export default function SiteConfigurationPage() {
         [key]: value,
       }
     }));
-  }
-
-  // New preset form state
-  const [newPresetName, setNewPresetName] = useState("");
-  const [newPresetKeyword, setNewPresetKeyword] = useState("");
-  const [newPresetCategory, setNewPresetCategory] = useState<"all" | "lands" | "apartments" | "houses" | "commercial">("all");
-  const [newPresetSource, setNewPresetSource] = useState("ikman");
-
-  function handleAddPreset() {
-    if (!newPresetName.trim() || !newPresetKeyword.trim()) {
-      toast.error("Please enter both preset name and location keyword");
-      return;
-    }
-    const newPreset: ScanPreset = {
-      id: `preset-${Date.now()}`,
-      name: newPresetName.trim(),
-      keyword: newPresetKeyword.trim(),
-      property_category: newPresetCategory,
-      strict_location: true,
-      scan_all: true,
-      source: newPresetSource,
-      is_default: false,
-    };
-    const current = siteConfig.scanner_settings?.presets || [];
-    setSiteConfig(s => ({
-      ...s,
-      scanner_settings: {
-        ...(s.scanner_settings || { enabled: false, frequency_hours: 24, pages_to_scan: 5, property_types: ["house", "apartment"] }),
-        presets: [...current, newPreset],
-      }
-    }));
-    setNewPresetName("");
-    setNewPresetKeyword("");
-    toast.success(`Preset "${newPreset.name}" added to list. Click "Save scan presets" to persist.`);
-  }
-
-  function handleRemovePreset(presetId: string) {
-    const current = siteConfig.scanner_settings?.presets || [];
-    const updated = current.filter(p => p.id !== presetId);
-    setSiteConfig(s => ({
-      ...s,
-      scanner_settings: {
-        ...(s.scanner_settings || { enabled: false, frequency_hours: 24, pages_to_scan: 5, property_types: ["house", "apartment"] }),
-        presets: updated,
-      }
-    }));
-    toast.info("Preset removed from list. Click save to persist.");
   }
 
   useEffect(() => {
@@ -313,266 +265,24 @@ export default function SiteConfigurationPage() {
         </form>
       </div>
 
-      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-        <h2 className="text-lg font-medium">Property Scanner Settings</h2>
-        <div className="mt-6 max-w-md space-y-6">
-          <div className="flex items-center space-x-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={siteConfig.scanner_settings?.enabled ?? false}
-              onClick={() => setSiteConfig(s => ({ ...s, scanner_settings: { ...(s.scanner_settings || { frequency_hours: 24, pages_to_scan: 5, property_types: ['house', 'apartment'] }), enabled: !(s.scanner_settings?.enabled ?? false) } }))}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#19352b] focus:ring-offset-2 ${
-                (siteConfig.scanner_settings?.enabled ?? false) ? 'bg-[#19352b] dark:bg-[#28513f]' : 'bg-gray-200 dark:bg-zinc-700'
-              }`}
-            >
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  (siteConfig.scanner_settings?.enabled ?? false) ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </button>
-            <span className="text-sm font-medium">Enable Background Scanner</span>
+      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-[#fbfcfb] dark:bg-zinc-900/50 p-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Compass className="h-5 w-5 text-[#19352b] dark:text-emerald-400" />
+            <h2 className="text-base font-semibold text-[#1a2923] dark:text-zinc-100">
+              Real Estate Scanner & Automation
+            </h2>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Run Frequency</label>
-            <select
-              value={siteConfig.scanner_settings?.frequency_hours ?? 24}
-              onChange={(e) => setSiteConfig(s => ({ ...s, scanner_settings: { ...(s.scanner_settings || { enabled: false, pages_to_scan: 5, property_types: ['house', 'apartment'] }), frequency_hours: parseInt(e.target.value) } }))}
-              className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-transparent dark:bg-zinc-950 px-3 py-2.5 outline-none focus:border-[#28513f] dark:focus:border-[#28513f] dark:text-zinc-200"
-            >
-              <option value={6}>Every 6 Hours</option>
-              <option value={12}>Every 12 Hours</option>
-              <option value={18}>Every 18 Hours</option>
-              <option value={24}>Every 24 Hours</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Pages to Scan</label>
-            <input
-              type="number"
-              min="1"
-              max="50"
-              value={siteConfig.scanner_settings?.pages_to_scan ?? 5}
-              onChange={(e) => setSiteConfig(s => ({ ...s, scanner_settings: { ...(s.scanner_settings || { enabled: false, frequency_hours: 24, property_types: ['house', 'apartment'] }), pages_to_scan: parseInt(e.target.value) || 1 } }))}
-              className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-transparent dark:bg-zinc-950 px-3 py-2.5 outline-none focus:border-[#28513f] dark:focus:border-[#28513f] dark:text-zinc-200"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-3">Property Types</label>
-            <div className="space-y-3">
-              {['house', 'apartment', 'land', 'commercial'].map(type => {
-                const isChecked = (siteConfig.scanner_settings?.property_types ?? ['house', 'apartment']).includes(type);
-                return (
-                  <label key={type} className="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={(e) => {
-                        const current = siteConfig.scanner_settings?.property_types ?? ['house', 'apartment'];
-                        const next = e.target.checked ? [...current, type] : current.filter(t => t !== type);
-                        setSiteConfig(s => ({ ...s, scanner_settings: { ...(s.scanner_settings || { enabled: false, frequency_hours: 24, pages_to_scan: 5 }), property_types: next } }));
-                      }}
-                      className="h-4 w-4 rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b] cursor-pointer"
-                    />
-                    <span className="text-sm capitalize">{type}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          
-          <div className="rounded-lg bg-gray-50 dark:bg-zinc-900 p-4 border border-gray-100 dark:border-zinc-800">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-black dark:text-zinc-200">Scanner Schedule & Status</h3>
-              {siteConfig.scanner_settings?.enabled ? (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Scheduled
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
-                  Disabled
-                </span>
-              )}
-            </div>
-            <div className="text-sm text-[#64736b] dark:text-zinc-400 space-y-1.5">
-              <p>
-                <span className="font-medium text-black dark:text-zinc-200">Next Scan:</span>{" "}
-                {siteConfig.scanner_settings?.enabled
-                  ? siteConfig.scanner_settings?.next_run_at
-                    ? new Date(siteConfig.scanner_settings.next_run_at).toLocaleString(undefined, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })
-                    : "Scheduled on next restart"
-                  : "Not scheduled (scanner disabled)"}
-              </p>
-              {siteConfig.scanner_settings?.last_run_at && (
-                <>
-                  <p>
-                    <span className="font-medium text-black dark:text-zinc-200">Last Scan:</span>{" "}
-                    {new Date(siteConfig.scanner_settings.last_run_at).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </p>
-                  <p>
-                    <span className="font-medium text-black dark:text-zinc-200">Last Status:</span>{" "}
-                    {siteConfig.scanner_settings.last_run_status || "Completed"}
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-          
-          <button
-            type="button"
-            onClick={(e) => handleUpdateSiteConfig(e as any)}
-            disabled={updatingSiteConfig}
-            className="mt-4 rounded-lg bg-[#19352b] dark:bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#132820] dark:hover:bg-[#1f4233] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
-          >
-            {updatingSiteConfig ? "Saving..." : "Save scanner configuration"}
-          </button>
+          <p className="mt-1 text-xs text-[#64736b] dark:text-zinc-400 max-w-xl">
+            Automated crawler scheduling, frequency, crawl depth, and search presets are now centrally managed in the dedicated Scanner & Automation Hub.
+          </p>
         </div>
-      </div>
-
-      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Bookmark className="h-5 w-5 text-[#19352b] dark:text-emerald-400" />
-          <h2 className="text-lg font-medium">Scan Presets & Watchlists</h2>
-        </div>
-        <p className="mt-1 text-sm text-[#64736b] dark:text-zinc-400">
-          Configure default and team search presets displayed across the Admin Prospects and Scan History drawers.
-        </p>
-
-        {/* Existing Presets List */}
-        <div className="mt-6 space-y-2.5">
-          {(siteConfig.scanner_settings?.presets && siteConfig.scanner_settings.presets.length > 0) ? (
-            siteConfig.scanner_settings.presets.map((preset) => (
-              <div
-                key={preset.id}
-                className="flex items-center justify-between rounded-lg border border-[#e5ebe7] dark:border-zinc-800 bg-[#fbfcfb] dark:bg-zinc-900/40 p-3"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#eef3f0] dark:bg-zinc-800 text-[#19352b] dark:text-emerald-400">
-                    <MapPin className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-[#1a2923] dark:text-zinc-100">
-                        {preset.name}
-                      </span>
-                      <SourceBadge source={preset.source} />
-                      {preset.is_default && (
-                        <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:text-zinc-400">
-                          Built-in
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-[#64736b] dark:text-zinc-400">
-                      Keyword: <span className="font-medium text-[#1a2923] dark:text-zinc-300">"{preset.keyword}"</span> • Category: <span className="capitalize">{preset.property_category}</span>
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemovePreset(preset.id)}
-                  className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition"
-                  title="Remove preset"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))
-          ) : (
-            <p className="text-xs text-[#64736b] dark:text-zinc-400 italic">No presets configured.</p>
-          )}
-        </div>
-
-        {/* Add Preset Form */}
-        <div className="mt-6 rounded-lg border border-dashed border-[#cbd8d1] dark:border-zinc-800 p-4 bg-[#f9faf9] dark:bg-zinc-900/30">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">
-            Add New Preset
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                Preset Name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Negombo Land Sales"
-                value={newPresetName}
-                onChange={(e) => setNewPresetName(e.target.value)}
-                className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                Location Keyword
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Negombo"
-                value={newPresetKeyword}
-                onChange={(e) => setNewPresetKeyword(e.target.value)}
-                className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                Category
-              </label>
-              <select
-                value={newPresetCategory}
-                onChange={(e) => setNewPresetCategory(e.target.value as any)}
-                className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
-              >
-                <option value="all">All Properties</option>
-                <option value="houses">Houses</option>
-                <option value="apartments">Apartments</option>
-                <option value="lands">Lands</option>
-                <option value="commercial">Commercial</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                Source Portal
-              </label>
-              <select
-                value={newPresetSource}
-                onChange={(e) => setNewPresetSource(e.target.value)}
-                className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
-              >
-                <option value="ikman">ikman.lk</option>
-                <option value="lpw">LankaPropertyWeb (Upcoming)</option>
-              </select>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleAddPreset}
-            className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-[#19352b] bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-[#19352b] dark:text-emerald-400 hover:bg-[#19352b] hover:text-white dark:hover:bg-emerald-700 dark:hover:text-white transition"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Preset</span>
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={(e) => handleUpdateSiteConfig(e as any)}
-          disabled={updatingSiteConfig}
-          className="mt-6 rounded-lg bg-[#19352b] dark:bg-[#28513f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#132820] dark:hover:bg-[#1f4233] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+        <Link
+          href="/admin/scans?tab=automation"
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#132820] dark:hover:bg-emerald-600 transition"
         >
-          {updatingSiteConfig ? "Saving..." : "Save scan presets"}
-        </button>
+          <span>Open Scanner Hub →</span>
+        </Link>
       </div>
 
       <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">

@@ -302,7 +302,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
         <h3 className="font-bold">Scan job not found</h3>
         <p className="mt-1 text-sm">The requested scan job ID does not exist or has been purged.</p>
         <Link href="/admin/scans" className="mt-4 inline-block font-semibold underline">
-          ← Back to Scan History
+          ← Back to Scanner Hub
         </Link>
       </div>
     );
@@ -354,7 +354,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
           href="/admin/scans"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64736b] dark:text-zinc-400 hover:text-[#19352b] dark:hover:text-emerald-400 transition mb-3"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Scan History
+          <ArrowLeft className="h-4 w-4" /> Back to Scanner Hub
         </Link>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
