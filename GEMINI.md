@@ -21,7 +21,9 @@
 * **Next.js 16:** Respect breaking changes in Next 16 App Router. Do not use Next 14/15 patterns from memory if they have been deprecated.
 * **Tailwind v4:** Configured exclusively through `@theme` in `frontend/app/globals.css`. **Do not create or look for a `tailwind.config.ts`.**
 * **Testing:** Vitest + React Testing Library (`pnpm test` from `frontend/`).
-  * *Gotcha:* `jsdom` has no layout engine. Tests verify DOM structure and scope boundaries, not visual styling.
+  * **Essential Only:** Test behavior, user interactions, and API contracts (`*-api.test.ts`, dialogs, drawers, form submissions).
+  * **No Brittle UI Tests:** Do NOT write tests that assert CSS classes (e.g., `toHaveClass`), rigid DOM hierarchies, copy wording, or placeholder scaffold boundaries. Layout and visual styling are verified in-browser.
+  * *Gotcha:* `jsdom` has no layout engine.
   * *Gotcha:* Auto-cleanup is explicitly handled in `tests/setup.ts`.
 
 ## Backend (FastAPI + uv + Neon/SQLite)
@@ -33,6 +35,7 @@
   * `uv run alembic upgrade head`
   * `uv run pytest`
 * **Testing:** Pytest uses an in-memory SQLite database, while production uses Neon Postgres.
+  * **Efficiency:** During rapid development, run scoped test files (e.g., `uv run pytest tests/test_agent_loop.py`) rather than the entire 255-test suite.
   * *Gotcha:* Models must stay portable across engines (e.g., use `Uuid`, `func.now()`, `ARRAY(Text).with_variant(JSON(), "sqlite")`).
   * *Gotcha:* `tests/conftest.py` sets `PRAGMA foreign_keys=ON`; without this, SQLite ignores foreign keys.
   * *Gotcha:* Alembic 1.19 has a false positive on enum columns, emitting `drop_constraint` for valid CHECKs. Ignore/filter these in migrations.
