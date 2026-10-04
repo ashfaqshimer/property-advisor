@@ -29,8 +29,10 @@ from app.schemas.prospect import (
     ScanJobRead,
     ScanJobList,
 )
-from app.scraper.classifier import classify_listing_heuristics
+from app.scraper.classifier import classify_listing_heuristics, classify_lpw_listing_heuristics
 from app.scraper.ikman_client import IkmanClient, IKMAN_BASE_URL
+from app.scraper.lpw_client import LankaPropertyWebClient, LPW_BASE_URL
+from app.scraper.schemas import LpwAd, LpwAdDetail
 from app.scraper.ikman_locations import resolve_ikman_location_slug
 from app.scraper.location_extractor import extract_suburb
 from app.agent.client import get_gemini_extractor_client
@@ -173,7 +175,15 @@ def _save_prospects_sync(
     filtered_count = 0
     with SessionLocal() as db:
         for ad in ads:
-            stmt = select(Prospect).where(Prospect.ikman_ad_id == ad.id)
+            is_lpw = getattr(request, "source", "ikman") == "lpw" or isinstance(ad, LpwAd)
+            source_name = "lpw" if is_lpw else "ikman"
+            ad_id = str(ad.id)
+            legacy_id = f"lpw-{ad_id}" if is_lpw else ad_id
+
+            stmt = select(Prospect).where(
+                (Prospect.source == source_name) & (Prospect.source_id == ad_id)
+                | (Prospect.ikman_ad_id == legacy_id)
+            )
             existing = db.execute(stmt).scalar_one_or_none()
             
             if existing:
@@ -185,59 +195,90 @@ def _save_prospects_sync(
                     db.rollback()
                 continue
                 
-            loc_str = ""
-            if isinstance(ad.location, str):
-                loc_str = ad.location
-            elif ad.location and hasattr(ad.location, "name"):
-                loc_str = ad.location.name or ""
-
-            suburb = extract_suburb(title=ad.title or "", slug=ad.slug or "", district=loc_str)
-            suburb_source = "extracted" if suburb else None
-
             is_discarded = False
             discard_reason = None
 
-            # Relevance check for scoped searches
-            if native_location_slug:
-                # Listing was fetched natively via Ikman's location route (/ads/{loc_slug}/{category})
-                # Ikman guarantees location membership, so no keyword mismatch discard is needed.
-                if not suburb:
-                    from app.scraper.location_extractor import BROAD_DISTRICTS
-                    if native_location_slug.lower() not in BROAD_DISTRICTS:
-                        suburb = native_location_slug.replace("-", " ").title()
-                        suburb_source = "ikman_location"
-            elif request.keyword and request.strict_location:
-                if not is_location_relevant(ad, request.keyword, suburb):
-                    is_discarded = True
-                    discard_reason = "location_mismatch"
-                    filtered_count += 1
+            if is_lpw:
+                loc_str = getattr(ad, "location", "") or getattr(ad, "suburb", "") or ""
+                suburb = getattr(ad, "suburb", None) or extract_suburb(title=ad.title or "", slug="", district=loc_str)
+                suburb_source = "lpw_location" if getattr(ad, "suburb", None) else ("extracted" if suburb else None)
+                prop_type = getattr(ad, "property_type", "property")
+                listing_type = getattr(ad, "listing_type", "sale")
+                ad_url = getattr(ad, "url", "")
+                ad_slug = f"property_details-{ad_id}.html"
 
-            if not is_discarded:
-                new_count += 1
+                if request.keyword and request.strict_location:
+                    if not is_location_relevant(ad, request.keyword, suburb):
+                        is_discarded = True
+                        discard_reason = "location_mismatch"
+                        filtered_count += 1
 
-            classification, confidence, reasons = classify_listing_heuristics(ad)
-            
-            if classification == "broker" and not is_discarded:
-                new_count -= 1
-                continue
-                        
-            phone_number = None
-            poster_name = None
-            
-            # Note: Phone numbers are fetched explicitly via the phone fetch API,
-            # not during the initial scan phase.
+                if not is_discarded:
+                    new_count += 1
 
-            prop_type = "property"
-            cat_slug = ""
-            if ad.category:
-                cat_slug = (ad.category.slug or ad.category.name or "").lower()
-            if "land" in cat_slug: prop_type = "land"
-            elif "apartments" in cat_slug: prop_type = "apartment"
-            elif "houses" in cat_slug: prop_type = "house"
-            elif "commercial" in cat_slug: prop_type = "commercial"
-            
-            listing_type = "sale"
-            if "rentals" in cat_slug: listing_type = "rent"
+                classification, confidence, reasons = classify_lpw_listing_heuristics(ad)
+                if classification == "broker" and not is_discarded:
+                    new_count -= 1
+                    continue
+
+                poster_name = None
+                phone_number = None
+                is_member = False
+                is_auth_dealer = False
+                membership_level = "free"
+                shop_name = None
+            else:
+                loc_str = ""
+                if isinstance(ad.location, str):
+                    loc_str = ad.location
+                elif ad.location and hasattr(ad.location, "name"):
+                    loc_str = ad.location.name or ""
+
+                suburb = extract_suburb(title=ad.title or "", slug=ad.slug or "", district=loc_str)
+                suburb_source = "extracted" if suburb else None
+
+                # Relevance check for scoped searches
+                if native_location_slug:
+                    if not suburb:
+                        from app.scraper.location_extractor import BROAD_DISTRICTS
+                        if native_location_slug.lower() not in BROAD_DISTRICTS:
+                            suburb = native_location_slug.replace("-", " ").title()
+                            suburb_source = "ikman_location"
+                elif request.keyword and request.strict_location:
+                    if not is_location_relevant(ad, request.keyword, suburb):
+                        is_discarded = True
+                        discard_reason = "location_mismatch"
+                        filtered_count += 1
+
+                if not is_discarded:
+                    new_count += 1
+
+                classification, confidence, reasons = classify_listing_heuristics(ad)
+                if classification == "broker" and not is_discarded:
+                    new_count -= 1
+                    continue
+                            
+                phone_number = None
+                poster_name = None
+
+                prop_type = "property"
+                cat_slug = ""
+                if ad.category:
+                    cat_slug = (ad.category.slug or ad.category.name or "").lower()
+                if "land" in cat_slug: prop_type = "land"
+                elif "apartments" in cat_slug: prop_type = "apartment"
+                elif "houses" in cat_slug: prop_type = "house"
+                elif "commercial" in cat_slug: prop_type = "commercial"
+                
+                listing_type = "sale"
+                if "rentals" in cat_slug: listing_type = "rent"
+
+                ad_url = f"{IKMAN_BASE_URL}/en/ad/{ad.slug}" if ad.slug else ""
+                ad_slug = ad.slug or ""
+                is_member = ad.isMember
+                is_auth_dealer = ad.isAuthDealer
+                membership_level = ad.membershipLevel
+                shop_name = ad.shopName
 
             geo_target = f"{suburb}, {loc_str}" if suburb and loc_str else (suburb or loc_str)
             lat, lng = None, None
@@ -245,9 +286,12 @@ def _save_prospects_sync(
                 lat, lng = geocode_location(db, geo_target)
 
             new_prospect = Prospect(
-                ikman_ad_id=ad.id,
-                ikman_url=f"{IKMAN_BASE_URL}/en/ad/{ad.slug}" if ad.slug else "",
-                ikman_slug=ad.slug or "",
+                source=source_name,
+                source_id=ad_id,
+                source_url=ad_url,
+                ikman_ad_id=legacy_id,
+                ikman_url=ad_url,
+                ikman_slug=ad_slug,
                 title=ad.title or "",
                 price=ad.price or "",
                 location=loc_str,
@@ -265,10 +309,10 @@ def _save_prospects_sync(
                 classification_method="heuristic",
                 status="discarded" if is_discarded else "new",
                 discard_reason=discard_reason,
-                is_member=ad.isMember,
-                is_auth_dealer=ad.isAuthDealer,
-                membership_level=ad.membershipLevel,
-                shop_name=ad.shopName,
+                is_member=is_member,
+                is_auth_dealer=is_auth_dealer,
+                membership_level=membership_level,
+                shop_name=shop_name,
                 first_scan_job_id=scan_job_id,
             )
             db.add(new_prospect)
@@ -282,7 +326,12 @@ def _save_prospects_sync(
                 else:
                     filtered_count -= 1
                 known_count += 1
-                existing_after = db.execute(select(Prospect).where(Prospect.ikman_ad_id == ad.id)).scalar_one_or_none()
+                existing_after = db.execute(
+                    select(Prospect).where(
+                        (Prospect.source == source_name) & (Prospect.source_id == ad_id)
+                        | (Prospect.ikman_ad_id == legacy_id)
+                    )
+                ).scalar_one_or_none()
                 if existing_after:
                     existing_after.last_seen_at = datetime.now(timezone.utc)
                     try:
@@ -293,8 +342,150 @@ def _save_prospects_sync(
     return found, new_count, known_count, filtered_count
 
 
+async def _run_lpw_scan_job(job_id: str, request: ScanRequest) -> None:
+    """Background task to run the LankaPropertyWeb scraper."""
+    client = LankaPropertyWebClient(delay=1.0)
+    start_time = asyncio.get_event_loop().time()
+    found_total = 0
+    new_total = 0
+    known_total = 0
+    filtered_total = 0
+    pages_processed = 0
+
+    scan_job_uuid: uuid.UUID | None = None
+    try:
+        scan_job_uuid = uuid.UUID(job_id)
+    except ValueError:
+        pass
+
+    lpw_cat_map = {
+        "all": ["House", "Apartment"],
+        "property": ["House", "Apartment"],
+        "houses": ["House"],
+        "house": ["House"],
+        "apartments": ["Apartment"],
+        "apartment": ["Apartment"],
+        "land": ["Land"],
+        "lands": ["Land"],
+        "commercial": ["Commercial"],
+        "commercial-property": ["Commercial"],
+    }
+
+    target_categories: list[str] = []
+    if request.categories and request.categories != ["property"]:
+        for c in request.categories:
+            cats = lpw_cat_map.get(c.lower().strip(), [c.title()])
+            for cat in cats:
+                if cat not in target_categories:
+                    target_categories.append(cat)
+    elif request.keyword and request.keyword.strip():
+        prop_cat = (request.property_category or "all").lower().strip()
+        for c in prop_cat.split(","):
+            cats = lpw_cat_map.get(c.strip(), [c.strip().title()])
+            for cat in cats:
+                if cat not in target_categories:
+                    target_categories.append(cat)
+    else:
+        target_categories = ["House", "Apartment"]
+
+    if not target_categories:
+        target_categories = ["House", "Apartment"]
+
+    # Determine listing types (sale, rent, or both)
+    listing_types = ["sale"]
+    req_cats_str = " ".join(request.categories or []).lower()
+    if "rent" in req_cats_str or "rent" in (request.property_category or "").lower():
+        listing_types = ["rent"]
+        if "sale" in req_cats_str:
+            listing_types = ["sale", "rent"]
+
+    pages_to_scan = request.pages_per_category or (10 if request.scan_all else 5)
+    total_target_pages = len(target_categories) * len(listing_types) * pages_to_scan
+
+    try:
+        for listing_type in listing_types:
+            for category in target_categories:
+                kw_label = f" for '{request.keyword}'" if request.keyword else ""
+
+                for page in range(1, pages_to_scan + 1):
+                    # Check cancellation
+                    with SessionLocal() as check_db:
+                        current_job = check_db.get(ScanJob, scan_job_uuid)
+                        if not current_job or current_job.status in ("cancelled", "failed"):
+                            return
+
+                    _update_job_status(
+                        job_id,
+                        "running",
+                        f"Scanning LPW {listing_type.title()} {category}{kw_label} (page {page}/{pages_to_scan})...",
+                        pages_scanned=pages_processed,
+                        total_pages=total_target_pages,
+                        total_found=found_total,
+                        new_count=new_total,
+                        updated_count=known_total,
+                        filtered_count=filtered_total,
+                    )
+
+                    ads, has_more = await client.fetch_listing_page(
+                        category=category,
+                        page=page,
+                        query=request.keyword,
+                        listing_type=listing_type,
+                    )
+
+                    if not ads:
+                        break
+
+                    f, n, k, fl = await asyncio.to_thread(
+                        _save_prospects_sync, ads, request, scan_job_uuid
+                    )
+                    found_total += f
+                    new_total += n
+                    known_total += k
+                    filtered_total += fl
+                    pages_processed += 1
+
+                    if not has_more:
+                        break
+
+        elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
+        summary = (
+            f"Done. Scanned {pages_processed} pages, found {found_total} listings "
+            f"({new_total} new, {known_total} updated, {filtered_total} filtered)."
+        )
+        _update_job_status(
+            job_id,
+            "completed",
+            summary,
+            pages_scanned=pages_processed,
+            total_pages=pages_processed,
+            total_found=found_total,
+            new_count=new_total,
+            updated_count=known_total,
+            filtered_count=filtered_total,
+            duration_seconds=elapsed,
+        )
+    except Exception as e:
+        logger.exception("lpw_scan_job_failed", job_id=job_id, error=str(e))
+        elapsed = round(asyncio.get_event_loop().time() - start_time, 2)
+        _update_job_status(
+            job_id,
+            "failed",
+            f"Failed: {str(e)}",
+            error=str(e),
+            pages_scanned=pages_processed,
+            duration_seconds=elapsed,
+        )
+    finally:
+        await client.close()
+
+
 async def _run_scan_job(job_id: str, request: ScanRequest) -> None:
     """Background task to run the scraper with concurrency and early exit."""
+    if getattr(request, "source", "ikman") == "lpw":
+        await _run_lpw_scan_job(job_id, request)
+        return
+
     client = IkmanClient(delay=1.0)
     start_time = asyncio.get_event_loop().time()
     found_total = 0
@@ -526,6 +717,7 @@ def start_scan(
     )
     new_job = ScanJob(
         id=uuid.UUID(job_id),
+        source=getattr(request, "source", "ikman") or "ikman",
         job_type="scan",
         status="running",
         progress=f"Starting scan{' for ' + request.keyword if request.keyword else ''}...",
@@ -648,7 +840,8 @@ def get_active_jobs(
 
 
 async def _run_phone_fetch_job(job_id: str, target_scan_job_id: uuid.UUID | None = None) -> None:
-    client = IkmanClient(delay=1.0)
+    ikman_client = IkmanClient(delay=1.0)
+    lpw_client = LankaPropertyWebClient(delay=1.0)
     start_time = asyncio.get_event_loop().time()
     
     try:
@@ -689,8 +882,28 @@ async def _run_phone_fetch_job(job_id: str, target_scan_job_id: uuid.UUID | None
                     pages_scanned=processed,
                     new_count=found_phones,
                 )
-                if prospect.ikman_slug:
-                    detail = await client.fetch_ad_detail(prospect.ikman_slug)
+                if prospect.source == "lpw" or (prospect.source_url and "lankapropertyweb" in prospect.source_url):
+                    target_url = prospect.source_url or prospect.ikman_url
+                    if target_url:
+                        detail = await lpw_client.fetch_ad_detail(target_url)
+                        if detail:
+                            if detail.phone_number:
+                                prospect.phone_number = detail.phone_number
+                                prospect.poster_name = detail.poster_name or prospect.poster_name
+                                found_phones += 1
+                            if detail.agent_type:
+                                dummy_ad = LpwAd(
+                                    id=prospect.source_id or str(prospect.id),
+                                    title=prospect.title,
+                                    url=target_url,
+                                )
+                                c_cls, c_conf, c_reas = classify_lpw_listing_heuristics(dummy_ad, detail=detail)
+                                prospect.classification = c_cls
+                                prospect.confidence = c_conf
+                                prospect.classification_reasons = c_reas
+                            db.commit()
+                elif prospect.ikman_slug:
+                    detail = await ikman_client.fetch_ad_detail(prospect.ikman_slug)
                     if detail:
                         loc_updated = _enrich_location_from_detail(db, prospect, detail)
                         if detail.contactCard and detail.contactCard.phoneNumbers:
@@ -735,7 +948,8 @@ async def _run_phone_fetch_job(job_id: str, target_scan_job_id: uuid.UUID | None
             duration_seconds=elapsed,
         )
     finally:
-        await client.close()
+        await ikman_client.close()
+        await lpw_client.close()
 
 
 @admin_router.post("/scan/phones")
@@ -906,6 +1120,7 @@ def start_scan_job_phone_fetch(
     new_phone_job_id = str(uuid.uuid4())
     new_job = ScanJob(
         id=uuid.UUID(new_phone_job_id),
+        source=parent_job.source or "ikman",
         job_type="phone_fetch",
         status="running",
         progress=f"Fetching phones for scan {str(job_id)[:8]}...",
@@ -941,6 +1156,7 @@ def export_scan_prospects_csv(
     writer = csv.writer(output)
     writer.writerow([
         "ID",
+        "Source",
         "Title",
         "Price",
         "Property Type",
@@ -952,13 +1168,14 @@ def export_scan_prospects_csv(
         "Classification",
         "Confidence",
         "Status",
-        "Ikman URL",
+        "Listing URL",
         "Discovered At",
     ])
 
     for p in prospects:
         writer.writerow([
             str(p.id),
+            p.source or "ikman",
             p.title or "",
             p.price or "",
             p.property_type or "",
@@ -970,7 +1187,7 @@ def export_scan_prospects_csv(
             p.classification or "",
             f"{p.confidence:.2f}" if p.confidence is not None else "",
             p.status or "",
-            p.ikman_url or "",
+            p.source_url or p.ikman_url or "",
             p.first_seen_at.isoformat() if p.first_seen_at else "",
         ])
 
@@ -997,31 +1214,62 @@ async def fetch_single_prospect_phone(
     prospect = db.get(Prospect, id)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect not found")
-        
-    if not prospect.ikman_slug:
-        raise HTTPException(status_code=400, detail="Prospect has no ikman slug to fetch")
-        
-    client = IkmanClient(delay=0) # Single manual fetch, no delay needed
-    try:
-        detail = await client.fetch_ad_detail(prospect.ikman_slug)
-        if detail:
-            loc_updated = _enrich_location_from_detail(db, prospect, detail)
-            if detail.contactCard and detail.contactCard.phoneNumbers:
-                prospect.poster_name = detail.contactCard.name
-                prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+
+    is_lpw = prospect.source == "lpw" or bool(prospect.source_url and "lankapropertyweb" in prospect.source_url)
+    if is_lpw:
+        target_url = prospect.source_url or prospect.ikman_url
+        if not target_url:
+            raise HTTPException(status_code=400, detail="Prospect has no URL to fetch")
+        client = LankaPropertyWebClient(delay=0)
+        try:
+            detail = await client.fetch_ad_detail(target_url)
+            if detail:
+                if detail.phone_number:
+                    prospect.phone_number = detail.phone_number
+                if detail.poster_name:
+                    prospect.poster_name = detail.poster_name
+                if detail.agent_type:
+                    dummy_ad = LpwAd(
+                        id=prospect.source_id or str(prospect.id),
+                        title=prospect.title,
+                        url=target_url,
+                    )
+                    c_cls, c_conf, c_reas = classify_lpw_listing_heuristics(dummy_ad, detail=detail)
+                    prospect.classification = c_cls
+                    prospect.confidence = c_conf
+                    prospect.classification_reasons = c_reas
                 db.commit()
                 db.refresh(prospect)
-            elif loc_updated:
-                db.commit()
-                db.refresh(prospect)
+                return prospect
             else:
-                raise HTTPException(status_code=404, detail="Phone number not found on ikman")
-        else:
-            raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
-    finally:
-        await client.close()
-        
-    return prospect
+                raise HTTPException(status_code=404, detail="Ad detail not found on LankaPropertyWeb")
+        finally:
+            await client.close()
+    else:
+        if not prospect.ikman_slug:
+            raise HTTPException(status_code=400, detail="Prospect has no ikman slug to fetch")
+            
+        client = IkmanClient(delay=0) # Single manual fetch, no delay needed
+        try:
+            detail = await client.fetch_ad_detail(prospect.ikman_slug)
+            if detail:
+                loc_updated = _enrich_location_from_detail(db, prospect, detail)
+                if detail.contactCard and detail.contactCard.phoneNumbers:
+                    prospect.poster_name = detail.contactCard.name
+                    prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+                    db.commit()
+                    db.refresh(prospect)
+                elif loc_updated:
+                    db.commit()
+                    db.refresh(prospect)
+                else:
+                    raise HTTPException(status_code=404, detail="Phone number not found on ikman")
+            else:
+                raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
+        finally:
+            await client.close()
+            
+        return prospect
 
 
 @admin_router.post("/{id}/convert-draft", response_model=ExtractedPropertyDraft)
@@ -1033,37 +1281,55 @@ async def generate_property_draft(
     prospect = db.get(Prospect, id)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect not found")
-        
-    if not prospect.ikman_slug:
-        raise HTTPException(status_code=400, detail="Prospect has no ikman slug to fetch")
-        
-    client = IkmanClient(delay=0)
-    try:
-        detail = await client.fetch_ad_detail(prospect.ikman_slug)
-        if not detail:
-            raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
-            
-        updated_contact = _enrich_location_from_detail(db, prospect, detail)
-        if detail.contactCard:
-            if detail.contactCard.name and prospect.poster_name != detail.contactCard.name:
-                prospect.poster_name = detail.contactCard.name
-                updated_contact = True
-            
-            new_phone = None
-            if detail.contactCard.phoneNumbers:
-                new_phone = str(detail.contactCard.phoneNumbers[0].get("number", ""))
-            
-            if new_phone and prospect.phone_number != new_phone:
-                prospect.phone_number = new_phone
-                updated_contact = True
-                
-        if updated_contact:
+
+    is_lpw = prospect.source == "lpw" or bool(prospect.source_url and "lankapropertyweb" in prospect.source_url)
+    if is_lpw:
+        target_url = prospect.source_url or prospect.ikman_url
+        if not target_url:
+            raise HTTPException(status_code=400, detail="Prospect has no URL to fetch")
+        client = LankaPropertyWebClient(delay=0)
+        try:
+            detail = await client.fetch_ad_detail(target_url)
+            if not detail:
+                raise HTTPException(status_code=404, detail="Ad detail not found on LankaPropertyWeb")
+            if detail.phone_number and prospect.phone_number != detail.phone_number:
+                prospect.phone_number = detail.phone_number
+            if detail.poster_name and prospect.poster_name != detail.poster_name:
+                prospect.poster_name = detail.poster_name
             db.commit()
+        finally:
+            await client.close()
+        raw_data = detail.model_dump_json(exclude_none=True)
+    else:
+        if not prospect.ikman_slug:
+            raise HTTPException(status_code=400, detail="Prospect has no ikman slug to fetch")
             
-    finally:
-        await client.close()
-    # Serialize the detail payload to JSON string
-    raw_data = detail.model_dump_json(exclude_none=True)
+        client = IkmanClient(delay=0)
+        try:
+            detail = await client.fetch_ad_detail(prospect.ikman_slug)
+            if not detail:
+                raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
+                
+            updated_contact = _enrich_location_from_detail(db, prospect, detail)
+            if detail.contactCard:
+                if detail.contactCard.name and prospect.poster_name != detail.contactCard.name:
+                    prospect.poster_name = detail.contactCard.name
+                    updated_contact = True
+                
+                new_phone = None
+                if detail.contactCard.phoneNumbers:
+                    new_phone = str(detail.contactCard.phoneNumbers[0].get("number", ""))
+                
+                if new_phone and prospect.phone_number != new_phone:
+                    prospect.phone_number = new_phone
+                    updated_contact = True
+                    
+            if updated_contact:
+                db.commit()
+                
+        finally:
+            await client.close()
+        raw_data = detail.model_dump_json(exclude_none=True)
     
     prompt = f"""
     Extract a structured real estate property listing from this raw data.
@@ -1100,9 +1366,9 @@ async def generate_property_draft(
         draft_dict["contact_phone"] = prospect.phone_number
         draft_dict["contact_type"] = "broker" if prospect.classification == "broker" else "owner"
         
-        draft_dict["source_platform"] = "ikman.lk"
-        draft_dict["source_url"] = prospect.ikman_url
-        draft_dict["source_id"] = prospect.ikman_ad_id
+        draft_dict["source_platform"] = "lankapropertyweb.com" if is_lpw else "ikman.lk"
+        draft_dict["source_url"] = prospect.source_url or prospect.ikman_url
+        draft_dict["source_id"] = prospect.source_id or prospect.ikman_ad_id
         draft_dict["prospect_id"] = prospect.id
         
         return ExtractedPropertyDraft(**draft_dict)

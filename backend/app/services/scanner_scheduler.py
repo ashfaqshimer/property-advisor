@@ -95,6 +95,7 @@ def run_property_scanner():
         job_id = uuid.uuid4()
         new_job = ScanJob(
             id=job_id,
+            source="ikman",
             job_type="scan",
             status="running",
             progress="Background scan started...",

@@ -17,10 +17,21 @@ class Prospect(Base):
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     
-    # ikman identifiers
-    ikman_ad_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    ikman_url: Mapped[str] = mapped_column(Text)
-    ikman_slug: Mapped[str] = mapped_column(String(256))
+    # Provenance / Portal source
+    source: Mapped[str] = mapped_column(
+        String(32), default="ikman", server_default="ikman", index=True
+    )
+    source_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Legacy / specific ikman identifiers (kept for backward compatibility)
+    ikman_ad_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    ikman_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ikman_slug: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+    __table_args__ = (
+        sa.UniqueConstraint("source", "source_id", name="uq_prospects_source_source_id"),
+    )
     
     # Listing data
     title: Mapped[str] = mapped_column(Text)

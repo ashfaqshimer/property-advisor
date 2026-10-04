@@ -89,6 +89,17 @@ export const DEFAULT_PRESETS: ScanPreset[] = [
     source: "ikman",
     is_default: true,
   },
+  {
+    id: "colombo-5-lpw",
+    name: "Colombo 5 Homes (LPW)",
+    keyword: "Colombo 5",
+    categories: ["houses"],
+    property_category: "houses",
+    strict_location: true,
+    scan_all: true,
+    source: "lpw",
+    is_default: true,
+  },
 ];
 
 export interface ScanLauncherDrawerProps {
@@ -496,34 +507,38 @@ export function ScanLauncherDrawer({
                 </p>
               </button>
 
-              {/* LankaPropertyWeb (Future Source Preview) */}
+              {/* LankaPropertyWeb Source Card */}
               <button
                 type="button"
-                onClick={() => {
-                  toast.info(
-                    "LankaPropertyWeb integration is scheduled for upcoming release! ikman.lk is currently active."
-                  );
-                }}
-                className="relative flex flex-col justify-between rounded-xl border border-dashed border-[#cbd8d1] dark:border-zinc-800 bg-[#fbfcfb] dark:bg-zinc-900/20 p-3.5 opacity-70 hover:opacity-100 transition cursor-pointer text-left"
+                onClick={() => setSelectedSource("lpw")}
+                className={`relative flex flex-col justify-between rounded-xl p-3.5 text-left transition cursor-pointer shadow-xs ${
+                  selectedSource === "lpw"
+                    ? "border-2 border-[#19352b] dark:border-emerald-600 bg-[#f4f6f4]/90 dark:bg-zinc-900/90"
+                    : "border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900/40 hover:border-[#19352b]/50"
+                }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-bold text-xs">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#19352b] dark:bg-emerald-600 text-white font-bold text-xs">
                       <Building2 className="h-4 w-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-[#64736b] dark:text-zinc-400 flex items-center gap-1.5">
+                      <div className="text-sm font-semibold text-[#1a2923] dark:text-zinc-100 flex items-center gap-1.5">
                         <span>LankaPropertyWeb</span>
-                        <span className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
-                          Upcoming
+                        <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-950 px-2 py-0.5 text-[10px] font-semibold text-blue-800 dark:text-blue-300">
+                          Active
                         </span>
                       </div>
                     </div>
                   </div>
-                  <Lock className="h-4 w-4 text-zinc-400" />
+                  {selectedSource === "lpw" && (
+                    <div className="h-5 w-5 rounded-full bg-[#19352b] dark:bg-emerald-600 flex items-center justify-center text-white">
+                      <Check className="h-3 w-3 stroke-[3]" />
+                    </div>
+                  )}
                 </div>
-                <p className="mt-2 text-xs text-[#718078] dark:text-zinc-500">
-                  Dedicated property portal connector coming in next release. Click to learn more.
+                <p className="mt-2 text-xs text-[#64736b] dark:text-zinc-400">
+                  Dedicated real estate portal scanning, explicit owner tags & spec extraction.
                 </p>
               </button>
             </div>

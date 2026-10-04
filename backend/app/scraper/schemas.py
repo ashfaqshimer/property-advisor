@@ -45,3 +45,29 @@ class IkmanAdDetail(IkmanAd):
             if "price" not in data and "money" in data and isinstance(data["money"], dict):
                 data["price"] = data["money"].get("amount")
         return data
+
+
+class LpwAd(BaseModel):
+    id: str
+    title: str
+    url: str
+    price: str | None = None
+    location: str | None = None
+    suburb: str | None = None
+    property_type: str = "house"  # house, apartment, land, commercial
+    listing_type: str = "sale"    # sale, rent
+    bedrooms: int | None = None
+    floor_area_sqft: float | None = None
+    has_agent_logo: bool = False
+    description_snippet: str | None = None
+
+
+class LpwAdDetail(LpwAd):
+    poster_name: str | None = None
+    phone_number: str | None = None
+    agent_type: str | None = None  # "Owner", "Agent", etc.
+    bathrooms: int | None = None
+    land_extent_perches: float | None = None
+    furnishing_status: str | None = None
+    full_description: str | None = None
+    images: list[str] = Field(default_factory=list)

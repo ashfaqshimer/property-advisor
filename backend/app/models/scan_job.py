@@ -19,6 +19,7 @@ class ScanJob(Base):
     error: Mapped[str | None] = mapped_column(Text)
     
     # Target & Scoping
+    source: Mapped[str] = mapped_column(String(32), default="ikman", server_default="ikman", index=True)
     keyword: Mapped[str | None] = mapped_column(String(128), nullable=True)
     property_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     

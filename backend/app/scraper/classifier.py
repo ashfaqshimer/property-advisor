@@ -1,4 +1,4 @@
-from app.scraper.schemas import IkmanAd
+from app.scraper.schemas import IkmanAd, LpwAd, LpwAdDetail
 
 
 def classify_listing_heuristics(ad: IkmanAd) -> tuple[str, int, list[str]]:
@@ -40,3 +40,48 @@ def classify_listing_heuristics(ad: IkmanAd) -> tuple[str, int, list[str]]:
         reasons.append("no_strong_signals")
 
     return ("owner", owner_confidence, reasons)
+
+
+def classify_lpw_listing_heuristics(
+    ad: LpwAd,
+    detail: LpwAdDetail | None = None
+) -> tuple[str, int, list[str]]:
+    """
+    Classifies a LankaPropertyWeb listing as 'broker' or 'owner'.
+    Returns: (classification, confidence, reasons)
+    """
+    reasons = []
+
+    # 1. Detail-level explicit advertiser label
+    if detail and detail.agent_type:
+        agent_type_lower = detail.agent_type.strip().lower()
+        if "owner" in agent_type_lower:
+            return ("owner", 95, ["lpw_explicit_owner_tag"])
+        if "agent" in agent_type_lower or "broker" in agent_type_lower:
+            return ("broker", 95, ["lpw_explicit_agent_tag"])
+        if "developer" in agent_type_lower or "builder" in agent_type_lower:
+            return ("broker", 90, ["lpw_developer_tag"])
+
+    # 2. Search card agency logo
+    if ad.has_agent_logo:
+        return ("broker", 85, ["lpw_agency_logo_detected"])
+
+    # 3. Content heuristics for title and snippet
+    text_corpus = f"{ad.title or ''} {ad.description_snippet or ''}".lower()
+    broker_terms = [
+        "real estate",
+        "realtors",
+        "properties (pvt)",
+        "pvt ltd",
+        "holdings",
+        "half month agent fee",
+        "agent fee applicable",
+        "professional fee",
+        "call our agent",
+    ]
+    for term in broker_terms:
+        if term in text_corpus:
+            return ("broker", 80, [f"broker_keyword:{term}"])
+
+    # 4. Default to owner with moderate confidence
+    return ("owner", 75, ["no_agency_logo", "no_broker_signals"])

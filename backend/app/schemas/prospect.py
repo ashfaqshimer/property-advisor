@@ -1,14 +1,38 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProspectBase(BaseModel):
     source: str = "ikman"
-    ikman_ad_id: str
-    ikman_url: str
-    ikman_slug: str
+    source_id: str | None = None
+    source_url: str | None = None
+    ikman_ad_id: str | None = None
+    ikman_url: str | None = None
+    ikman_slug: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_source_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            sid = data.get("source_id") or data.get("ikman_ad_id")
+            surl = data.get("source_url") or data.get("ikman_url")
+            if sid:
+                data.setdefault("source_id", sid)
+                data.setdefault("ikman_ad_id", sid)
+            if surl:
+                data.setdefault("source_url", surl)
+                data.setdefault("ikman_url", surl)
+        elif hasattr(data, "__dict__"):
+            sid = getattr(data, "source_id", None) or getattr(data, "ikman_ad_id", None)
+            surl = getattr(data, "source_url", None) or getattr(data, "ikman_url", None)
+            if sid and not getattr(data, "source_id", None):
+                setattr(data, "source_id", sid)
+            if surl and not getattr(data, "source_url", None):
+                setattr(data, "source_url", surl)
+        return data
     title: str
     price: str
     location: str
