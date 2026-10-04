@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { createAgent, getStaffUsers, StaffUser, updateAgent, getCurrentUser, AuthUser } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
@@ -9,6 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
@@ -22,9 +24,19 @@ export default function AdminUsersPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getCurrentUser().then(setCurrentUser).catch(() => {});
+    getCurrentUser()
+      .then((u) => {
+        if (!u || !["root", "admin"].includes(u.role)) {
+          router.replace("/admin");
+          return;
+        }
+        setCurrentUser(u);
+      })
+      .catch(() => {
+        router.replace("/admin");
+      });
     getStaffUsers().then(setUsers).catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load users.')).finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   function startEditing(user: StaffUser) {
     setEditingUser(user);

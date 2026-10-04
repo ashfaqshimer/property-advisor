@@ -86,7 +86,17 @@ function ScanHistoryContent() {
   const isRootOrAdmin = user?.role === "root" || user?.role === "admin";
 
   useEffect(() => {
-    getCurrentUser().then(setUser).catch(() => {});
+    getCurrentUser()
+      .then((u) => {
+        if (!u || !["root", "admin"].includes(u.role)) {
+          router.replace("/admin");
+          return;
+        }
+        setUser(u);
+      })
+      .catch(() => {
+        router.replace("/admin");
+      });
     getScanPresets()
       .then((p) => {
         if (Array.isArray(p)) setPresets(p);
@@ -97,7 +107,7 @@ function ScanHistoryContent() {
         if (cfg) setSiteConfig(cfg);
       })
       .catch(() => {});
-  }, []);
+  }, [router]);
 
   // Sync hub tab if URL param changes
   useEffect(() => {

@@ -264,9 +264,11 @@ export default function ProspectsPage() {
   };
 
   useEffect(() => {
-    // Check for active jobs on mount
-    refreshActiveJobs();
-  }, []);
+    // Check for active jobs on mount for admins
+    if (isAdminOrRoot) {
+      refreshActiveJobs();
+    }
+  }, [isAdminOrRoot]);
 
   // Polling for scan progress
   useEffect(() => {
@@ -423,76 +425,76 @@ export default function ProspectsPage() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Find Prospects</h1>
-          <p className="mt-2 text-sm text-[#64736b] dark:text-zinc-400">Scrape property listings from ikman.lk to find new leads.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isAdminOrRoot ? "Find Prospects" : "Assigned Prospects"}
+          </h1>
+          <p className="mt-2 text-sm text-[#64736b] dark:text-zinc-400">
+            {isAdminOrRoot
+              ? "Scrape property listings from ikman.lk to find new leads."
+              : "Prospects assigned to you for outreach and conversion."}
+          </p>
         </div>
-        <div className="flex flex-col items-center sm:items-end gap-1.5 w-full sm:w-auto">
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <button
-              onClick={handleStartBulkPhoneFetch}
-              disabled={activePhoneJobId !== null}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-4 py-2 text-sm font-semibold text-[#19352b] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
-            >
-              <PhoneCall className="h-4 w-4" />
-              {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
-            </button>
-            {isAdminOrRoot && (
-              <>
-                <Link
-                  href="/admin/scans"
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-3.5 py-2 text-sm font-semibold text-[#19352b] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 cursor-pointer w-full sm:w-auto"
+        {isAdminOrRoot && (
+          <div className="flex flex-col items-center sm:items-end gap-1.5 w-full sm:w-auto">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+              <button
+                onClick={handleStartBulkPhoneFetch}
+                disabled={activePhoneJobId !== null}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-4 py-2 text-sm font-semibold text-[#19352b] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
+              >
+                <PhoneCall className="h-4 w-4" />
+                {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
+              </button>
+              <Link
+                href="/admin/scans"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white dark:bg-zinc-950 border border-[#cbd8d1] dark:border-zinc-700 px-3.5 py-2 text-sm font-semibold text-[#19352b] dark:text-zinc-200 shadow-sm hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 cursor-pointer w-full sm:w-auto"
+              >
+                <Compass className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
+                <span>Scanner Hub</span>
+              </Link>
+              <button
+                onClick={() => setIsScanModalOpen(true)}
+                disabled={activeJobId !== null}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
+              >
+                <Search className="h-4 w-4" />
+                {activeJobId ? "Scan Running..." : "New Scan"}
+              </button>
+            </div>
+            {(lastScanAt || lastPhoneFetchAt) && (
+              <div className="flex items-center gap-2 text-[11px] text-[#64736b] dark:text-zinc-400 pr-1 mt-1 sm:mt-0 flex-wrap justify-center sm:justify-end">
+                <button 
+                  onClick={() => setShowExactTime(prev => !prev)}
+                  className="flex items-center gap-1.5 cursor-pointer hover:text-[#1a2923] dark:hover:text-white transition-colors underline decoration-dotted underline-offset-2 decoration-[#cbd8d1]"
                 >
-                  <Compass className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
-                  <span>Scanner Hub</span>
-                </Link>
-                <button
-                  onClick={() => setIsScanModalOpen(true)}
-                  disabled={activeJobId !== null}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default w-full sm:w-auto"
-                >
-                  <Search className="h-4 w-4" />
-                  {activeJobId ? "Scan Running..." : "New Scan"}
+                  <Clock className="h-3 w-3 opacity-70" />
+                  <span>
+                    {lastScanAt && (
+                      <span title={format(parseISO(lastScanAt), "PPP p")}>
+                        Scanned {showExactTime ? format(parseISO(lastScanAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastScanAt), { addSuffix: true })}
+                        {lastScanBy && ` by ${lastScanBy}`}
+                      </span>
+                    )}
+                    {lastScanAt && lastPhoneFetchAt && " • "}
+                    {lastPhoneFetchAt && (
+                      <span title={format(parseISO(lastPhoneFetchAt), "PPP p")}>
+                        Synced {showExactTime ? format(parseISO(lastPhoneFetchAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastPhoneFetchAt), { addSuffix: true })}
+                        {lastPhoneFetchBy && ` by ${lastPhoneFetchBy}`}
+                      </span>
+                    )}
+                  </span>
                 </button>
-              </>
+                <span>•</span>
+                <Link
+                  href="/admin/scans?type=phone_fetch"
+                  className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-0.5"
+                >
+                  <span>Sync Log →</span>
+                </Link>
+              </div>
             )}
           </div>
-          {(lastScanAt || lastPhoneFetchAt) && (
-            <div className="flex items-center gap-2 text-[11px] text-[#64736b] dark:text-zinc-400 pr-1 mt-1 sm:mt-0 flex-wrap justify-center sm:justify-end">
-              <button 
-                onClick={() => setShowExactTime(prev => !prev)}
-                className="flex items-center gap-1.5 cursor-pointer hover:text-[#1a2923] dark:hover:text-white transition-colors underline decoration-dotted underline-offset-2 decoration-[#cbd8d1]"
-              >
-                <Clock className="h-3 w-3 opacity-70" />
-                <span>
-                  {lastScanAt && (
-                    <span title={format(parseISO(lastScanAt), "PPP p")}>
-                      Scanned {showExactTime ? format(parseISO(lastScanAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastScanAt), { addSuffix: true })}
-                      {lastScanBy && ` by ${lastScanBy}`}
-                    </span>
-                  )}
-                  {lastScanAt && lastPhoneFetchAt && " • "}
-                  {lastPhoneFetchAt && (
-                    <span title={format(parseISO(lastPhoneFetchAt), "PPP p")}>
-                      Synced {showExactTime ? format(parseISO(lastPhoneFetchAt), "MMM d, h:mm a") : formatDistanceToNow(parseISO(lastPhoneFetchAt), { addSuffix: true })}
-                      {lastPhoneFetchBy && ` by ${lastPhoneFetchBy}`}
-                    </span>
-                  )}
-                </span>
-              </button>
-              {isAdminOrRoot && (
-                <>
-                  <span>•</span>
-                  <Link
-                    href="/admin/scans?type=phone_fetch"
-                    className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-0.5"
-                  >
-                    <span>Sync Log →</span>
-                  </Link>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Quick Presets Bar */}
@@ -525,7 +527,7 @@ export default function ProspectsPage() {
         </div>
       )}
       
-      {activeJobId && scanStatus && (
+      {isAdminOrRoot && activeJobId && scanStatus && (
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20 p-4">
           <div className="flex items-center gap-3">
             <RefreshCw className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
@@ -554,7 +556,7 @@ export default function ProspectsPage() {
         </div>
       )}
 
-      {activePhoneJobId && phoneJobStatus && (
+      {isAdminOrRoot && activePhoneJobId && phoneJobStatus && (
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-orange-200 dark:border-orange-900/50 bg-orange-50 dark:bg-orange-900/20 p-4">
           <div className="flex items-center gap-3">
             <RefreshCw className="h-5 w-5 animate-spin text-orange-600 dark:text-orange-400 shrink-0" />
@@ -925,7 +927,7 @@ export default function ProspectsPage() {
                         </button>
                       )}
 
-                      {prospect.status === "contacted" && ["root", "admin"].includes(user?.role ?? "") && (
+                      {prospect.status === "contacted" && (
                         <button
                           type="button"
                           onClick={() => handleGenerateDraft(prospect)}
@@ -1155,103 +1157,101 @@ export default function ProspectsPage() {
                               <Undo2 className="h-3.5 w-3.5" />
                               <span>Keep</span>
                             </button>
-                          ) : (
-                            ["root", "admin"].includes(user?.role ?? "") && !isTerminal && (
-                              <div className="flex items-center gap-1.5">
-                                {telegramAgentConfigured && (
-                                  prospect.assignment_status === "pending" ? (
+                          ) : !isTerminal ? (
+                            <div className="flex items-center gap-1.5">
+                              {isAdminOrRoot && telegramAgentConfigured && (
+                                prospect.assignment_status === "pending" ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300"
+                                    title="Dispatched to agent — awaiting response"
+                                  >
+                                    <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                    <span>Assigned</span>
+                                  </span>
+                                ) : prospect.assignment_status === "interested" ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-300"
+                                    title="Agent outcome: Interested"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Interested</span>
+                                  </span>
+                                ) : prospect.assignment_status === "not_interested" ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/30 px-2.5 py-1 text-xs font-medium text-red-800 dark:text-red-300"
+                                    title="Agent outcome: Not Interested"
+                                  >
+                                    <span>Not Interested</span>
+                                  </span>
+                                ) : prospect.assignment_status === "no_answer" ? (
+                                  <div className="flex items-center gap-1">
                                     <span
-                                      className="inline-flex items-center gap-1 rounded border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300"
-                                      title="Dispatched to agent — awaiting response"
+                                      className="inline-flex items-center gap-1 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                                      title="Agent outcome: No Answer"
                                     >
-                                      <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                                      <span>Assigned</span>
+                                      <span>No Answer</span>
                                     </span>
-                                  ) : prospect.assignment_status === "interested" ? (
-                                    <span
-                                      className="inline-flex items-center gap-1 rounded border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-300"
-                                      title="Agent outcome: Interested"
-                                    >
-                                      <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                                      <span>Interested</span>
-                                    </span>
-                                  ) : prospect.assignment_status === "not_interested" ? (
-                                    <span
-                                      className="inline-flex items-center gap-1 rounded border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/30 px-2.5 py-1 text-xs font-medium text-red-800 dark:text-red-300"
-                                      title="Agent outcome: Not Interested"
-                                    >
-                                      <span>Not Interested</span>
-                                    </span>
-                                  ) : prospect.assignment_status === "no_answer" ? (
-                                    <div className="flex items-center gap-1">
-                                      <span
-                                        className="inline-flex items-center gap-1 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300"
-                                        title="Agent outcome: No Answer"
-                                      >
-                                        <span>No Answer</span>
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSingleAssign(prospect.id)}
-                                        disabled={isAssigning}
-                                        className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
-                                        title="Re-assign to agent"
-                                      >
-                                        <Send className="h-3 w-3" />
-                                        <span>Re-assign</span>
-                                      </button>
-                                    </div>
-                                  ) : prospect.assignment_status === "callback_later" ? (
-                                    <div className="flex items-center gap-1">
-                                      <span
-                                        className="inline-flex items-center gap-1 rounded border border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300"
-                                        title="Agent outcome: Call Back Later"
-                                      >
-                                        <span>Call Later</span>
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSingleAssign(prospect.id)}
-                                        disabled={isAssigning}
-                                        className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
-                                        title="Re-assign to agent"
-                                      >
-                                        <Send className="h-3 w-3" />
-                                        <span>Re-assign</span>
-                                      </button>
-                                    </div>
-                                  ) : (
                                     <button
                                       type="button"
                                       onClick={() => handleSingleAssign(prospect.id)}
                                       disabled={isAssigning}
-                                      className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
-                                      title="Dispatch to agent via Telegram"
+                                      className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                                      title="Re-assign to agent"
                                     >
                                       <Send className="h-3 w-3" />
-                                      <span>Assign</span>
+                                      <span>Re-assign</span>
                                     </button>
-                                  )
-                                )}
-                                <button
-                                  onClick={() => handleGenerateDraft(prospect)}
-                                  disabled={draftLoading === prospect.id}
-                                  className="inline-flex items-center gap-1 rounded bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default"
-                                >
-                                  {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDiscardModalProspect(prospect)}
-                                  disabled={updatingStatusId === prospect.id}
-                                  className="inline-flex items-center gap-1 rounded border border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/20 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 disabled:opacity-50 cursor-pointer"
-                                  title="Discard prospect with a reason"
-                                >
-                                  <span>Discard...</span>
-                                </button>
-                              </div>
-                            )
-                          )}
+                                  </div>
+                                ) : prospect.assignment_status === "callback_later" ? (
+                                  <div className="flex items-center gap-1">
+                                    <span
+                                      className="inline-flex items-center gap-1 rounded border border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300"
+                                      title="Agent outcome: Call Back Later"
+                                    >
+                                      <span>Call Later</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSingleAssign(prospect.id)}
+                                      disabled={isAssigning}
+                                      className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                                      title="Re-assign to agent"
+                                    >
+                                      <Send className="h-3 w-3" />
+                                      <span>Re-assign</span>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSingleAssign(prospect.id)}
+                                    disabled={isAssigning}
+                                    className="inline-flex items-center gap-1 rounded border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                                    title="Dispatch to agent via Telegram"
+                                  >
+                                    <Send className="h-3 w-3" />
+                                    <span>Assign</span>
+                                  </button>
+                                )
+                              )}
+                              <button
+                                onClick={() => handleGenerateDraft(prospect)}
+                                disabled={draftLoading === prospect.id}
+                                className="inline-flex items-center gap-1 rounded bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default"
+                              >
+                                {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDiscardModalProspect(prospect)}
+                                disabled={updatingStatusId === prospect.id}
+                                className="inline-flex items-center gap-1 rounded border border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/20 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 disabled:opacity-50 cursor-pointer"
+                                title="Discard prospect with a reason"
+                              >
+                                <span>Discard...</span>
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -1329,23 +1329,25 @@ export default function ProspectsPage() {
       )}
 
       {/* Scan Launcher Drawer */}
-      <ScanLauncherDrawer
-        isOpen={isScanModalOpen}
-        onClose={() => {
-          setIsScanModalOpen(false);
-          setSelectedPreset(null);
-        }}
-        initialPreset={selectedPreset}
-        onPresetsChanged={setPresets}
-        onScanStarted={(jobId, info) => {
-          setActiveJobId(jobId);
-          autoFetchPhonesRef.current = !!info?.autoFetchPhones;
-          setScanStatus({
-            status: "running",
-            progress: info?.keyword ? `Starting scan for '${info.keyword}'...` : "Starting scan in background...",
-          });
-        }}
-      />
+      {isAdminOrRoot && (
+        <ScanLauncherDrawer
+          isOpen={isScanModalOpen}
+          onClose={() => {
+            setIsScanModalOpen(false);
+            setSelectedPreset(null);
+          }}
+          initialPreset={selectedPreset}
+          onPresetsChanged={setPresets}
+          onScanStarted={(jobId, info) => {
+            setActiveJobId(jobId);
+            autoFetchPhonesRef.current = !!info?.autoFetchPhones;
+            setScanStatus({
+              status: "running",
+              progress: info?.keyword ? `Starting scan for '${info.keyword}'...` : "Starting scan in background...",
+            });
+          }}
+        />
+      )}
 
       {/* Draft Modal */}
       {draftModalData && (

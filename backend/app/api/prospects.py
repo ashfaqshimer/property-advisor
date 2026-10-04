@@ -744,6 +744,9 @@ def start_bulk_phone_fetch(
     db: DbSession,
     _admin: CurrentStaffUser
 ) -> dict[str, str]:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
     job_id = str(uuid.uuid4())
     new_job = ScanJob(
         id=uuid.UUID(job_id),
@@ -1027,9 +1030,6 @@ async def generate_property_draft(
     db: DbSession,
     _admin: CurrentStaffUser
 ) -> Any:
-    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
-        raise HTTPException(status_code=403, detail="Only root and admin users can extract properties")
-
     prospect = db.get(Prospect, id)
     if not prospect:
         raise HTTPException(status_code=404, detail="Prospect not found")
@@ -1123,6 +1123,10 @@ def list_prospects(
     page_size: int = 50,
 ) -> Any:
     stmt = select(Prospect)
+
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        assigned_subq = select(FieldAssignment.prospect_id).where(FieldAssignment.prospect_id.is_not(None))
+        stmt = stmt.where(Prospect.id.in_(assigned_subq))
 
     # Terminal statuses that are hidden from the default working list.
     TERMINAL_STATUSES = ("discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke")
@@ -1258,6 +1262,9 @@ def purge_old_prospects(
     db: DbSession,
     _admin: CurrentStaffUser
 ) -> dict[str, Any]:
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
     config = db.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
     retention_days = config.prospect_retention_days if config else 30
     
@@ -1291,6 +1298,9 @@ def save_scan_preset(
     _admin: CurrentStaffUser,
 ) -> list[dict[str, Any]]:
     """Add or update a scan preset in site_configuration."""
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
     config = db.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
     if not config:
         config = SiteConfiguration(scanner_settings={"presets": list(DEFAULT_SCAN_PRESETS)})
@@ -1322,6 +1332,9 @@ def delete_scan_preset(
     _admin: CurrentStaffUser,
 ) -> list[dict[str, Any]]:
     """Delete a scan preset by ID from site_configuration."""
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
     config = db.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
     if not config:
         return [dict(p) for p in DEFAULT_SCAN_PRESETS if p.get("id") != preset_id]
@@ -1344,6 +1357,9 @@ def reset_scan_presets(
     _admin: CurrentStaffUser,
 ) -> list[dict[str, Any]]:
     """Reset scan presets to default system presets."""
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
     config = db.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
     if not config:
         config = SiteConfiguration(scanner_settings={"presets": list(DEFAULT_SCAN_PRESETS)})

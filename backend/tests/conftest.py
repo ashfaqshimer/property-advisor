@@ -124,6 +124,30 @@ def authenticated_client(seeded: Session):
 
 
 @pytest.fixture
+def agent_client(seeded: Session):
+    user = StaffUser(
+        name="Field Agent",
+        email="agent@example.com",
+        role="agent",
+        hashed_password=password_hasher.hash("agent password"),
+        is_superuser=False,
+        is_active=True,
+        is_verified=True,
+    )
+    seeded.add(user)
+    seeded.commit()
+    fastapi_app.dependency_overrides[get_db] = lambda: seeded
+    with TestClient(fastapi_app) as test_client:
+        response = test_client.post(
+            "/auth/login",
+            data={"username": "agent@example.com", "password": "agent password"},
+        )
+        assert response.status_code == 204
+        yield test_client
+    fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
 def chat_client(seeded: Session):
     """Factory: hands back a TestClient wired to a scripted stand-in for Gemini.
 

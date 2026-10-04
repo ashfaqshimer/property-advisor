@@ -8,6 +8,8 @@ import {
 	deletePropertyContact,
 	getPropertyContacts,
 	updatePropertyContact,
+	getCurrentUser,
+	type AuthUser,
 	type PropertyContact,
 } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
@@ -21,6 +23,7 @@ const typeBadge = {
 } as const;
 
 export default function AdminContactsPage() {
+	const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 	const [contacts, setContacts] = useState<PropertyContact[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showCreate, setShowCreate] = useState(false);
@@ -31,7 +34,10 @@ export default function AdminContactsPage() {
 	const [expandedId, setExpandedId] = useState<string | null>(null);
 	const formRef = useRef<HTMLDivElement>(null);
 
+	const canDelete = currentUser?.role === 'root' || currentUser?.role === 'admin';
+
 	useEffect(() => {
+		getCurrentUser().then(setCurrentUser).catch(() => {});
 		getPropertyContacts()
 			.then(setContacts)
 			.catch((err: unknown) => toast.error(err instanceof Error ? err.message : 'Could not load contacts.'))
@@ -71,6 +77,7 @@ export default function AdminContactsPage() {
 	}
 
 	async function handleDelete(id: string) {
+		if (!canDelete) return;
 		setDeletingId(id);
 		try {
 			await deletePropertyContact(id);
@@ -181,15 +188,17 @@ export default function AdminContactsPage() {
 													<Pencil className="h-3.5 w-3.5" />
 													Edit
 												</button>
-												<button
-													type='button'
-													disabled={deletingId === contact.id}
-													onClick={() => handleDelete(contact.id)}
-													className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer disabled:opacity-50'
-												>
-													{deletingId === contact.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
-													Delete
-												</button>
+												{canDelete && (
+													<button
+														type='button'
+														disabled={deletingId === contact.id}
+														onClick={() => handleDelete(contact.id)}
+														className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer disabled:opacity-50'
+													>
+														{deletingId === contact.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
+														Delete
+													</button>
+												)}
 											</div>
 										</div>
 										{expandedId === contact.id && contact.notes && (

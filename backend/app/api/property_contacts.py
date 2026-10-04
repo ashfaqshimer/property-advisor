@@ -9,6 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentStaffUser
+from app.schemas.auth import StaffRole
 from app.db.session import get_db
 from app.models.property_contact import PropertyContact, PropertyContactPhone
 from app.schemas.property_contact import (
@@ -135,6 +136,11 @@ def delete_property_contact(
     db: DbSession,
     _user: CurrentStaffUser,
 ) -> None:
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Agents are not permitted to delete contacts.",
+        )
     contact = db.get(PropertyContact, contact_id)
     if contact is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found.")

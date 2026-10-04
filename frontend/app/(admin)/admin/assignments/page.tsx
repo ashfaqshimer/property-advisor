@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { ExternalLink, RefreshCw, MessageSquare, Phone, Send } from "lucide-react";
 import {
   FieldAssignment,
   PaginatedFieldAssignments,
+  getCurrentUser,
   getFieldAssignments,
   resendFieldAssignment,
 } from "../../../../lib/api";
@@ -66,12 +68,25 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AssignmentsPage() {
+  const router = useRouter();
   const [data, setData] = useState<PaginatedFieldAssignments | null>(null);
   const [loading, setLoading] = useState(true);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((u) => {
+        if (!u || !["root", "admin"].includes(u.role)) {
+          router.replace("/admin");
+        }
+      })
+      .catch(() => {
+        router.replace("/admin");
+      });
+  }, [router]);
 
   const handleResend = async (assignmentId: string) => {
     setResendingId(assignmentId);

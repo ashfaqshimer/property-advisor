@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
@@ -29,6 +30,7 @@ import {
 import {
   ScanJob,
   Prospect,
+  getCurrentUser,
   getScanJob,
   getScanJobProspects,
   getScanExportUrl,
@@ -45,8 +47,21 @@ import { SourceBadge } from "../../../../../components/admin/SourceBadge";
 import DiscardProspectModal, { getDiscardReasonLabel, isBrokerSignalReason } from "../../../../../components/admin/DiscardProspectModal";
 
 export default function ScanDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const resolvedParams = use(params);
   const jobId = resolvedParams.id;
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((u) => {
+        if (!u || !["root", "admin"].includes(u.role)) {
+          router.replace("/admin");
+        }
+      })
+      .catch(() => {
+        router.replace("/admin");
+      });
+  }, [router]);
 
   const [job, setJob] = useState<ScanJob | null>(null);
   const [prospects, setProspects] = useState<Prospect[]>([]);
