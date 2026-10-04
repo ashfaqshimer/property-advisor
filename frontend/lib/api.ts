@@ -226,12 +226,27 @@ export interface ScanPreset {
   is_default?: boolean;
 }
 
+export type AutomatedScanner = {
+  id: string;
+  name: string;
+  source: string; // "ikman" | "lpw"
+  enabled: boolean;
+  frequency_hours: number;
+  pages_to_scan: number;
+  property_types: string[];
+  keyword?: string | null;
+  last_run_at?: string | null;
+  last_run_status?: string | null;
+  next_run_at?: string | null;
+};
+
 export type ScannerSettingsConfigField = {
   enabled: boolean;
   frequency_hours: number;
   pages_to_scan: number;
   property_types: string[];
   presets?: ScanPreset[];
+  scanners?: AutomatedScanner[];
   last_run_at?: string | null;
   last_run_status?: string | null;
   next_run_at?: string | null;
@@ -327,6 +342,18 @@ export async function resetScanPresets(): Promise<ScanPreset[]> {
     throw new ChatError("unexpected", `Failed to reset presets (${response.status}).`, response.status);
   }
   return (await response.json()) as ScanPreset[];
+}
+
+export async function triggerAutomatedScanner(scannerId: string): Promise<{ message: string }> {
+  const response = await fetch(`${baseUrl()}/admin/site-configuration/scanners/${encodeURIComponent(scannerId)}/run`, {
+    method: "POST",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to trigger scanner (${response.status}).`, response.status);
+  }
+  return (await response.json()) as { message: string };
 }
 
 

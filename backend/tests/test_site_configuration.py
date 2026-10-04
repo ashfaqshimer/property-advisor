@@ -131,3 +131,101 @@ def test_scan_presets_crud_and_defaults(authenticated_client: TestClient, seeded
     assert del_res.status_code == 200
     remaining_presets = del_res.json()
     assert not any(p["id"] == "kandy-villas" for p in remaining_presets)
+
+
+def test_automated_scanners_defaults_and_additional_lpw_scanner(authenticated_client: TestClient, seeded: Session) -> None:
+    from unittest.mock import patch
+
+    # Initialize site configuration
+    init_res = authenticated_client.put("/admin/site-configuration", json={"scanner_settings": {"enabled": False}})
+    assert init_res.status_code == 200
+
+    # 1. Fetch site configuration and verify default automated scanners
+    res = authenticated_client.get("/site-configuration")
+    assert res.status_code == 200
+    data = res.json()
+    scanners = data["scanner_settings"]["scanners"]
+    assert len(scanners) >= 2
+    sources = [s["source"] for s in scanners]
+    assert "ikman" in sources
+    assert "lpw" in sources
+
+    # 2. Add an additional scanner for LankaPropertyWeb
+    updated_scanners = list(scanners)
+    updated_scanners.append({
+        "id": "lpw-colombo-custom",
+        "name": "LPW Colombo Luxury",
+        "source": "lpw",
+        "enabled": True,
+        "frequency_hours": 12,
+        "pages_to_scan": 3,
+        "property_types": ["apartment", "house"],
+        "keyword": "Colombo 03",
+    })
+    update_res = authenticated_client.put(
+        "/admin/site-configuration",
+        json={"scanner_settings": {"scanners": updated_scanners}}
+    )
+    assert update_res.status_code == 200
+    update_data = update_res.json()
+    new_scanners = update_data["scanner_settings"]["scanners"]
+    lpw_custom = next((s for s in new_scanners if s["id"] == "lpw-colombo-custom"), None)
+    assert lpw_custom is not None
+    assert lpw_custom["source"] == "lpw"
+    assert lpw_custom["enabled"] is True
+    assert lpw_custom["next_run_at"] is not None
+
+    # 3. Trigger the scanner via the run endpoint
+    with patch("app.api.site_configuration.run_automated_scanner") as mock_run:
+        run_res = authenticated_client.post("/admin/site-configuration/scanners/lpw-colombo-custom/run")
+        assert run_res.status_code == 200
+        assert "started in background" in run_res.json()["message"]
+        assert mock_run.called
+
+
+def test_run_automated_scanner_lpw(seeded: Session, monkeypatch) -> None:
+    from unittest.mock import AsyncMock, patch
+    from app.services.scanner_scheduler import run_automated_scanner
+    from app.models.scan_job import ScanJob
+
+    monkeypatch.setattr("app.services.scanner_scheduler.SessionLocal", lambda: seeded)
+
+    # Seed an enabled LPW scanner in SiteConfiguration
+    config = seeded.query(SiteConfiguration).first()
+    if not config:
+        config = SiteConfiguration(scanner_settings={})
+        seeded.add(config)
+
+    config.scanner_settings = {
+        "scanners": [
+            {
+                "id": "test-lpw-runner",
+                "name": "Test LPW Runner",
+                "source": "lpw",
+                "enabled": True,
+                "frequency_hours": 6,
+                "pages_to_scan": 2,
+                "property_types": ["house"],
+                "keyword": "Battaramulla",
+            }
+        ]
+    }
+    seeded.commit()
+
+    with patch("app.services.scanner_scheduler._run_scan_job", new_callable=AsyncMock) as mock_run:
+        run_automated_scanner("test-lpw-runner")
+        assert mock_run.called
+        # Check ScanRequest passed to _run_scan_job
+        called_args = mock_run.call_args[0]
+        req = called_args[1]
+        assert req.source == "lpw"
+        assert req.keyword == "Battaramulla"
+        assert "House" in req.categories
+
+    # Verify ScanJob in database
+    latest_job = seeded.query(ScanJob).filter(ScanJob.source == "lpw").order_by(ScanJob.created_at.desc()).first()
+    assert latest_job is not None
+    assert latest_job.source == "lpw"
+    assert latest_job.keyword == "Battaramulla"
+    assert "Automation (Test LPW Runner)" in latest_job.created_by_name
+

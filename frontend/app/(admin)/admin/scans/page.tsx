@@ -28,6 +28,9 @@ import {
   Trash2,
   ShieldAlert,
   RotateCcw,
+  Building2,
+  Play,
+  X,
 } from "lucide-react";
 
 import {
@@ -44,6 +47,8 @@ import {
   SiteConfiguration,
   getSiteConfiguration,
   updateSiteConfiguration,
+  AutomatedScanner,
+  triggerAutomatedScanner,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
@@ -73,6 +78,15 @@ function ScanHistoryContent() {
 
   const [siteConfig, setSiteConfig] = useState<SiteConfiguration | null>(null);
   const [savingAutomation, setSavingAutomation] = useState(false);
+  const [runningScannerId, setRunningScannerId] = useState<string | null>(null);
+  const [isAddScannerModalOpen, setIsAddScannerModalOpen] = useState(false);
+  const [addScannerName, setAddScannerName] = useState("");
+  const [addScannerSource, setAddScannerSource] = useState("lpw");
+  const [addScannerFrequency, setAddScannerFrequency] = useState(24);
+  const [addScannerPages, setAddScannerPages] = useState(5);
+  const [addScannerTypes, setAddScannerTypes] = useState<string[]>(["house", "apartment"]);
+  const [addScannerKeyword, setAddScannerKeyword] = useState("");
+  const [addScannerEnabled, setAddScannerEnabled] = useState(true);
 
   // New preset form in presets tab
   const [newPresetName, setNewPresetName] = useState("");
@@ -129,12 +143,169 @@ function ScanHistoryContent() {
     router.replace(qs ? `/admin/scans?${qs}` : "/admin/scans");
   };
 
+  const configuredScanners: AutomatedScanner[] =
+    siteConfig?.scanner_settings?.scanners && siteConfig.scanner_settings.scanners.length > 0
+      ? siteConfig.scanner_settings.scanners
+      : [
+          {
+            id: "default-ikman",
+            name: "Ikman Portal Scanner",
+            source: "ikman",
+            enabled: siteConfig?.scanner_settings?.enabled ?? false,
+            frequency_hours: siteConfig?.scanner_settings?.frequency_hours ?? 24,
+            pages_to_scan: siteConfig?.scanner_settings?.pages_to_scan ?? 5,
+            property_types: siteConfig?.scanner_settings?.property_types ?? ["house", "apartment"],
+            last_run_at: siteConfig?.scanner_settings?.last_run_at,
+            last_run_status: siteConfig?.scanner_settings?.last_run_status,
+            next_run_at: siteConfig?.scanner_settings?.next_run_at,
+          },
+          {
+            id: "default-lpw",
+            name: "LankaPropertyWeb Scanner",
+            source: "lpw",
+            enabled: false,
+            frequency_hours: 24,
+            pages_to_scan: 5,
+            property_types: ["house", "apartment"],
+            keyword: null,
+            last_run_at: null,
+            last_run_status: null,
+            next_run_at: null,
+          },
+        ];
+
+  const handleToggleScanner = (scannerId: string) => {
+    if (!isRootOrAdmin || !siteConfig) return;
+    const currentList = configuredScanners;
+    const updated = currentList.map((sc) =>
+      sc.id === scannerId ? { ...sc, enabled: !sc.enabled } : sc
+    );
+    const anyEnabled = updated.some((s) => s.enabled);
+    setSiteConfig({
+      ...siteConfig,
+      scanner_settings: {
+        ...(siteConfig.scanner_settings || {
+          frequency_hours: 24,
+          pages_to_scan: 5,
+          property_types: ["house", "apartment"],
+        }),
+        enabled: anyEnabled,
+        scanners: updated,
+      },
+    });
+  };
+
+  const handleUpdateScanner = (scannerId: string, patch: Partial<AutomatedScanner>) => {
+    if (!isRootOrAdmin || !siteConfig) return;
+    const currentList = configuredScanners;
+    const updated = currentList.map((sc) =>
+      sc.id === scannerId ? { ...sc, ...patch } : sc
+    );
+    setSiteConfig({
+      ...siteConfig,
+      scanner_settings: {
+        ...(siteConfig.scanner_settings || {
+          frequency_hours: 24,
+          pages_to_scan: 5,
+          property_types: ["house", "apartment"],
+          enabled: false,
+        }),
+        scanners: updated,
+      },
+    });
+  };
+
+  const handleDeleteScanner = (scannerId: string) => {
+    if (!isRootOrAdmin || !siteConfig) return;
+    const currentList = configuredScanners;
+    const updated = currentList.filter((sc) => sc.id !== scannerId);
+    const anyEnabled = updated.some((s) => s.enabled);
+    setSiteConfig({
+      ...siteConfig,
+      scanner_settings: {
+        ...(siteConfig.scanner_settings || {
+          frequency_hours: 24,
+          pages_to_scan: 5,
+          property_types: ["house", "apartment"],
+        }),
+        enabled: anyEnabled,
+        scanners: updated,
+      },
+    });
+    toast.info("Scanner removed. Click 'Save Automation Settings' to apply.");
+  };
+
+  const handleRunScannerNow = async (scannerId: string, scannerName: string) => {
+    setRunningScannerId(scannerId);
+    try {
+      await triggerAutomatedScanner(scannerId);
+      toast.success(`Started scan for "${scannerName}" in background! Refreshing history...`);
+      fetchJobs(true);
+    } catch (err: any) {
+      toast.error(err.message || `Failed to run scanner "${scannerName}"`);
+    } finally {
+      setRunningScannerId(null);
+    }
+  };
+
+  const handleAddAdditionalScanner = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addScannerName.trim()) {
+      toast.error("Please enter a name for the scanner.");
+      return;
+    }
+    const newScanner: AutomatedScanner = {
+      id: `scanner-${Date.now()}`,
+      name: addScannerName.trim(),
+      source: addScannerSource,
+      enabled: addScannerEnabled,
+      frequency_hours: addScannerFrequency,
+      pages_to_scan: addScannerPages,
+      property_types: addScannerTypes.length > 0 ? addScannerTypes : ["house", "apartment"],
+      keyword: addScannerKeyword.trim() || null,
+      last_run_at: null,
+      last_run_status: null,
+      next_run_at: null,
+    };
+    const currentList = configuredScanners;
+    const updated = [...currentList, newScanner];
+    const anyEnabled = updated.some((s) => s.enabled);
+    setSiteConfig({
+      ...siteConfig!,
+      scanner_settings: {
+        ...(siteConfig!.scanner_settings || {
+          frequency_hours: 24,
+          pages_to_scan: 5,
+          property_types: ["house", "apartment"],
+        }),
+        enabled: anyEnabled,
+        scanners: updated,
+      },
+    });
+    setIsAddScannerModalOpen(false);
+    setAddScannerName("");
+    setAddScannerKeyword("");
+    toast.success(`Scanner "${newScanner.name}" added! Click "Save Automation Settings" to commit.`);
+  };
+
   const handleSaveAutomation = async () => {
     if (!siteConfig) return;
     setSavingAutomation(true);
     try {
+      const currentScanners = configuredScanners;
+      const anyEnabled = currentScanners.some((s) => s.enabled);
+      const settingsToSave = {
+        ...(siteConfig.scanner_settings || {
+          frequency_hours: 24,
+          pages_to_scan: 5,
+          property_types: ["house", "apartment"],
+        }),
+        enabled: anyEnabled,
+        scanners: currentScanners,
+      };
+
       const updated = await updateSiteConfiguration({
-        scanner_settings: siteConfig.scanner_settings,
+        scanner_settings: settingsToSave,
         prospect_retention_days: siteConfig.prospect_retention_days,
       });
       setSiteConfig(updated);
@@ -986,226 +1157,494 @@ function ScanHistoryContent() {
             </div>
           )}
 
+          {/* Section Header with Summary & Add Button */}
           <div className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-[#19352b] dark:text-emerald-400" />
                   <h2 className="text-lg font-bold text-[#1a2923] dark:text-zinc-100">
-                    Background Crawler Engine
+                    Automated Background Scanners & Crawlers
                   </h2>
                 </div>
                 <p className="mt-1 text-xs text-[#64736b] dark:text-zinc-400">
-                  Automate scraping jobs across active property portals on a regular interval.
+                  Configure multi-source automated crawlers for LankaPropertyWeb (LPW) and Ikman.lk with individual schedules, crawl depths, and property categories.
                 </p>
               </div>
 
-              <div className="flex items-center space-x-3">
+              {isRootOrAdmin && (
                 <button
                   type="button"
-                  role="switch"
-                  disabled={!isRootOrAdmin}
-                  aria-checked={siteConfig?.scanner_settings?.enabled ?? false}
-                  onClick={() =>
-                    setSiteConfig((s) =>
-                      s
-                        ? {
-                            ...s,
-                            scanner_settings: {
-                              ...(s.scanner_settings || {
-                                frequency_hours: 24,
-                                pages_to_scan: 5,
-                                property_types: ["house", "apartment"],
-                              }),
-                              enabled: !(s.scanner_settings?.enabled ?? false),
-                            },
-                          }
-                        : s
-                    )
-                  }
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#19352b] disabled:opacity-50 ${
-                    (siteConfig?.scanner_settings?.enabled ?? false)
-                      ? "bg-[#19352b] dark:bg-emerald-600"
-                      : "bg-gray-200 dark:bg-zinc-700"
-                  }`}
+                  onClick={() => setIsAddScannerModalOpen(true)}
+                  className="cursor-pointer shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#132820] dark:hover:bg-emerald-600 transition"
                 >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      (siteConfig?.scanner_settings?.enabled ?? false) ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Set Up Additional Scanner</span>
                 </button>
-                <span className="text-xs font-semibold text-[#1a2923] dark:text-zinc-200">
-                  {(siteConfig?.scanner_settings?.enabled ?? false) ? "Enabled" : "Disabled"}
-                </span>
-              </div>
+              )}
             </div>
 
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-2">
-                  Crawl Frequency
-                </label>
-                <select
-                  disabled={!isRootOrAdmin}
-                  value={siteConfig?.scanner_settings?.frequency_hours ?? 24}
-                  onChange={(e) =>
-                    setSiteConfig((s) =>
-                      s
-                        ? {
-                            ...s,
-                            scanner_settings: {
-                              ...(s.scanner_settings || {
-                                enabled: false,
-                                pages_to_scan: 5,
-                                property_types: ["house", "apartment"],
-                              }),
-                              frequency_hours: parseInt(e.target.value),
-                            },
-                          }
-                        : s
-                    )
-                  }
-                  className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
-                >
-                  <option value={6}>Every 6 Hours (High Frequency)</option>
-                  <option value={12}>Every 12 Hours (Twice Daily)</option>
-                  <option value={18}>Every 18 Hours</option>
-                  <option value={24}>Every 24 Hours (Daily Standard)</option>
-                </select>
-                <p className="mt-1.5 text-[11px] text-[#64736b] dark:text-zinc-400">
-                  How often the background scheduler invokes the portal crawler.
+            {/* Quick Metrics Bar */}
+            <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-lg border border-[#e5ebe7] dark:border-zinc-800 p-3 bg-[#fbfcfb] dark:bg-zinc-900/40">
+                <span className="text-[11px] font-medium text-[#718078] dark:text-zinc-400">Total Scanners</span>
+                <p className="mt-0.5 text-lg font-bold text-[#1a2923] dark:text-zinc-100">{configuredScanners.length}</p>
+              </div>
+              <div className="rounded-lg border border-[#e5ebe7] dark:border-zinc-800 p-3 bg-[#fbfcfb] dark:bg-zinc-900/40">
+                <span className="text-[11px] font-medium text-[#718078] dark:text-zinc-400">Active / Scheduled</span>
+                <p className="mt-0.5 text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                  {configuredScanners.filter((s) => s.enabled).length}
                 </p>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-2">
-                  Crawl Depth (Pages per run)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  disabled={!isRootOrAdmin}
-                  value={siteConfig?.scanner_settings?.pages_to_scan ?? 5}
-                  onChange={(e) =>
-                    setSiteConfig((s) =>
-                      s
-                        ? {
-                            ...s,
-                            scanner_settings: {
-                              ...(s.scanner_settings || {
-                                enabled: false,
-                                frequency_hours: 24,
-                                property_types: ["house", "apartment"],
-                              }),
-                              pages_to_scan: parseInt(e.target.value) || 1,
-                            },
-                          }
-                        : s
-                    )
-                  }
-                  className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
-                />
-                <p className="mt-1.5 text-[11px] text-[#64736b] dark:text-zinc-400">
-                  Number of pagination pages evaluated per run (approx ~25 listings per page).
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-[#dce4df] dark:border-zinc-800">
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">
-                Included Property Categories
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {["house", "apartment", "land", "commercial"].map((type) => {
-                  const isChecked = (
-                    siteConfig?.scanner_settings?.property_types ?? ["house", "apartment"]
-                  ).includes(type);
-                  return (
-                    <label
-                      key={type}
-                      className="flex items-center space-x-2.5 rounded-lg border border-[#e5ebe7] dark:border-zinc-800 p-2.5 bg-[#fbfcfb] dark:bg-zinc-900/40 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        disabled={!isRootOrAdmin}
-                        checked={isChecked}
-                        onChange={(e) => {
-                          const current =
-                            siteConfig?.scanner_settings?.property_types ?? ["house", "apartment"];
-                          const next = e.target.checked
-                            ? [...current, type]
-                            : current.filter((t) => t !== type);
-                          setSiteConfig((s) =>
-                            s
-                              ? {
-                                  ...s,
-                                  scanner_settings: {
-                                    ...(s.scanner_settings || {
-                                      enabled: false,
-                                      frequency_hours: 24,
-                                      pages_to_scan: 5,
-                                    }),
-                                    property_types: next,
-                                  },
-                                }
-                              : s
-                          );
-                        }}
-                        className="h-4 w-4 rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b] cursor-pointer"
-                      />
-                      <span className="text-xs font-semibold capitalize text-[#1a2923] dark:text-zinc-200">
-                        {type}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-[#f9faf9] dark:bg-zinc-900/50 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400">
-                  Scheduler Live State
-                </span>
-                {siteConfig?.scanner_settings?.enabled ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Active Schedule
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
-                    Automation Disabled
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[#64736b] dark:text-zinc-400">
-                <div>
-                  <span className="font-semibold text-[#1a2923] dark:text-zinc-200">Next Scheduled Run:</span>{" "}
-                  {siteConfig?.scanner_settings?.enabled
-                    ? siteConfig.scanner_settings.next_run_at
-                      ? new Date(siteConfig.scanner_settings.next_run_at).toLocaleString(undefined, {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })
-                      : "Scheduled on next restart"
-                    : "Not scheduled (disabled)"}
+              <div className="rounded-lg border border-[#e5ebe7] dark:border-zinc-800 p-3 bg-[#fbfcfb] dark:bg-zinc-900/40">
+                <span className="text-[11px] font-medium text-[#718078] dark:text-zinc-400">Portals Active</span>
+                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                  {Array.from(new Set(configuredScanners.map((s) => s.source))).map((src) => (
+                    <SourceBadge key={src} source={src} />
+                  ))}
                 </div>
-                {siteConfig?.scanner_settings?.last_run_at && (
-                  <div>
-                    <span className="font-semibold text-[#1a2923] dark:text-zinc-200">Last Execution:</span>{" "}
-                    {new Date(siteConfig.scanner_settings.last_run_at).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </div>
-                )}
+              </div>
+              <div className="rounded-lg border border-[#e5ebe7] dark:border-zinc-800 p-3 bg-[#fbfcfb] dark:bg-zinc-900/40">
+                <span className="text-[11px] font-medium text-[#718078] dark:text-zinc-400">Next Upcoming Crawl</span>
+                <p className="mt-0.5 text-xs font-semibold text-[#1a2923] dark:text-zinc-200 truncate">
+                  {siteConfig?.scanner_settings?.next_run_at
+                    ? new Date(siteConfig.scanner_settings.next_run_at).toLocaleString(undefined, {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })
+                    : configuredScanners.some((s) => s.enabled)
+                      ? "On next cycle"
+                      : "All disabled"}
+                </p>
               </div>
             </div>
           </div>
+
+          {/* List of Configured Scanners */}
+          <div className="space-y-4">
+            {configuredScanners.map((scanner, index) => {
+              const isDefault = scanner.id === "default-ikman" || scanner.id === "default-lpw";
+              return (
+                <div
+                  key={scanner.id || index}
+                  className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm transition hover:border-[#19352b]/40"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-[#e5ebe7] dark:border-zinc-800">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f4f6f4] dark:bg-zinc-900 text-[#19352b] dark:text-emerald-400 border border-[#e5ebe7] dark:border-zinc-800">
+                        {scanner.source === "lpw" ? (
+                          <Building2 className="h-5 w-5" />
+                        ) : (
+                          <Globe className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base font-bold text-[#1a2923] dark:text-zinc-100">
+                            {scanner.name}
+                          </h3>
+                          <SourceBadge source={scanner.source} />
+                          {scanner.keyword && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-md">
+                              <MapPin className="h-3 w-3" />
+                              <span>{scanner.keyword}</span>
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#64736b] dark:text-zinc-400 mt-0.5">
+                          ID: <code className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">{scanner.id}</code>
+                          {isDefault && <span className="ml-1.5 text-emerald-600 dark:text-emerald-400 font-medium">• Built-in portal scanner</span>}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 self-end sm:self-center">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          role="switch"
+                          disabled={!isRootOrAdmin}
+                          aria-checked={scanner.enabled}
+                          onClick={() => handleToggleScanner(scanner.id)}
+                          className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#19352b] disabled:opacity-50 ${
+                            scanner.enabled
+                              ? "bg-[#19352b] dark:bg-emerald-600"
+                              : "bg-gray-200 dark:bg-zinc-700"
+                          }`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              scanner.enabled ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                        <span className="text-xs font-semibold text-[#1a2923] dark:text-zinc-200 w-16">
+                          {scanner.enabled ? "Active" : "Disabled"}
+                        </span>
+                      </div>
+
+                      {!isDefault && isRootOrAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteScanner(scanner.id)}
+                          className="cursor-pointer p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                          title="Delete this scanner"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scanner Config Fields */}
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                        Crawl Frequency
+                      </label>
+                      <select
+                        disabled={!isRootOrAdmin}
+                        value={scanner.frequency_hours}
+                        onChange={(e) =>
+                          handleUpdateScanner(scanner.id, { frequency_hours: parseInt(e.target.value) })
+                        }
+                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
+                      >
+                        <option value={6}>Every 6 Hours</option>
+                        <option value={12}>Every 12 Hours</option>
+                        <option value={18}>Every 18 Hours</option>
+                        <option value={24}>Every 24 Hours (Daily)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                        Pages to Scan (Depth)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        disabled={!isRootOrAdmin}
+                        value={scanner.pages_to_scan}
+                        onChange={(e) =>
+                          handleUpdateScanner(scanner.id, { pages_to_scan: parseInt(e.target.value) || 1 })
+                        }
+                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                        Location Keyword (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Colombo 7 or Island-wide"
+                        disabled={!isRootOrAdmin}
+                        value={scanner.keyword || ""}
+                        onChange={(e) =>
+                          handleUpdateScanner(scanner.id, { keyword: e.target.value || null })
+                        }
+                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Categories */}
+                  <div className="mt-4 pt-3 border-t border-[#e5ebe7] dark:border-zinc-800">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-2">
+                      Property Categories
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {["house", "apartment", "land", "commercial"].map((type) => {
+                        const isChecked = (scanner.property_types || ["house", "apartment"]).includes(type);
+                        return (
+                          <label
+                            key={type}
+                            className="flex items-center space-x-2 rounded-lg border border-[#e5ebe7] dark:border-zinc-800 p-2 bg-[#fbfcfb] dark:bg-zinc-900/40 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              disabled={!isRootOrAdmin}
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const current = scanner.property_types || ["house", "apartment"];
+                                const next = e.target.checked
+                                  ? [...current, type]
+                                  : current.filter((t) => t !== type);
+                                handleUpdateScanner(scanner.id, { property_types: next });
+                              }}
+                              className="h-3.5 w-3.5 rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b] cursor-pointer"
+                            />
+                            <span className="text-xs font-semibold capitalize text-[#1a2923] dark:text-zinc-200">
+                              {type}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Live Status and Actions Bar */}
+                  <div className="mt-4 pt-3 border-t border-[#e5ebe7] dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs bg-[#f9faf9] dark:bg-zinc-900/50 p-3 rounded-lg">
+                    <div className="space-y-0.5">
+                      <div>
+                        <span className="font-semibold text-[#1a2923] dark:text-zinc-200">Next Scheduled:</span>{" "}
+                        <span className="text-[#64736b] dark:text-zinc-400">
+                          {scanner.enabled
+                            ? scanner.next_run_at
+                              ? new Date(scanner.next_run_at).toLocaleString(undefined, {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                })
+                              : "Scheduled on next interval"
+                            : "Disabled"}
+                        </span>
+                      </div>
+                      {scanner.last_run_at && (
+                        <div>
+                          <span className="font-semibold text-[#1a2923] dark:text-zinc-200">Last Execution:</span>{" "}
+                          <span className="text-[#64736b] dark:text-zinc-400">
+                            {new Date(scanner.last_run_at).toLocaleString(undefined, {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })}
+                            {scanner.last_run_status && ` (${scanner.last_run_status})`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {isRootOrAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleRunScannerNow(scanner.id, scanner.name)}
+                        disabled={runningScannerId === scanner.id}
+                        className="cursor-pointer shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#19352b]/20 dark:border-emerald-800 bg-white dark:bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-[#19352b] dark:text-emerald-300 hover:bg-[#f4f6f4] dark:hover:bg-zinc-700 transition disabled:opacity-50"
+                      >
+                        {runningScannerId === scanner.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Play className="h-3.5 w-3.5 fill-current" />
+                        )}
+                        <span>{runningScannerId === scanner.id ? "Launching..." : "Run Now"}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Modal / Dialog for Adding an Additional Scanner */}
+          {isAddScannerModalOpen && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="w-full max-w-lg rounded-2xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between border-b border-[#e5ebe7] dark:border-zinc-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-[#19352b] dark:text-emerald-400" />
+                    <h3 className="text-lg font-bold text-[#1a2923] dark:text-zinc-100">
+                      Set Up Additional Scanner
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddScannerModalOpen(false)}
+                    className="cursor-pointer rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddAdditionalScanner} className="mt-4 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                      Scanner Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. LankaPropertyWeb Colombo Luxury, Kandy Rentals..."
+                      value={addScannerName}
+                      onChange={(e) => setAddScannerName(e.target.value)}
+                      className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                      Target Portal / Source
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setAddScannerSource("lpw")}
+                        className={`cursor-pointer rounded-xl border p-3 text-left transition flex items-center justify-between ${
+                          addScannerSource === "lpw"
+                            ? "border-2 border-[#19352b] dark:border-emerald-500 bg-[#f4f6f4] dark:bg-zinc-900"
+                            : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-zinc-400"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
+                          <div>
+                            <span className="text-xs font-bold text-[#1a2923] dark:text-zinc-100 block">
+                              LankaPropertyWeb
+                            </span>
+                            <span className="text-[10px] text-[#64736b] dark:text-zinc-400">
+                              LPW portal scraper
+                            </span>
+                          </div>
+                        </div>
+                        {addScannerSource === "lpw" && (
+                          <div className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAddScannerSource("ikman")}
+                        className={`cursor-pointer rounded-xl border p-3 text-left transition flex items-center justify-between ${
+                          addScannerSource === "ikman"
+                            ? "border-2 border-[#19352b] dark:border-emerald-500 bg-[#f4f6f4] dark:bg-zinc-900"
+                            : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-zinc-400"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
+                          <div>
+                            <span className="text-xs font-bold text-[#1a2923] dark:text-zinc-100 block">
+                              ikman.lk
+                            </span>
+                            <span className="text-[10px] text-[#64736b] dark:text-zinc-400">
+                              Ikman marketplace
+                            </span>
+                          </div>
+                        </div>
+                        {addScannerSource === "ikman" && (
+                          <div className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                        Crawl Frequency
+                      </label>
+                      <select
+                        value={addScannerFrequency}
+                        onChange={(e) => setAddScannerFrequency(parseInt(e.target.value))}
+                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+                      >
+                        <option value={6}>Every 6 Hours</option>
+                        <option value={12}>Every 12 Hours</option>
+                        <option value={18}>Every 18 Hours</option>
+                        <option value={24}>Every 24 Hours</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                        Crawl Depth (Pages)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={addScannerPages}
+                        onChange={(e) => setAddScannerPages(parseInt(e.target.value) || 1)}
+                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                      Target Location / Keyword (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Colombo 7, Rajagiriya, Kandy (or leave empty for all)"
+                      value={addScannerKeyword}
+                      onChange={(e) => setAddScannerKeyword(e.target.value)}
+                      className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                      Property Categories
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {["house", "apartment", "land", "commercial"].map((type) => {
+                        const isChecked = addScannerTypes.includes(type);
+                        return (
+                          <label
+                            key={type}
+                            className="flex items-center space-x-2 rounded-lg border border-[#e5ebe7] dark:border-zinc-800 p-2 bg-[#fbfcfb] dark:bg-zinc-900/40 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                setAddScannerTypes((prev) =>
+                                  e.target.checked
+                                    ? [...prev, type]
+                                    : prev.filter((t) => t !== type)
+                                );
+                              }}
+                              className="h-3.5 w-3.5 rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b] cursor-pointer"
+                            />
+                            <span className="text-xs font-semibold capitalize text-[#1a2923] dark:text-zinc-200">
+                              {type}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={addScannerEnabled}
+                        onChange={(e) => setAddScannerEnabled(e.target.checked)}
+                        className="h-4 w-4 rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b] cursor-pointer"
+                      />
+                      <span className="text-xs font-semibold text-[#1a2923] dark:text-zinc-200">
+                        Enable immediately upon creation
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#e5ebe7] dark:border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddScannerModalOpen(false)}
+                      className="cursor-pointer rounded-lg border border-[#cbd8d1] dark:border-zinc-800 px-4 py-2 text-xs font-semibold text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="cursor-pointer rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-[#132820] dark:hover:bg-emerald-600 transition shadow-xs"
+                    >
+                      Add Scanner
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
             <h3 className="text-base font-bold text-[#1a2923] dark:text-zinc-100">

@@ -87,7 +87,72 @@ DEFAULT_SCAN_PRESETS: list[dict[str, Any]] = [
         "source": "ikman",
         "is_default": True,
     },
+    {
+        "id": "colombo-5-lpw",
+        "name": "Colombo 5 Homes (LPW)",
+        "keyword": "Colombo 5",
+        "categories": ["houses"],
+        "property_category": "houses",
+        "strict_location": True,
+        "scan_all": True,
+        "source": "lpw",
+        "is_default": True,
+    },
 ]
+
+
+class AutomatedScannerConfig(BaseModel):
+    id: str
+    name: str
+    source: str = "ikman"  # "ikman" | "lpw"
+    enabled: bool = True
+    frequency_hours: int = Field(default=24, description="Must be 6, 12, 18, or 24")
+    pages_to_scan: int = Field(default=5, ge=1, le=50)
+    property_types: list[str] = Field(default_factory=lambda: ["house", "apartment"])
+    keyword: str | None = None
+    last_run_at: datetime | None = None
+    last_run_status: str | None = None
+    next_run_at: datetime | None = None
+
+
+def get_default_automated_scanners(legacy: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    leg = legacy or {}
+    legacy_enabled = leg.get("enabled", False)
+    legacy_freq = leg.get("frequency_hours", 24)
+    legacy_pages = leg.get("pages_to_scan", 5)
+    legacy_types = leg.get("property_types", ["house", "apartment"])
+    legacy_last_run = leg.get("last_run_at")
+    legacy_last_status = leg.get("last_run_status")
+    legacy_next_run = leg.get("next_run_at")
+
+    return [
+        {
+            "id": "default-ikman",
+            "name": "Ikman Portal Scanner",
+            "source": "ikman",
+            "enabled": legacy_enabled,
+            "frequency_hours": legacy_freq,
+            "pages_to_scan": legacy_pages,
+            "property_types": legacy_types,
+            "keyword": None,
+            "last_run_at": legacy_last_run,
+            "last_run_status": legacy_last_status,
+            "next_run_at": legacy_next_run,
+        },
+        {
+            "id": "default-lpw",
+            "name": "LankaPropertyWeb Scanner",
+            "source": "lpw",
+            "enabled": False,
+            "frequency_hours": 24,
+            "pages_to_scan": 5,
+            "property_types": ["house", "apartment"],
+            "keyword": None,
+            "last_run_at": None,
+            "last_run_status": None,
+            "next_run_at": None,
+        },
+    ]
 
 
 class ScannerSettingsConfigField(BaseModel):
@@ -96,6 +161,7 @@ class ScannerSettingsConfigField(BaseModel):
     pages_to_scan: int = Field(default=5, ge=1, le=50)
     property_types: list[str] = Field(default_factory=lambda: ["house", "apartment"])
     presets: list[ScanPresetConfig] = Field(default_factory=list)
+    scanners: list[AutomatedScannerConfig] = Field(default_factory=list)
     last_run_at: datetime | None = None
     last_run_status: str | None = None
     next_run_at: datetime | None = None
