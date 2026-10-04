@@ -27,7 +27,7 @@ OUTCOME_BUTTONS = [
 # Maps assignment status → prospect status update
 PROSPECT_STATUS_MAP: dict[str, str | None] = {
     "interested": "contacted",
-    "not_interested": "ignored",
+    "not_interested": "discarded",
     "callback_later": "contacted",
     "no_answer": None,  # no change — eligible for retry
 }

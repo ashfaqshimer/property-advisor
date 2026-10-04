@@ -165,3 +165,98 @@ def test_send_system_alert():
         assert "System Alert: Gemini Quota Exceeded" in payload["text"]
         assert "ResourceExhausted: 429" in payload["text"]
         assert "[PRODUCTION]" in payload["text"]
+
+
+def test_telegram_webhook_prospect_status_sync(seeded, client):
+    from unittest.mock import patch
+    import uuid
+    from app.models.prospect import Prospect
+    from app.models.scan_job import ScanJob
+    from app.models.field_assignment import FieldAssignment
+
+    scan_job = ScanJob(
+        id=uuid.uuid4(),
+        job_type="scan",
+        status="completed",
+        new_count=1,
+        filtered_count=0,
+    )
+    seeded.add(scan_job)
+    seeded.flush()
+
+    prospect = Prospect(
+        id=uuid.uuid4(),
+        ikman_ad_id="ad-test-tg",
+        ikman_url="https://ikman.lk/en/ad/test-tg",
+        ikman_slug="test-tg",
+        title="Test Property",
+        price="Rs 25,000,000",
+        location="Colombo 03",
+        property_type="house",
+        listing_type="for_sale",
+        classification="owner",
+        confidence=85,
+        classification_reasons=["direct_owner"],
+        classification_method="heuristic",
+        status="new",
+        first_scan_job_id=scan_job.id,
+    )
+    seeded.add(prospect)
+    seeded.flush()
+
+    assignment = FieldAssignment(
+        id=uuid.uuid4(),
+        prospect_id=prospect.id,
+        status="pending",
+    )
+    seeded.add(assignment)
+    seeded.commit()
+
+    with patch("app.api.telegram.answer_callback_query"), patch("app.api.telegram.send_confirmation"), patch("app.api.telegram._get_agent_chat_id", return_value="123456"):
+        # Agent taps "not_interested"
+        resp = client.post(
+            "/telegram/webhook",
+            json={
+                "update_id": 1,
+                "callback_query": {
+                    "id": "cq-1",
+                    "from": {"id": 123456},
+                    "data": f"fa:{assignment.id}:not_interested",
+                },
+            },
+        )
+        assert resp.status_code == 200
+
+        seeded.refresh(prospect)
+        seeded.refresh(scan_job)
+        seeded.refresh(assignment)
+
+        assert assignment.status == "not_interested"
+        assert prospect.status == "discarded"
+        assert prospect.discard_reason == "not_interested"
+        assert scan_job.new_count == 0
+        assert scan_job.filtered_count == 1
+
+        # Agent taps "interested" (e.g. follow-up or re-open)
+        resp2 = client.post(
+            "/telegram/webhook",
+            json={
+                "update_id": 2,
+                "callback_query": {
+                    "id": "cq-2",
+                    "from": {"id": 123456},
+                    "data": f"fa:{assignment.id}:interested",
+                },
+            },
+        )
+        assert resp2.status_code == 200
+
+        seeded.refresh(prospect)
+        seeded.refresh(scan_job)
+        seeded.refresh(assignment)
+
+        assert assignment.status == "interested"
+        assert prospect.status == "contacted"
+        assert prospect.discard_reason is None
+        assert scan_job.new_count == 1
+        assert scan_job.filtered_count == 0

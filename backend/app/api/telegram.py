@@ -5,15 +5,17 @@ Handles:
   - message:        free-text note replies and /skip command
 """
 
+from typing import Annotated
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db.session import SessionLocal
+from app.db.session import get_db
 from app.models.field_assignment import FieldAssignment
 from app.models.prospect import Prospect
+from app.models.scan_job import ScanJob
 from app.services.telegram_dispatch import (
     PROSPECT_STATUS_MAP,
     answer_callback_query,
@@ -88,7 +90,22 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
     if prospect_new_status and assignment.prospect_id:
         prospect = db.get(Prospect, assignment.prospect_id)
         if prospect:
+            old_status = prospect.status
             prospect.status = prospect_new_status
+            if prospect_new_status == "discarded":
+                prospect.discard_reason = "not_interested"
+                if old_status != "discarded" and prospect.first_scan_job_id:
+                    scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                    if scan_job:
+                        scan_job.new_count = max(0, (scan_job.new_count or 0) - 1)
+                        scan_job.filtered_count = (scan_job.filtered_count or 0) + 1
+            elif old_status == "discarded" and prospect_new_status != "discarded":
+                prospect.discard_reason = None
+                if prospect.first_scan_job_id:
+                    scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                    if scan_job:
+                        scan_job.new_count = (scan_job.new_count or 0) + 1
+                        scan_job.filtered_count = max(0, (scan_job.filtered_count or 0) - 1)
 
     # Flag as awaiting notes (unless no_answer — notes optional but still prompted)
     assignment.awaiting_notes = True
@@ -141,6 +158,7 @@ def _handle_message(db: Session, msg: dict) -> None:
 @router.post("/webhook")
 async def telegram_webhook(
     request: Request,
+    db: Annotated[Session, Depends(get_db)],
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
 ) -> dict:
     """Receive updates from Telegram (button taps + text replies)."""
@@ -149,11 +167,10 @@ async def telegram_webhook(
     update = await request.json()
     logger.debug("telegram_webhook_received", update_id=update.get("update_id"))
 
-    with SessionLocal() as db:
-        if cq := update.get("callback_query"):
-            _handle_callback_query(db, cq)
-        elif msg := update.get("message"):
-            _handle_message(db, msg)
+    if cq := update.get("callback_query"):
+        _handle_callback_query(db, cq)
+    elif msg := update.get("message"):
+        _handle_message(db, msg)
 
     return {"ok": True}
 
