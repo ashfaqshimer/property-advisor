@@ -30,6 +30,7 @@ dev = [
     "httpx2>=2.9.1",
     "pytest>=8.3",
     "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
 ]
 
 [tool.pytest.ini_options]
@@ -37,7 +38,7 @@ testpaths = ["tests"]
 # There's no [build-system], so `app` isn't installed as a package — put backend/ on
 # sys.path the same way `uv run python -m app.db.seed` does.
 pythonpath = ["."]
-addopts = "-q"
+addopts = "-q -n 4"
 filterwarnings = [
     # The suite runs on SQLite, which has no native Decimal — SQLAlchemy warns on
     # every Numeric read. Production is Postgres, where this doesn't apply.
