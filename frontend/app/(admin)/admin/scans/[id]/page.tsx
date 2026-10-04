@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Undo2,
   Square,
+  Bot,
 } from "lucide-react";
 
 import {
@@ -41,6 +42,7 @@ import {
   stopScanJob,
 } from "../../../../../lib/api";
 import { SourceBadge } from "../../../../../components/admin/SourceBadge";
+import DiscardProspectModal, { getDiscardReasonLabel, isBrokerSignalReason } from "../../../../../components/admin/DiscardProspectModal";
 
 export default function ScanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -66,6 +68,8 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
   const [draftProspectId, setDraftProspectId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const [discardModalProspect, setDiscardModalProspect] = useState<Prospect | null>(null);
+  const [isDiscarding, setIsDiscarding] = useState(false);
 
   const fetchJobData = useCallback(async () => {
     try {
@@ -176,12 +180,20 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const handleStatusChange = async (prospectId: string, newStatus: string) => {
+  const handleStatusChange = async (prospectId: string, newStatus: string, discardReason?: string | null) => {
+    if (newStatus === "discarded" && !discardReason) {
+      const target = prospects.find((p) => p.id === prospectId);
+      if (target) {
+        setDiscardModalProspect(target);
+        return;
+      }
+    }
+
     setUpdatingStatusId(prospectId);
     try {
       const oldProspect = prospects.find((p) => p.id === prospectId);
       const oldStatus = oldProspect?.status;
-      const updated = await updateProspect(prospectId, newStatus);
+      const updated = await updateProspect(prospectId, newStatus, discardReason);
       setProspects((prev) => prev.map((p) => (p.id === prospectId ? updated : p)));
 
       if (oldStatus === "discarded" && newStatus !== "discarded") {
@@ -213,6 +225,15 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
       toast.error(err.message || "Failed to update prospect status");
     } finally {
       setUpdatingStatusId(null);
+    }
+  };
+
+  const handleConfirmDiscard = async (prospectId: string, discardReason: string) => {
+    setIsDiscarding(true);
+    try {
+      await handleStatusChange(prospectId, "discarded", discardReason);
+    } finally {
+      setIsDiscarding(false);
     }
   };
 
@@ -619,8 +640,15 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                           </span>
                           <SourceBadge source={p.source} url={p.ikman_url} />
                           {isDiscarded && (
-                            <span className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
-                              <Filter className="h-3 w-3" /> Discard: {p.discard_reason ? p.discard_reason.replace("_", " ") : "location mismatch"}
+                            <span
+                              className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${
+                                isBrokerSignalReason(p.discard_reason)
+                                  ? "bg-purple-100 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-800"
+                                  : "bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                              }`}
+                            >
+                              {isBrokerSignalReason(p.discard_reason) && <Bot className="h-3 w-3" />}
+                              {getDiscardReasonLabel(p.discard_reason)}
                             </span>
                           )}
                         </div>
@@ -649,11 +677,11 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                       >
                         <option value="new">New</option>
                         <option value="contacted">Contacted</option>
-                        <option value="unavailable">Unavailable</option>
-                        <option value="agent_no_deal">Agent – No Deal</option>
-                        <option value="agent_co_broke">Agent – Co-broke</option>
                         <option value="converted">Converted</option>
-                        <option value="discarded">Discarded</option>
+                        <option value="discarded">Discarded...</option>
+                        {!["new", "contacted", "converted", "discarded"].includes(p.status) && (
+                          <option value={p.status}>{p.status.replace(/_/g, " ")}</option>
+                        )}
                       </select>
                     </div>
 
@@ -701,24 +729,38 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                           <button
                             onClick={() => handleStatusChange(p.id, "new")}
                             disabled={updatingStatusId === p.id}
-                            className="cursor-pointer inline-flex items-center gap-1 rounded-lg bg-emerald-600 dark:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 dark:hover:bg-emerald-600 transition disabled:opacity-50"
+                            className="cursor-pointer inline-flex items-center gap-1 rounded-lg bg-emerald-600 dark:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 dark:hover:bg-emerald-600 transition disabled:opacity-50 min-h-[36px]"
                           >
                             <Undo2 className="h-3.5 w-3.5" />
                             <span>Keep</span>
                           </button>
-                        ) : !isTerminal && (
-                          <button
-                            onClick={() => handleGenerateDraft(p)}
-                            disabled={draftLoading === p.id}
-                            className="cursor-pointer inline-flex items-center gap-1 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 disabled:opacity-50"
-                          >
-                            {draftLoading === p.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-3.5 w-3.5" />
+                        ) : (
+                          <>
+                            {!isTerminal && (
+                              <button
+                                onClick={() => handleGenerateDraft(p)}
+                                disabled={draftLoading === p.id}
+                                className="cursor-pointer inline-flex items-center gap-1 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 disabled:opacity-50 min-h-[36px]"
+                              >
+                                {draftLoading === p.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Sparkles className="h-3.5 w-3.5" />
+                                )}
+                                <span>Draft</span>
+                              </button>
                             )}
-                            <span>Draft</span>
-                          </button>
+                            {!isTerminal && (
+                              <button
+                                type="button"
+                                onClick={() => setDiscardModalProspect(p)}
+                                disabled={updatingStatusId === p.id}
+                                className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/20 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 disabled:opacity-50 min-h-[36px]"
+                              >
+                                <span>Discard...</span>
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -822,24 +864,38 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                         </td>
 
                         <td className="px-4 py-4">
-                          <select
-                            value={p.status}
-                            disabled={updatingStatusId === p.id}
-                            onChange={(e) => handleStatusChange(p.id, e.target.value)}
-                            className={`cursor-pointer text-xs rounded border px-2 py-1 font-semibold outline-none focus:border-[#19352b] ${
-                              isDiscarded
-                                ? "border-amber-300 dark:border-amber-700 bg-white dark:bg-zinc-800 text-amber-800 dark:text-amber-300"
-                                : "border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-800"
-                            }`}
-                          >
-                            <option value="new">New</option>
-                            <option value="contacted">Contacted</option>
-                            <option value="unavailable">Unavailable</option>
-                            <option value="agent_no_deal">Agent – No Deal</option>
-                            <option value="agent_co_broke">Agent – Co-broke</option>
-                            <option value="converted">Converted</option>
-                            <option value="discarded">Discarded</option>
-                          </select>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={p.status}
+                              disabled={updatingStatusId === p.id}
+                              onChange={(e) => handleStatusChange(p.id, e.target.value)}
+                              className={`cursor-pointer text-xs rounded border px-2 py-1 font-semibold outline-none focus:border-[#19352b] ${
+                                isDiscarded
+                                  ? "border-amber-300 dark:border-amber-700 bg-white dark:bg-zinc-800 text-amber-800 dark:text-amber-300"
+                                  : "border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                              }`}
+                            >
+                              <option value="new">New</option>
+                              <option value="contacted">Contacted</option>
+                              <option value="converted">Converted</option>
+                              <option value="discarded">Discarded...</option>
+                              {!["new", "contacted", "converted", "discarded"].includes(p.status) && (
+                                <option value={p.status}>{p.status.replace(/_/g, " ")}</option>
+                              )}
+                            </select>
+                            {isDiscarded && (
+                              <span
+                                className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${
+                                  isBrokerSignalReason(p.discard_reason)
+                                    ? "bg-purple-100 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-800"
+                                    : "bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                                }`}
+                              >
+                                {isBrokerSignalReason(p.discard_reason) && <Bot className="h-3 w-3" />}
+                                {getDiscardReasonLabel(p.discard_reason)}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="px-5 py-4 text-right">
@@ -855,18 +911,29 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                                 <span>Keep</span>
                               </button>
                             ) : !isTerminal && (
-                              <button
-                                onClick={() => handleGenerateDraft(p)}
-                                disabled={draftLoading === p.id}
-                                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 transition disabled:opacity-50"
-                              >
-                                {draftLoading === p.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Sparkles className="h-3.5 w-3.5" />
-                                )}
-                                <span>Draft</span>
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleGenerateDraft(p)}
+                                  disabled={draftLoading === p.id}
+                                  className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-600 transition disabled:opacity-50"
+                                >
+                                  {draftLoading === p.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                  )}
+                                  <span>Draft</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDiscardModalProspect(p)}
+                                  disabled={updatingStatusId === p.id}
+                                  className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/20 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 disabled:opacity-50"
+                                  title="Discard prospect with a reason"
+                                >
+                                  <span>Discard...</span>
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -1017,6 +1084,15 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       )}
+
+      {/* Discard Reason Modal */}
+      <DiscardProspectModal
+        isOpen={!!discardModalProspect}
+        prospect={discardModalProspect}
+        onClose={() => setDiscardModalProspect(null)}
+        onConfirm={handleConfirmDiscard}
+        loading={isDiscarding}
+      />
     </div>
   );
 }

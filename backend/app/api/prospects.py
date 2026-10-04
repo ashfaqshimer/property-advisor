@@ -1098,13 +1098,7 @@ async def generate_property_draft(
         
         draft_dict["contact_name"] = prospect.poster_name
         draft_dict["contact_phone"] = prospect.phone_number
-        # agent_co_broke prospects convert with contact_type="agent" regardless of
-        # what the scanner classified them as, since we confirmed they are agents
-        # who are willing to share commission.
-        if prospect.status == "agent_co_broke":
-            draft_dict["contact_type"] = "agent"
-        else:
-            draft_dict["contact_type"] = prospect.classification
+        draft_dict["contact_type"] = "broker" if prospect.classification == "broker" else "owner"
         
         draft_dict["source_platform"] = "ikman.lk"
         draft_dict["source_url"] = prospect.ikman_url
@@ -1235,8 +1229,7 @@ def update_prospect(
         old_status = prospect.status
         prospect.status = prospect_update.status
         # Scan job counter adjustments: only "discarded" moves prospects into the
-        # filtered bucket. All other terminal statuses (unavailable, agent_no_deal,
-        # agent_co_broke, converted) are outcomes of active prospects and leave
+        # filtered bucket. Converted is an outcome of active prospects and leaves
         # the scan counters unchanged.
         if old_status == "discarded" and prospect_update.status != "discarded":
             prospect.discard_reason = None

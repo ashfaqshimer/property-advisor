@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, CheckSquare, Send, Bookmark } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, CheckSquare, Send, Bookmark, Bot } from "lucide-react";
 
 import {
   Prospect,
@@ -26,6 +26,7 @@ import {
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
+import DiscardProspectModal, { getDiscardReasonLabel, isBrokerSignalReason } from "../../../../components/admin/DiscardProspectModal";
 
 export default function ProspectsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -161,6 +162,8 @@ export default function ProspectsPage() {
   const [draftProspectId, setDraftProspectId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const [discardModalProspect, setDiscardModalProspect] = useState<Prospect | null>(null);
+  const [isDiscarding, setIsDiscarding] = useState(false);
 
   const handleGenerateDraft = async (prospect: Prospect) => {
     setDraftLoading(prospect.id);
@@ -327,12 +330,20 @@ export default function ProspectsPage() {
   }, [activePhoneJobId]);
 
 
-  const handleUpdateStatus = async (id: string, newStatus: string) => {
+  const handleUpdateStatus = async (id: string, newStatus: string, discardReason?: string | null) => {
+    if (newStatus === "discarded" && !discardReason) {
+      const target = prospects.find((p) => p.id === id);
+      if (target) {
+        setDiscardModalProspect(target);
+        return;
+      }
+    }
+
     setUpdatingStatusId(id);
     try {
       const oldProspect = prospects.find(p => p.id === id);
       const oldStatus = oldProspect?.status;
-      const updated = await updateProspect(id, newStatus);
+      const updated = await updateProspect(id, newStatus, discardReason);
       setProspects(prev => prev.map(p => p.id === id ? updated : p));
       if (oldStatus === "discarded" && newStatus !== "discarded") {
         toast.success(`Prospect restored to active! Status: ${newStatus}`);
@@ -345,6 +356,15 @@ export default function ProspectsPage() {
       toast.error("Failed to update status");
     } finally {
       setUpdatingStatusId(null);
+    }
+  };
+
+  const handleConfirmDiscard = async (prospectId: string, discardReason: string) => {
+    setIsDiscarding(true);
+    try {
+      await handleUpdateStatus(prospectId, "discarded", discardReason);
+    } finally {
+      setIsDiscarding(false);
     }
   };
 
@@ -600,9 +620,6 @@ export default function ProspectsPage() {
           <option value="">All Statuses</option>
           <option value="new">New</option>
           <option value="contacted">Contacted</option>
-          <option value="unavailable">Unavailable</option>
-          <option value="agent_no_deal">Agent – No Deal</option>
-          <option value="agent_co_broke">Agent – Co-broke</option>
           <option value="converted">Converted</option>
           <option value="discarded">Discarded</option>
         </select>
@@ -736,8 +753,15 @@ export default function ProspectsPage() {
                       </span>
                       <SourceBadge source={prospect.source} url={prospect.ikman_url} />
                       {isDiscarded && (
-                        <span className="inline-flex items-center rounded bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
-                          Discarded{prospect.discard_reason ? `: ${prospect.discard_reason.replace("_", " ")}` : ""}
+                        <span
+                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${
+                            isBrokerSignalReason(prospect.discard_reason)
+                              ? "bg-purple-100 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-800"
+                              : "bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                          }`}
+                        >
+                          {isBrokerSignalReason(prospect.discard_reason) && <Bot className="h-3 w-3" />}
+                          {getDiscardReasonLabel(prospect.discard_reason)}
                         </span>
                       )}
                     </div>
@@ -765,11 +789,11 @@ export default function ProspectsPage() {
                       >
                         <option value="new">New</option>
                         <option value="contacted">Contacted</option>
-                        <option value="unavailable">Unavailable</option>
-                        <option value="agent_no_deal">Agent – No Deal</option>
-                        <option value="agent_co_broke">Agent – Co-broke</option>
                         <option value="converted">Converted</option>
-                        <option value="discarded">Discarded</option>
+                        <option value="discarded">Discarded...</option>
+                        {!["new", "contacted", "converted", "discarded"].includes(prospect.status) && (
+                          <option value={prospect.status}>{prospect.status.replace(/_/g, " ")}</option>
+                        )}
                       </select>
                     </div>
                   </div>
@@ -872,6 +896,71 @@ export default function ProspectsPage() {
                         </button>
                       )}
                     </div>
+                  )}
+                </div>
+
+                {/* Mobile card quick action buttons */}
+                <div className="pt-2 border-t border-[#dce4df] dark:border-zinc-800 flex items-center gap-2">
+                  {isDiscarded ? (
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateStatus(prospect.id, "new")}
+                      disabled={updatingStatusId === prospect.id}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 dark:bg-emerald-700 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 cursor-pointer min-h-[42px]"
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                      <span>Keep / Restore to Active</span>
+                    </button>
+                  ) : (
+                    <>
+                      {prospect.status === "new" && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                          disabled={updatingStatusId === prospect.id}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 py-2 text-xs font-semibold text-[#19352b] dark:text-zinc-200 hover:bg-[#e0e7e3] dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer min-h-[42px]"
+                        >
+                          <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                          <span>Mark Contacted</span>
+                        </button>
+                      )}
+
+                      {prospect.status === "contacted" && ["root", "admin"].includes(user?.role ?? "") && (
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateDraft(prospect)}
+                          disabled={draftLoading === prospect.id}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 py-2 text-xs font-semibold text-white hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer min-h-[42px]"
+                        >
+                          {draftLoading === prospect.id ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Sparkles className="h-3.5 w-3.5" />
+                              <span>Convert to Listing</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {prospect.status === "converted" && (
+                        <div className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 py-2 text-xs font-bold text-emerald-800 dark:text-emerald-300 min-h-[42px]">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>Converted to Listing</span>
+                        </div>
+                      )}
+
+                      {!isTerminal && (
+                        <button
+                          type="button"
+                          onClick={() => setDiscardModalProspect(prospect)}
+                          disabled={updatingStatusId === prospect.id}
+                          className="inline-flex items-center justify-center gap-1 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/20 px-3 py-2 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 disabled:opacity-50 cursor-pointer min-h-[42px]"
+                        >
+                          <span>Discard...</span>
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -1034,15 +1123,22 @@ export default function ProspectsPage() {
                           >
                             <option value="new">New</option>
                             <option value="contacted">Contacted</option>
-                            <option value="unavailable">Unavailable</option>
-                            <option value="agent_no_deal">Agent – No Deal</option>
-                            <option value="agent_co_broke">Agent – Co-broke</option>
                             <option value="converted">Converted</option>
-                            <option value="discarded">Discarded</option>
+                            <option value="discarded">Discarded...</option>
+                            {!["new", "contacted", "converted", "discarded"].includes(prospect.status) && (
+                              <option value={prospect.status}>{prospect.status.replace(/_/g, " ")}</option>
+                            )}
                           </select>
                           {isDiscarded && (
-                            <span className="inline-flex items-center rounded bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
-                              {prospect.discard_reason ? prospect.discard_reason.replace("_", " ") : "location mismatch"}
+                            <span
+                              className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${
+                                isBrokerSignalReason(prospect.discard_reason)
+                                  ? "bg-purple-100 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-800"
+                                  : "bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                              }`}
+                            >
+                              {isBrokerSignalReason(prospect.discard_reason) && <Bot className="h-3 w-3" />}
+                              {getDiscardReasonLabel(prospect.discard_reason)}
                             </span>
                           )}
                         </div>
@@ -1143,6 +1239,15 @@ export default function ProspectsPage() {
                                   className="inline-flex items-center gap-1 rounded bg-[#19352b] dark:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-200 hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:opacity-50 cursor-pointer disabled:cursor-default"
                                 >
                                   {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDiscardModalProspect(prospect)}
+                                  disabled={updatingStatusId === prospect.id}
+                                  className="inline-flex items-center gap-1 rounded border border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/20 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 disabled:opacity-50 cursor-pointer"
+                                  title="Discard prospect with a reason"
+                                >
+                                  <span>Discard...</span>
                                 </button>
                               </div>
                             )
@@ -1340,6 +1445,15 @@ export default function ProspectsPage() {
           </div>
         </div>
       )}
+
+      {/* Discard Reason Modal */}
+      <DiscardProspectModal
+        isOpen={!!discardModalProspect}
+        prospect={discardModalProspect}
+        onClose={() => setDiscardModalProspect(null)}
+        onConfirm={handleConfirmDiscard}
+        loading={isDiscarding}
+      />
     </div>
   );
 }

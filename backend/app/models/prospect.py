@@ -46,13 +46,10 @@ class Prospect(Base):
     classification_method: Mapped[str] = mapped_column(String(16))  # heuristic, llm, hybrid
     
     # Workflow
-    # new          – just discovered, not yet contacted
-    # contacted    – outreach made, outcome pending
-    # unavailable  – property gone or owner won't work with agents
-    # agent_no_deal – confirmed broker/agent, not willing to co-broke (training signal)
-    # agent_co_broke – agent willing to share commission; convert with contact_type=agent
-    # converted    – owner converted to a full property listing
-    # discarded    – system-filtered (location mismatch, etc.)
+    # new       – just discovered, not yet contacted
+    # contacted – outreach made, outcome pending
+    # converted – converted to a full property listing
+    # discarded – rejected/ignored/closed (with discard_reason: misclassified_broker, not_interested, out_of_area, already_sold, unreachable, duplicate)
     status: Mapped[str] = mapped_column(String(32), default="new")
     
     # Timestamps

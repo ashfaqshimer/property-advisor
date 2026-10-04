@@ -1048,12 +1048,20 @@ export async function getProspects(filters?: { status?: string; property_type?: 
   return (await response.json()) as PaginatedProspects;
 }
 
-export async function updateProspect(id: string, status: string): Promise<Prospect> {
+export async function updateProspect(
+  id: string,
+  status: string,
+  discard_reason?: string | null
+): Promise<Prospect> {
+  const payload: { status: string; discard_reason?: string | null } = { status };
+  if (discard_reason !== undefined) {
+    payload.discard_reason = discard_reason;
+  }
   const response = await fetch(`${baseUrl()}/admin/prospects/${id}`, {
     method: "PATCH",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new ChatError("unexpected", `Prospect update failed (${response.status}).`, response.status);
