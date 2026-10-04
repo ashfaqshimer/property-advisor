@@ -44,10 +44,9 @@ def get_site_configuration(db: DbSession) -> SiteConfiguration:
             from app.schemas.site_configuration import DEFAULT_SCAN_PRESETS
             settings["presets"] = DEFAULT_SCAN_PRESETS
 
-        # Ensure automated scanners list is populated
-        if not settings.get("scanners"):
-            from app.schemas.site_configuration import get_default_automated_scanners
-            settings["scanners"] = get_default_automated_scanners(settings)
+        # Ensure automated scanners list is populated with all defaults
+        from app.schemas.site_configuration import ensure_default_scanners
+        settings["scanners"] = ensure_default_scanners(settings)
 
         # Sync live next_run_at for each scanner
         for sc in settings.get("scanners", []):
@@ -80,10 +79,10 @@ def get_site_configuration(db: DbSession) -> SiteConfiguration:
 
         config.scanner_settings = settings
     else:
-        from app.schemas.site_configuration import DEFAULT_SCAN_PRESETS, get_default_automated_scanners
+        from app.schemas.site_configuration import DEFAULT_SCAN_PRESETS, ensure_default_scanners
         config.scanner_settings = {
             "presets": DEFAULT_SCAN_PRESETS,
-            "scanners": get_default_automated_scanners(),
+            "scanners": ensure_default_scanners(),
         }
     return config
 
@@ -149,10 +148,18 @@ def run_scanner_now(
         raise HTTPException(status_code=404, detail="Site configuration not found.")
 
     settings = dict(config.scanner_settings or {})
-    scanners = list(settings.get("scanners") or [])
+    from app.schemas.site_configuration import ensure_default_scanners
+    scanners = ensure_default_scanners(settings)
     scanner = next((s for s in scanners if s.get("id") == scanner_id), None)
-    if not scanner and scanner_id != "default-ikman":
+    if not scanner:
         raise HTTPException(status_code=404, detail=f"Scanner '{scanner_id}' not found.")
 
-    background_tasks.add_task(run_automated_scanner, scanner_id)
-    return {"message": f"Scanner '{scanner_id}' started in background."}
+    # Persist default scanners into DB if they weren't stored yet
+    if settings.get("scanners") != scanners:
+        settings["scanners"] = scanners
+        config.scanner_settings = settings
+        flag_modified(config, "scanner_settings")
+        db.commit()
+
+    background_tasks.add_task(run_automated_scanner, scanner_id, is_manual=True)
+    return {"message": f"Scanner '{scanner.get('name', scanner_id)}' started in background."}

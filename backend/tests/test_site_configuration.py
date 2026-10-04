@@ -229,3 +229,46 @@ def test_run_automated_scanner_lpw(seeded: Session, monkeypatch) -> None:
     assert latest_job.keyword == "Battaramulla"
     assert "Automation (Test LPW Runner)" in latest_job.created_by_name
 
+
+def test_trigger_default_lpw_scanner_when_not_in_db(authenticated_client: TestClient, seeded: Session) -> None:
+    from unittest.mock import patch, AsyncMock
+    from app.services.scanner_scheduler import run_automated_scanner
+
+    # Ensure SiteConfiguration has legacy scanner_settings without a 'scanners' key
+    config = seeded.query(SiteConfiguration).first()
+    if not config:
+        config = SiteConfiguration(scanner_settings={})
+        seeded.add(config)
+    config.scanner_settings = {
+        "enabled": True,
+        "frequency_hours": 12,
+        "pages_to_scan": 5,
+        "property_types": ["house", "apartment"],
+    }
+    seeded.commit()
+
+    # Trigger default-lpw run endpoint
+    with patch("app.api.site_configuration.run_automated_scanner") as mock_run:
+        res = authenticated_client.post("/admin/site-configuration/scanners/default-lpw/run")
+        assert res.status_code == 200
+        assert "LankaPropertyWeb Scanner" in res.json()["message"]
+        mock_run.assert_called_once_with("default-lpw", is_manual=True)
+
+    # Verify that default scanners are now persisted in DB
+    seeded.refresh(config)
+    assert config.scanner_settings.get("scanners") is not None
+    lpw_in_db = next((s for s in config.scanner_settings["scanners"] if s["id"] == "default-lpw"), None)
+    assert lpw_in_db is not None
+    assert lpw_in_db["source"] == "lpw"
+
+    # Also verify that run_automated_scanner runs when is_manual=True even if enabled is False
+    with patch("app.services.scanner_scheduler.SessionLocal", lambda: seeded):
+        with patch("app.services.scanner_scheduler._run_scan_job", new_callable=AsyncMock) as mock_scan:
+            run_automated_scanner("default-lpw", is_manual=True)
+            assert mock_scan.called
+            called_args = mock_scan.call_args[0]
+            req = called_args[1]
+            assert req.source == "lpw"
+            assert "House" in req.categories
+
+

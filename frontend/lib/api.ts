@@ -351,7 +351,12 @@ export async function triggerAutomatedScanner(scannerId: string): Promise<{ mess
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new ChatError("unexpected", `Failed to trigger scanner (${response.status}).`, response.status);
+    let detail = `Failed to trigger scanner (${response.status}).`;
+    try {
+      const data = await response.json();
+      if (data?.detail) detail = data.detail;
+    } catch {}
+    throw new ChatError("unexpected", detail, response.status);
   }
   return (await response.json()) as { message: string };
 }

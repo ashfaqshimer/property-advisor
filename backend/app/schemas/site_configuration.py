@@ -155,6 +155,18 @@ def get_default_automated_scanners(legacy: dict[str, Any] | None = None) -> list
     ]
 
 
+def ensure_default_scanners(settings: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Ensures both legacy and standard default scanners exist in the scanners list."""
+    sett = settings or {}
+    existing = [dict(s) for s in (sett.get("scanners") or [])]
+    existing_ids = {s.get("id") for s in existing if s.get("id")}
+    defaults = get_default_automated_scanners(sett)
+    for def_sc in defaults:
+        if def_sc["id"] not in existing_ids:
+            existing.append(def_sc)
+    return existing
+
+
 class ScannerSettingsConfigField(BaseModel):
     enabled: bool = False
     frequency_hours: int = Field(default=24, description="Must be 6, 12, 18, or 24")

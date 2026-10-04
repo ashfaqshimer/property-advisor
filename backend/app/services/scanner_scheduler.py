@@ -176,9 +176,9 @@ def sync_all_scanner_schedules(scanner_settings: dict) -> dict:
     settings["next_run_at"] = earliest_next_run.isoformat() if earliest_next_run else None
     return settings
 
-def run_automated_scanner(scanner_id: str):
+def run_automated_scanner(scanner_id: str, is_manual: bool = False):
     """Executes a specific automated scanner instance in background."""
-    logger.info("automated_scanner.run_started", scanner_id=scanner_id)
+    logger.info("automated_scanner.run_started", scanner_id=scanner_id, is_manual=is_manual)
     with SessionLocal() as session:
         result = session.execute(select(SiteConfiguration).limit(1))
         config = result.scalar_one_or_none()
@@ -188,7 +188,8 @@ def run_automated_scanner(scanner_id: str):
             return
 
         settings = dict(config.scanner_settings or {})
-        scanners = list(settings.get("scanners") or [])
+        from app.schemas.site_configuration import ensure_default_scanners
+        scanners = ensure_default_scanners(settings)
         scanner = next((s for s in scanners if s.get("id") == scanner_id), None)
 
         if not scanner:
@@ -207,7 +208,7 @@ def run_automated_scanner(scanner_id: str):
                 logger.warning("automated_scanner.not_found", scanner_id=scanner_id)
                 return
 
-        if not scanner.get("enabled"):
+        if not is_manual and not scanner.get("enabled"):
             logger.info("automated_scanner.disabled_in_db", scanner_id=scanner_id)
             return
 
@@ -298,10 +299,14 @@ def run_automated_scanner(scanner_id: str):
             else:
                 updated_scanners.append(s)
 
-        if not updated_scanners and scanner_id == "default-ikman":
-            updated_scanners = [dict(scanner)]
-            updated_scanners[0]["last_run_at"] = now_iso
-            updated_scanners[0]["last_run_status"] = status_text
+        scanner_found_in_list = any(s.get("id") == scanner_id for s in updated_scanners)
+        if not scanner_found_in_list:
+            s_copy = dict(scanner)
+            s_copy["last_run_at"] = now_iso
+            s_copy["last_run_status"] = status_text
+            if next_time_iso:
+                s_copy["next_run_at"] = next_time_iso
+            updated_scanners.append(s_copy)
 
         settings["scanners"] = updated_scanners
         settings["last_run_at"] = now_iso
@@ -411,34 +416,19 @@ def init_scheduler():
 
     if config and config.scanner_settings:
         settings = dict(config.scanner_settings)
-        scanners = settings.get("scanners") or []
-        if scanners:
-            synced_settings = sync_all_scanner_schedules(settings)
-            try:
-                with SessionLocal() as session:
-                    cfg = session.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
-                    if cfg:
-                        cfg.scanner_settings = synced_settings
-                        flag_modified(cfg, "scanner_settings")
-                        session.commit()
-            except Exception as e:
-                logger.warning("init_scheduler.save_next_run_failed", error=str(e))
-        elif settings.get("enabled"):
-            freq = settings.get("frequency_hours", 24)
-            last_run = settings.get("last_run_at")
-            next_run = schedule_property_scanner(freq, last_run)
-            if next_run:
-                try:
-                    with SessionLocal() as session:
-                        cfg = session.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
-                        if cfg:
-                            s = dict(cfg.scanner_settings or {})
-                            s["next_run_at"] = next_run.isoformat()
-                            cfg.scanner_settings = s
-                            flag_modified(cfg, "scanner_settings")
-                            session.commit()
-                except Exception as e:
-                    logger.warning("init_scheduler.save_next_run_failed", error=str(e))
+        from app.schemas.site_configuration import ensure_default_scanners
+        scanners = ensure_default_scanners(settings)
+        settings["scanners"] = scanners
+        synced_settings = sync_all_scanner_schedules(settings)
+        try:
+            with SessionLocal() as session:
+                cfg = session.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
+                if cfg:
+                    cfg.scanner_settings = synced_settings
+                    flag_modified(cfg, "scanner_settings")
+                    session.commit()
+        except Exception as e:
+            logger.warning("init_scheduler.save_next_run_failed", error=str(e))
 
     if not scheduler.running:
         scheduler.start()
