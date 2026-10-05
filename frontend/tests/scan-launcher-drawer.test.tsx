@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { ScanLauncherDrawer, DEFAULT_PRESETS } from "@/components/admin/ScanLauncherDrawer";
+import { ScanLauncherDrawer } from "@/components/admin/ScanLauncherDrawer";
 import * as api from "@/lib/api";
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -9,12 +9,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return {
     ...actual,
     startProspectScan: vi.fn(),
-    getScanPresets: vi.fn().mockResolvedValue([]),
-    saveScanPreset: vi.fn(),
-    deleteScanPreset: vi.fn(),
   };
 });
-
 
 describe("ScanLauncherDrawer", () => {
   beforeEach(() => {
@@ -120,24 +116,6 @@ describe("ScanLauncherDrawer", () => {
     });
   });
 
-  it("applies a saved scan preset when clicked", () => {
-    render(
-      <ScanLauncherDrawer
-        isOpen={true}
-        onClose={vi.fn()}
-        onScanStarted={vi.fn()}
-      />
-    );
-
-    const presetBtn = screen.getByRole("button", { name: "Rajagiriya Lands" });
-    fireEvent.click(presetBtn);
-
-    const input = screen.getByPlaceholderText(/e\.g\. Rajagiriya/i) as HTMLInputElement;
-    expect(input.value).toBe("Rajagiriya");
-
-    expect(screen.getByText(/Selected: lands/i)).toBeInTheDocument();
-  });
-
   it("calls onClose when cancel or close button is clicked", () => {
     const handleClose = vi.fn();
 
@@ -160,53 +138,54 @@ describe("ScanLauncherDrawer", () => {
     expect(handleClose).toHaveBeenCalledTimes(2);
   });
 
-  it("saves a new preset using saveScanPreset", async () => {
-    const handlePresetsChanged = vi.fn();
-    vi.mocked(api.saveScanPreset).mockResolvedValueOnce([
-      ...DEFAULT_PRESETS,
-      {
-        id: "preset-custom-1",
-        name: "Dehiwala Beachfront",
-        keyword: "Dehiwala",
-        property_category: "apartments",
-        strict_location: true,
-        scan_all: true,
-        source: "ikman",
-        is_default: false,
-      },
-    ]);
-
+  it("populates form from initialPreset prop when provided", () => {
     render(
       <ScanLauncherDrawer
         isOpen={true}
         onClose={vi.fn()}
         onScanStarted={vi.fn()}
-        onPresetsChanged={handlePresetsChanged}
+        initialPreset={{
+          keyword: "Battaramulla",
+          property_category: "houses",
+          source: "lpw",
+        }}
       />
     );
 
-    const dehiwalaPill = screen.getByRole("button", { name: "Dehiwala" });
-    fireEvent.click(dehiwalaPill);
+    const input = screen.getByPlaceholderText(/e\.g\. Rajagiriya/i) as HTMLInputElement;
+    expect(input.value).toBe("Battaramulla");
+    expect(screen.getByText(/Selected: houses/i)).toBeInTheDocument();
+  });
 
-    const saveCurrentBtn = screen.getByRole("button", { name: /save current/i });
-    fireEvent.click(saveCurrentBtn);
+  it("switches target source when clicking source toggle button", async () => {
+    const handleScanStarted = vi.fn();
+    vi.mocked(api.startProspectScan).mockResolvedValueOnce({ job_id: "test-job-456" });
 
-    const nameInput = screen.getByPlaceholderText(/preset name/i);
-    fireEvent.change(nameInput, { target: { value: "Dehiwala Beachfront" } });
+    render(
+      <ScanLauncherDrawer
+        isOpen={true}
+        onClose={vi.fn()}
+        onScanStarted={handleScanStarted}
+      />
+    );
 
-    const saveBtn = screen.getByRole("button", { name: "Save" });
-    fireEvent.click(saveBtn);
+    const lpwBtn = screen.getByText("LankaPropertyWeb").closest("button");
+    expect(lpwBtn).not.toBeNull();
+    fireEvent.click(lpwBtn!);
+
+    const pill = screen.getByRole("button", { name: "Dehiwala" });
+    fireEvent.click(pill);
+
+    const submitBtn = screen.getByRole("button", { name: /launch scan/i });
+    fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(api.saveScanPreset).toHaveBeenCalledWith(
+      expect(api.startProspectScan).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: "Dehiwala Beachfront",
+          source: "lpw",
           keyword: "Dehiwala",
-          source: "ikman",
         })
       );
-      expect(handlePresetsChanged).toHaveBeenCalled();
     });
   });
 });
-

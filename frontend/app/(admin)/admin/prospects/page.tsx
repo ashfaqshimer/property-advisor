@@ -20,8 +20,6 @@ import {
   AuthUser,
   createPropertyContact,
   getCurrentUser,
-  getScanPresets,
-  ScanPreset,
   createFieldAssignments,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
@@ -39,17 +37,7 @@ export default function ProspectsPage() {
   const [propertyType, setPropertyType] = useState<string>("all");
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [selectedPreset, setSelectedPreset] = useState<ScanPreset | null>(null);
-  const [presets, setPresets] = useState<ScanPreset[]>([]);
   const autoFetchPhonesRef = useRef(false);
-
-  useEffect(() => {
-    getScanPresets()
-      .then((p) => {
-        if (Array.isArray(p)) setPresets(p);
-      })
-      .catch(() => {});
-  }, []);
 
 
   // Search
@@ -497,35 +485,7 @@ export default function ProspectsPage() {
         )}
       </div>
 
-      {/* Quick Presets Bar */}
-      {isAdminOrRoot && (
-        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 pt-1 text-xs [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
-          <span className="font-bold text-[#718078] dark:text-zinc-400 text-[11px] uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
-            <Bookmark className="h-3 w-3 text-[#19352b] dark:text-emerald-400" /> Presets:
-          </span>
-          {presets.map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => {
-                setSelectedPreset(preset);
-                setIsScanModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1 text-xs font-medium text-[#1a2923] dark:text-zinc-200 hover:border-[#19352b] hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition cursor-pointer"
-            >
-              <span>{preset.name}</span>
-            </button>
-          ))}
-          <button
-            onClick={() => {
-              setSelectedPreset(null);
-              setIsScanModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#cbd8d1] dark:border-zinc-700 bg-transparent px-2.5 py-1 text-xs font-medium text-[#64736b] dark:text-zinc-400 hover:border-[#19352b] hover:text-[#19352b] dark:hover:text-zinc-200 transition cursor-pointer"
-          >
-            <span>+ Custom Scan</span>
-          </button>
-        </div>
-      )}
+
       
       {isAdminOrRoot && activeJobId && scanStatus && (
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20 p-4">
@@ -1332,12 +1292,7 @@ export default function ProspectsPage() {
       {isAdminOrRoot && (
         <ScanLauncherDrawer
           isOpen={isScanModalOpen}
-          onClose={() => {
-            setIsScanModalOpen(false);
-            setSelectedPreset(null);
-          }}
-          initialPreset={selectedPreset}
-          onPresetsChanged={setPresets}
+          onClose={() => setIsScanModalOpen(false)}
           onScanStarted={(jobId, info) => {
             setActiveJobId(jobId);
             autoFetchPhonesRef.current = !!info?.autoFetchPhones;

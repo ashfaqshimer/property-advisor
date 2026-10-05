@@ -31,6 +31,10 @@ import {
   Building2,
   Play,
   X,
+  ChevronDown,
+  ChevronUp,
+  SlidersHorizontal,
+  Check,
 } from "lucide-react";
 
 import {
@@ -39,11 +43,6 @@ import {
   stopScanJob,
   AuthUser,
   getCurrentUser,
-  getScanPresets,
-  saveScanPreset,
-  deleteScanPreset,
-  resetScanPresets,
-  ScanPreset,
   SiteConfiguration,
   getSiteConfiguration,
   updateSiteConfiguration,
@@ -53,13 +52,412 @@ import {
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
 
+interface AutomatedScannerCardProps {
+  scanner: AutomatedScanner;
+  isRootOrAdmin: boolean;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  isToggling: boolean;
+  onToggle: () => void;
+  isRunning: boolean;
+  onRunNow: () => void;
+  isSaving: boolean;
+  onSave: (patch: Partial<AutomatedScanner>) => void;
+  onDelete: () => void;
+}
+
+function AutomatedScannerCard({
+  scanner,
+  isRootOrAdmin,
+  isExpanded,
+  onToggleExpand,
+  isToggling,
+  onToggle,
+  isRunning,
+  onRunNow,
+  isSaving,
+  onSave,
+  onDelete,
+}: AutomatedScannerCardProps) {
+  const isDefault = scanner.id === "default-ikman" || scanner.id === "default-lpw";
+
+  // Local draft state for editing
+  const [frequency, setFrequency] = useState(scanner.frequency_hours);
+  const [pages, setPages] = useState(scanner.pages_to_scan);
+  const [keyword, setKeyword] = useState(scanner.keyword || "");
+  const [propertyTypes, setPropertyTypes] = useState<string[]>(
+    scanner.property_types || ["house", "apartment"]
+  );
+
+  useEffect(() => {
+    setFrequency(scanner.frequency_hours);
+    setPages(scanner.pages_to_scan);
+    setKeyword(scanner.keyword || "");
+    setPropertyTypes(scanner.property_types || ["house", "apartment"]);
+  }, [scanner]);
+
+  const handleSaveForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      frequency_hours: frequency,
+      pages_to_scan: pages,
+      keyword: keyword.trim() || null,
+      property_types: propertyTypes.length > 0 ? propertyTypes : ["house", "apartment"],
+    });
+  };
+
+  const handleCancelForm = () => {
+    setFrequency(scanner.frequency_hours);
+    setPages(scanner.pages_to_scan);
+    setKeyword(scanner.keyword || "");
+    setPropertyTypes(scanner.property_types || ["house", "apartment"]);
+    onToggleExpand();
+  };
+
+  const renderLastRunStatus = () => {
+    if (!scanner.last_run_at) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+          <Clock className="h-3 w-3" /> Never executed
+        </span>
+      );
+    }
+
+    const runDate = parseISO(scanner.last_run_at);
+    const timeAgo = formatDistanceToNow(runDate, { addSuffix: true });
+    const isFailed = scanner.last_run_status === "failed";
+    const isRunningState = scanner.last_run_status === "running";
+
+    if (isRunningState) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 animate-pulse">
+          <Loader2 className="h-3 w-3 animate-spin" /> In Progress
+        </span>
+      );
+    }
+
+    if (isFailed) {
+      return (
+        <span
+          className="inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-950/60 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900"
+          title={scanner.last_run_status || "Failed"}
+        >
+          <AlertCircle className="h-3 w-3" /> Failed {timeAgo}
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+        <CheckCircle2 className="h-3 w-3" /> Completed {timeAgo}
+      </span>
+    );
+  };
+
+  return (
+    <div
+      className={`rounded-xl border transition shadow-2xs ${
+        scanner.enabled
+          ? "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:border-[#19352b]/50"
+          : "border-[#e5ebe7] dark:border-zinc-800 bg-[#fafbfa] dark:bg-zinc-900/40 opacity-85"
+      }`}
+    >
+      {/* Top Main Row */}
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3">
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                scanner.enabled
+                  ? "bg-[#eef3f0] dark:bg-emerald-950/60 text-[#19352b] dark:text-emerald-400 border-[#cbd8d1] dark:border-emerald-900/60"
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700"
+              }`}
+            >
+              {scanner.source === "lpw" ? (
+                <Building2 className="h-5 w-5" />
+              ) : (
+                <Globe className="h-5 w-5" />
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-bold text-[#1a2923] dark:text-zinc-100">
+                  {scanner.name}
+                </h3>
+                <SourceBadge source={scanner.source} />
+                {scanner.keyword ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-[#19352b] dark:text-emerald-400 px-2 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700">
+                    <MapPin className="h-3 w-3" />
+                    <span>{scanner.keyword}</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded">
+                    Island-wide
+                  </span>
+                )}
+                {isDefault && (
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium hidden md:inline">
+                    • Built-in
+                  </span>
+                )}
+              </div>
+
+              {/* Cadence & Depth Pills */}
+              <div className="flex items-center gap-2 flex-wrap text-xs text-[#64736b] dark:text-zinc-400 mt-1">
+                <span className="font-medium text-[#1a2923] dark:text-zinc-300">
+                  Every {scanner.frequency_hours}h
+                </span>
+                <span>•</span>
+                <span>{scanner.pages_to_scan} pages (~{scanner.pages_to_scan * 25} listings)</span>
+                <span>•</span>
+                <span className="capitalize">
+                  {(scanner.property_types || ["house", "apartment"]).join(", ")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Toggle Switch */}
+          <div className="flex items-center gap-3 self-end sm:self-center">
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                role="switch"
+                disabled={!isRootOrAdmin || isToggling}
+                aria-checked={scanner.enabled}
+                onClick={onToggle}
+                className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#19352b] disabled:opacity-50 ${
+                  scanner.enabled
+                    ? "bg-[#19352b] dark:bg-emerald-600"
+                    : "bg-gray-300 dark:bg-zinc-700"
+                }`}
+                aria-label={`Toggle ${scanner.name}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    scanner.enabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+              <span className="text-xs font-semibold text-[#1a2923] dark:text-zinc-200 w-14">
+                {isToggling ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
+                ) : scanner.enabled ? (
+                  <span className="text-emerald-700 dark:text-emerald-400">Active</span>
+                ) : (
+                  <span className="text-zinc-500 dark:text-zinc-400">Paused</span>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Execution Bar & Action Buttons */}
+        <div className="mt-3.5 pt-3 border-t border-[#e5ebe7] dark:border-zinc-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[#718078] dark:text-zinc-400 text-[11px] font-medium">Last Run:</span>
+              {renderLastRunStatus()}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-[#718078] dark:text-zinc-400 text-[11px] font-medium">Next:</span>
+              <span className="font-medium text-[#1a2923] dark:text-zinc-300 text-[11px]">
+                {scanner.enabled
+                  ? scanner.next_run_at
+                    ? new Date(scanner.next_run_at).toLocaleString(undefined, {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })
+                    : "On next scheduled cycle"
+                  : "Paused"}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {isRootOrAdmin && (
+              <button
+                type="button"
+                onClick={onRunNow}
+                disabled={isRunning}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-[#19352b]/20 dark:border-emerald-800 bg-[#eef3f0]/60 dark:bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-[#19352b] dark:text-emerald-300 hover:bg-[#19352b] hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white transition disabled:opacity-50"
+              >
+                {isRunning ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Play className="h-3 w-3 fill-current" />
+                )}
+                <span>{isRunning ? "Running..." : "Run Now"}</span>
+              </button>
+            )}
+
+            {isRootOrAdmin && (
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                className={`cursor-pointer inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                  isExpanded
+                    ? "border-[#19352b] bg-[#19352b] text-white dark:border-emerald-600 dark:bg-emerald-600"
+                    : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#1a2923] dark:text-zinc-300 hover:bg-[#f4f6f4]"
+                }`}
+              >
+                <SlidersHorizontal className="h-3 w-3" />
+                <span>{isExpanded ? "Close Config" : "Configure"}</span>
+                {isExpanded ? <ChevronUp className="h-3 w-3 ml-0.5" /> : <ChevronDown className="h-3 w-3 ml-0.5" />}
+              </button>
+            )}
+
+            {!isDefault && isRootOrAdmin && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="cursor-pointer p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                title="Delete this scanner"
+                aria-label="Delete this scanner"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Inline Configuration Drawer */}
+      {isExpanded && (
+        <form
+          onSubmit={handleSaveForm}
+          className="border-t border-[#e5ebe7] dark:border-zinc-800 bg-[#f9faf9] dark:bg-zinc-900/60 p-4 sm:p-5 rounded-b-xl space-y-4 animate-in slide-in-from-top-2 duration-150"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                Crawl Frequency
+              </label>
+              <select
+                disabled={!isRootOrAdmin || isSaving}
+                value={frequency}
+                onChange={(e) => setFrequency(parseInt(e.target.value))}
+                className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+              >
+                <option value={6}>Every 6 Hours</option>
+                <option value={12}>Every 12 Hours</option>
+                <option value={18}>Every 18 Hours</option>
+                <option value={24}>Every 24 Hours (Daily)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                Pages to Scan (Depth)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                disabled={!isRootOrAdmin || isSaving}
+                value={pages}
+                onChange={(e) => setPages(parseInt(e.target.value) || 1)}
+                className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+              />
+              <span className="text-[10px] text-[#718078] dark:text-zinc-400">
+                25 listings/page = ~{pages * 25} ads
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
+                Location Keyword (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Colombo 7 (or empty for island-wide)"
+                disabled={!isRootOrAdmin || isSaving}
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+              />
+            </div>
+          </div>
+
+          {/* Property Category Chips */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-2">
+              Property Categories
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {["house", "apartment", "land", "commercial"].map((type) => {
+                const isChecked = propertyTypes.includes(type);
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    disabled={!isRootOrAdmin || isSaving}
+                    onClick={() => {
+                      setPropertyTypes((prev) =>
+                        prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+                      );
+                    }}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-2.5 text-xs font-semibold cursor-pointer transition ${
+                      isChecked
+                        ? "border-[#19352b] dark:border-emerald-600 bg-[#eef3f0] dark:bg-emerald-950/40 text-[#19352b] dark:text-emerald-300 font-bold"
+                        : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#1a2923] dark:text-zinc-300 hover:border-[#19352b]/40"
+                    }`}
+                  >
+                    {isChecked ? (
+                      <Check className="h-3.5 w-3.5 text-[#19352b] dark:text-emerald-400 stroke-[3]" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                    )}
+                    <span className="capitalize">{type}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#e5ebe7] dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={handleCancelForm}
+              disabled={isSaving}
+              className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-[#64736b] dark:text-zinc-400 hover:bg-[#eef3f0] dark:hover:bg-zinc-800 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#132820] dark:hover:bg-emerald-600 transition disabled:opacity-50"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  <span>Save Settings</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function ScanHistoryContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const tabParam = searchParams.get("tab") as "history" | "automation" | "presets" | null;
-  const [hubTab, setHubTab] = useState<"history" | "automation" | "presets">(
-    tabParam && ["history", "automation", "presets"].includes(tabParam) ? tabParam : "history"
+  const tabParam = searchParams.get("tab") as "history" | "automation" | null;
+  const [hubTab, setHubTab] = useState<"history" | "automation">(
+    tabParam && ["history", "automation"].includes(tabParam) ? tabParam : "history"
   );
 
   const initialType = searchParams.get("type") || "scan";
@@ -73,12 +471,14 @@ function ScanHistoryContent() {
   const [filterType, setFilterType] = useState<string>(initialType);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isScanDrawerOpen, setIsScanDrawerOpen] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<ScanPreset | null>(null);
-  const [presets, setPresets] = useState<ScanPreset[]>([]);
 
   const [siteConfig, setSiteConfig] = useState<SiteConfiguration | null>(null);
-  const [savingAutomation, setSavingAutomation] = useState(false);
   const [runningScannerId, setRunningScannerId] = useState<string | null>(null);
+  const [expandedScannerId, setExpandedScannerId] = useState<string | null>(null);
+  const [savingScannerId, setSavingScannerId] = useState<string | null>(null);
+  const [togglingScannerId, setTogglingScannerId] = useState<string | null>(null);
+  const [savingRetention, setSavingRetention] = useState(false);
+
   const [isAddScannerModalOpen, setIsAddScannerModalOpen] = useState(false);
   const [addScannerName, setAddScannerName] = useState("");
   const [addScannerSource, setAddScannerSource] = useState("lpw");
@@ -87,15 +487,7 @@ function ScanHistoryContent() {
   const [addScannerTypes, setAddScannerTypes] = useState<string[]>(["house", "apartment"]);
   const [addScannerKeyword, setAddScannerKeyword] = useState("");
   const [addScannerEnabled, setAddScannerEnabled] = useState(true);
-
-  // New preset form in presets tab
-  const [newPresetName, setNewPresetName] = useState("");
-  const [newPresetKeyword, setNewPresetKeyword] = useState("");
-  const [newPresetCategories, setNewPresetCategories] = useState<string[]>([
-    "houses",
-    "apartments",
-  ]);
-  const [newPresetSource, setNewPresetSource] = useState("ikman");
+  const [addingScanner, setAddingScanner] = useState(false);
 
   const isRootOrAdmin = user?.role === "root" || user?.role === "admin";
 
@@ -111,11 +503,6 @@ function ScanHistoryContent() {
       .catch(() => {
         router.replace("/admin");
       });
-    getScanPresets()
-      .then((p) => {
-        if (Array.isArray(p)) setPresets(p);
-      })
-      .catch(() => {});
     getSiteConfiguration()
       .then((cfg) => {
         if (cfg) setSiteConfig(cfg);
@@ -125,13 +512,13 @@ function ScanHistoryContent() {
 
   // Sync hub tab if URL param changes
   useEffect(() => {
-    const currentTab = searchParams.get("tab") as "history" | "automation" | "presets" | null;
-    if (currentTab && ["history", "automation", "presets"].includes(currentTab)) {
+    const currentTab = searchParams.get("tab") as "history" | "automation" | null;
+    if (currentTab && ["history", "automation"].includes(currentTab)) {
       setHubTab(currentTab);
     }
   }, [searchParams]);
 
-  const handleHubTabChange = (newTab: "history" | "automation" | "presets") => {
+  const handleHubTabChange = (newTab: "history" | "automation") => {
     setHubTab(newTab);
     const params = new URLSearchParams(window.location.search);
     if (newTab === "history") {
@@ -174,72 +561,83 @@ function ScanHistoryContent() {
           },
         ];
 
-  const handleToggleScanner = (scannerId: string) => {
-    if (!isRootOrAdmin || !siteConfig) return;
-    const currentList = configuredScanners;
-    const updated = currentList.map((sc) =>
-      sc.id === scannerId ? { ...sc, enabled: !sc.enabled } : sc
-    );
-    const anyEnabled = updated.some((s) => s.enabled);
-    setSiteConfig({
-      ...siteConfig,
-      scanner_settings: {
-        ...(siteConfig.scanner_settings || {
-          frequency_hours: 24,
-          pages_to_scan: 5,
-          property_types: ["house", "apartment"],
-        }),
-        enabled: anyEnabled,
-        scanners: updated,
-      },
+  // Helper to persist updated scanner list directly to site configuration
+  const persistScanners = async (updatedList: AutomatedScanner[], successMessage?: string) => {
+    if (!siteConfig) return;
+    const anyEnabled = updatedList.some((s) => s.enabled);
+    const settingsToSave = {
+      ...(siteConfig.scanner_settings || {
+        frequency_hours: 24,
+        pages_to_scan: 5,
+        property_types: ["house", "apartment"],
+      }),
+      enabled: anyEnabled,
+      scanners: updatedList,
+    };
+    const updated = await updateSiteConfiguration({
+      scanner_settings: settingsToSave,
+      prospect_retention_days: siteConfig.prospect_retention_days,
     });
+    setSiteConfig(updated);
+    if (successMessage) toast.success(successMessage);
   };
 
-  const handleUpdateScanner = (scannerId: string, patch: Partial<AutomatedScanner>) => {
+  const handleToggleScanner = async (scannerId: string) => {
     if (!isRootOrAdmin || !siteConfig) return;
-    const currentList = configuredScanners;
-    const updated = currentList.map((sc) =>
+    setTogglingScannerId(scannerId);
+    const target = configuredScanners.find((sc) => sc.id === scannerId);
+    const nextState = !target?.enabled;
+    const updated = configuredScanners.map((sc) =>
+      sc.id === scannerId ? { ...sc, enabled: nextState } : sc
+    );
+    try {
+      await persistScanners(updated, `Scanner "${target?.name}" ${nextState ? "activated" : "paused"}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update scanner status");
+    } finally {
+      setTogglingScannerId(null);
+    }
+  };
+
+  const handleSaveScannerCard = async (scannerId: string, patch: Partial<AutomatedScanner>) => {
+    if (!isRootOrAdmin || !siteConfig) return;
+    setSavingScannerId(scannerId);
+    const updated = configuredScanners.map((sc) =>
       sc.id === scannerId ? { ...sc, ...patch } : sc
     );
-    setSiteConfig({
-      ...siteConfig,
-      scanner_settings: {
-        ...(siteConfig.scanner_settings || {
-          frequency_hours: 24,
-          pages_to_scan: 5,
-          property_types: ["house", "apartment"],
-          enabled: false,
-        }),
-        scanners: updated,
-      },
-    });
+    try {
+      await persistScanners(updated, "Scanner schedule settings saved successfully!");
+      setExpandedScannerId(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save scanner settings");
+    } finally {
+      setSavingScannerId(null);
+    }
   };
 
-  const handleDeleteScanner = (scannerId: string) => {
+  const handleDeleteScanner = async (scannerId: string) => {
     if (!isRootOrAdmin || !siteConfig) return;
-    const currentList = configuredScanners;
-    const updated = currentList.filter((sc) => sc.id !== scannerId);
-    const anyEnabled = updated.some((s) => s.enabled);
-    setSiteConfig({
-      ...siteConfig,
-      scanner_settings: {
-        ...(siteConfig.scanner_settings || {
-          frequency_hours: 24,
-          pages_to_scan: 5,
-          property_types: ["house", "apartment"],
-        }),
-        enabled: anyEnabled,
-        scanners: updated,
-      },
-    });
-    toast.info("Scanner removed. Click 'Save Automation Settings' to apply.");
+    const target = configuredScanners.find((sc) => sc.id === scannerId);
+    if (!window.confirm(`Delete scanner "${target?.name || scannerId}"? This will cancel its automated runs.`)) return;
+    const updated = configuredScanners.filter((sc) => sc.id !== scannerId);
+    try {
+      await persistScanners(updated, `Scanner "${target?.name}" removed.`);
+      if (expandedScannerId === scannerId) setExpandedScannerId(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove scanner");
+    }
   };
 
   const handleRunScannerNow = async (scannerId: string, scannerName: string) => {
     setRunningScannerId(scannerId);
     try {
       await triggerAutomatedScanner(scannerId);
-      toast.success(`Started scan for "${scannerName}" in background! Refreshing history...`);
+      toast.success(`Started scan for "${scannerName}" in background!`, {
+        action: {
+          label: "View in History",
+          onClick: () => handleHubTabChange("history"),
+        },
+      });
       fetchJobs(true);
     } catch (err: any) {
       toast.error(err.message || `Failed to run scanner "${scannerName}"`);
@@ -248,12 +646,13 @@ function ScanHistoryContent() {
     }
   };
 
-  const handleAddAdditionalScanner = (e: React.FormEvent) => {
+  const handleAddAdditionalScanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addScannerName.trim()) {
       toast.error("Please enter a name for the scanner.");
       return;
     }
+    setAddingScanner(true);
     const newScanner: AutomatedScanner = {
       id: `scanner-${Date.now()}`,
       name: addScannerName.trim(),
@@ -269,105 +668,36 @@ function ScanHistoryContent() {
     };
     const currentList = configuredScanners;
     const updated = [...currentList, newScanner];
-    const anyEnabled = updated.some((s) => s.enabled);
-    setSiteConfig({
-      ...siteConfig!,
-      scanner_settings: {
-        ...(siteConfig!.scanner_settings || {
-          frequency_hours: 24,
-          pages_to_scan: 5,
-          property_types: ["house", "apartment"],
-        }),
-        enabled: anyEnabled,
-        scanners: updated,
-      },
-    });
-    setIsAddScannerModalOpen(false);
-    setAddScannerName("");
-    setAddScannerKeyword("");
-    toast.success(`Scanner "${newScanner.name}" added! Click "Save Automation Settings" to commit.`);
+    try {
+      await persistScanners(updated, `Scanner "${newScanner.name}" created and saved!`);
+      setIsAddScannerModalOpen(false);
+      setAddScannerName("");
+      setAddScannerKeyword("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create scanner");
+    } finally {
+      setAddingScanner(false);
+    }
   };
 
-  const handleSaveAutomation = async () => {
+  const handleSaveRetention = async () => {
     if (!siteConfig) return;
-    setSavingAutomation(true);
+    setSavingRetention(true);
     try {
-      const currentScanners = configuredScanners;
-      const anyEnabled = currentScanners.some((s) => s.enabled);
-      const settingsToSave = {
-        ...(siteConfig.scanner_settings || {
-          frequency_hours: 24,
-          pages_to_scan: 5,
-          property_types: ["house", "apartment"],
-        }),
-        enabled: anyEnabled,
-        scanners: currentScanners,
-      };
-
       const updated = await updateSiteConfiguration({
-        scanner_settings: settingsToSave,
+        scanner_settings: siteConfig.scanner_settings,
         prospect_retention_days: siteConfig.prospect_retention_days,
       });
       setSiteConfig(updated);
-      toast.success("Automation crawler settings updated successfully.");
+      toast.success("Retention policy updated successfully.");
     } catch (err: any) {
-      toast.error(err.message || "Failed to update crawler settings.");
+      toast.error(err.message || "Failed to update retention policy");
     } finally {
-      setSavingAutomation(false);
+      setSavingRetention(false);
     }
   };
 
-  const handleAddPresetFromTab = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPresetName.trim() || !newPresetKeyword.trim()) {
-      toast.error("Please enter both preset name and location keyword.");
-      return;
-    }
-    const newPreset: ScanPreset = {
-      id: `preset-${Date.now()}`,
-      name: newPresetName.trim(),
-      keyword: newPresetKeyword.trim(),
-      categories: newPresetCategories.length > 0 ? newPresetCategories : ["all"],
-      property_category:
-        newPresetCategories.length === 1
-          ? (newPresetCategories[0] as any)
-          : (newPresetCategories.length > 1 ? newPresetCategories.join(",") : "all"),
-      strict_location: true,
-      scan_all: true,
-      source: newPresetSource,
-      is_default: false,
-    };
-    try {
-      const updated = await saveScanPreset(newPreset);
-      setPresets(updated);
-      setNewPresetName("");
-      setNewPresetKeyword("");
-      toast.success(`Preset "${newPreset.name}" saved!`);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save preset");
-    }
-  };
 
-  const handleDeletePresetFromTab = async (presetId: string) => {
-    try {
-      const updated = await deleteScanPreset(presetId);
-      setPresets(updated);
-      toast.info("Preset deleted");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete preset");
-    }
-  };
-
-  const handleResetPresets = async () => {
-    if (!window.confirm("Reset all presets to system defaults?")) return;
-    try {
-      const restored = await resetScanPresets();
-      setPresets(restored);
-      toast.success("Restored system default presets");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to reset presets");
-    }
-  };
 
 
 
@@ -561,52 +891,10 @@ function ScanHistoryContent() {
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" title="Background scanner active" />
           )}
         </button>
-
-        <button
-          onClick={() => handleHubTabChange("presets")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition cursor-pointer ${
-            hubTab === "presets"
-              ? "border-[#19352b] text-[#19352b] dark:border-emerald-500 dark:text-emerald-400"
-              : "border-transparent text-[#64736b] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-zinc-200"
-          }`}
-        >
-          <Bookmark className="h-4 w-4" />
-          <span>Presets & Portals</span>
-          <span className="rounded-full bg-[#f4f6f4] dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-[#19352b] dark:text-zinc-300">
-            {presets.length}
-          </span>
-        </button>
       </div>
 
       {hubTab === "history" && (
         <div className="space-y-6">
-          {/* Quick Presets Bar */}
-          <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 pt-1 text-xs [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
-            <span className="font-bold text-[#718078] dark:text-zinc-400 text-[11px] uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
-              <Bookmark className="h-3 w-3 text-[#19352b] dark:text-emerald-400" /> Presets:
-            </span>
-            {presets.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => {
-                  setSelectedPreset(preset);
-                  setIsScanDrawerOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1 text-xs font-medium text-[#1a2923] dark:text-zinc-200 hover:border-[#19352b] hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition cursor-pointer"
-              >
-                <span>{preset.name}</span>
-              </button>
-            ))}
-            <button
-              onClick={() => {
-                setSelectedPreset(null);
-                setIsScanDrawerOpen(true);
-              }}
-              className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#cbd8d1] dark:border-zinc-700 bg-transparent px-2.5 py-1 text-xs font-medium text-[#64736b] dark:text-zinc-400 hover:border-[#19352b] hover:text-[#19352b] dark:hover:text-zinc-200 transition cursor-pointer"
-            >
-              <span>+ Custom Scan</span>
-            </button>
-          </div>
 
 
 
@@ -1221,221 +1509,25 @@ function ScanHistoryContent() {
           </div>
 
           {/* List of Configured Scanners */}
-          <div className="space-y-4">
-            {configuredScanners.map((scanner, index) => {
-              const isDefault = scanner.id === "default-ikman" || scanner.id === "default-lpw";
-              return (
-                <div
-                  key={scanner.id || index}
-                  className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm transition hover:border-[#19352b]/40"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-[#e5ebe7] dark:border-zinc-800">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f4f6f4] dark:bg-zinc-900 text-[#19352b] dark:text-emerald-400 border border-[#e5ebe7] dark:border-zinc-800">
-                        {scanner.source === "lpw" ? (
-                          <Building2 className="h-5 w-5" />
-                        ) : (
-                          <Globe className="h-5 w-5" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-base font-bold text-[#1a2923] dark:text-zinc-100">
-                            {scanner.name}
-                          </h3>
-                          <SourceBadge source={scanner.source} />
-                          {scanner.keyword && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-md">
-                              <MapPin className="h-3 w-3" />
-                              <span>{scanner.keyword}</span>
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-[#64736b] dark:text-zinc-400 mt-0.5">
-                          ID: <code className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">{scanner.id}</code>
-                          {isDefault && <span className="ml-1.5 text-emerald-600 dark:text-emerald-400 font-medium">• Built-in portal scanner</span>}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 self-end sm:self-center">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          role="switch"
-                          disabled={!isRootOrAdmin}
-                          aria-checked={scanner.enabled}
-                          onClick={() => handleToggleScanner(scanner.id)}
-                          className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#19352b] disabled:opacity-50 ${
-                            scanner.enabled
-                              ? "bg-[#19352b] dark:bg-emerald-600"
-                              : "bg-gray-200 dark:bg-zinc-700"
-                          }`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              scanner.enabled ? "translate-x-5" : "translate-x-0"
-                            }`}
-                          />
-                        </button>
-                        <span className="text-xs font-semibold text-[#1a2923] dark:text-zinc-200 w-16">
-                          {scanner.enabled ? "Active" : "Disabled"}
-                        </span>
-                      </div>
-
-                      {!isDefault && isRootOrAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteScanner(scanner.id)}
-                          className="cursor-pointer p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
-                          title="Delete this scanner"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Scanner Config Fields */}
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
-                        Crawl Frequency
-                      </label>
-                      <select
-                        disabled={!isRootOrAdmin}
-                        value={scanner.frequency_hours}
-                        onChange={(e) =>
-                          handleUpdateScanner(scanner.id, { frequency_hours: parseInt(e.target.value) })
-                        }
-                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
-                      >
-                        <option value={6}>Every 6 Hours</option>
-                        <option value={12}>Every 12 Hours</option>
-                        <option value={18}>Every 18 Hours</option>
-                        <option value={24}>Every 24 Hours (Daily)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
-                        Pages to Scan (Depth)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={50}
-                        disabled={!isRootOrAdmin}
-                        value={scanner.pages_to_scan}
-                        onChange={(e) =>
-                          handleUpdateScanner(scanner.id, { pages_to_scan: parseInt(e.target.value) || 1 })
-                        }
-                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-1.5">
-                        Location Keyword (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Colombo 7 or Island-wide"
-                        disabled={!isRootOrAdmin}
-                        value={scanner.keyword || ""}
-                        onChange={(e) =>
-                          handleUpdateScanner(scanner.id, { keyword: e.target.value || null })
-                        }
-                        className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Categories */}
-                  <div className="mt-4 pt-3 border-t border-[#e5ebe7] dark:border-zinc-800">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-2">
-                      Property Categories
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {["house", "apartment", "land", "commercial"].map((type) => {
-                        const isChecked = (scanner.property_types || ["house", "apartment"]).includes(type);
-                        return (
-                          <label
-                            key={type}
-                            className="flex items-center space-x-2 rounded-lg border border-[#e5ebe7] dark:border-zinc-800 p-2 bg-[#fbfcfb] dark:bg-zinc-900/40 cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              disabled={!isRootOrAdmin}
-                              checked={isChecked}
-                              onChange={(e) => {
-                                const current = scanner.property_types || ["house", "apartment"];
-                                const next = e.target.checked
-                                  ? [...current, type]
-                                  : current.filter((t) => t !== type);
-                                handleUpdateScanner(scanner.id, { property_types: next });
-                              }}
-                              className="h-3.5 w-3.5 rounded border-[#cbd8d1] text-[#19352b] focus:ring-[#19352b] cursor-pointer"
-                            />
-                            <span className="text-xs font-semibold capitalize text-[#1a2923] dark:text-zinc-200">
-                              {type}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Live Status and Actions Bar */}
-                  <div className="mt-4 pt-3 border-t border-[#e5ebe7] dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs bg-[#f9faf9] dark:bg-zinc-900/50 p-3 rounded-lg">
-                    <div className="space-y-0.5">
-                      <div>
-                        <span className="font-semibold text-[#1a2923] dark:text-zinc-200">Next Scheduled:</span>{" "}
-                        <span className="text-[#64736b] dark:text-zinc-400">
-                          {scanner.enabled
-                            ? scanner.next_run_at
-                              ? new Date(scanner.next_run_at).toLocaleString(undefined, {
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
-                                })
-                              : "Scheduled on next interval"
-                            : "Disabled"}
-                        </span>
-                      </div>
-                      {scanner.last_run_at && (
-                        <div>
-                          <span className="font-semibold text-[#1a2923] dark:text-zinc-200">Last Execution:</span>{" "}
-                          <span className="text-[#64736b] dark:text-zinc-400">
-                            {new Date(scanner.last_run_at).toLocaleString(undefined, {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })}
-                            {scanner.last_run_status && ` (${scanner.last_run_status})`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {isRootOrAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => handleRunScannerNow(scanner.id, scanner.name)}
-                        disabled={runningScannerId === scanner.id}
-                        className="cursor-pointer shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#19352b]/20 dark:border-emerald-800 bg-white dark:bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-[#19352b] dark:text-emerald-300 hover:bg-[#f4f6f4] dark:hover:bg-zinc-700 transition disabled:opacity-50"
-                      >
-                        {runningScannerId === scanner.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Play className="h-3.5 w-3.5 fill-current" />
-                        )}
-                        <span>{runningScannerId === scanner.id ? "Launching..." : "Run Now"}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="space-y-3">
+            {configuredScanners.map((scanner, index) => (
+              <AutomatedScannerCard
+                key={scanner.id || index}
+                scanner={scanner}
+                isRootOrAdmin={isRootOrAdmin}
+                isExpanded={expandedScannerId === scanner.id}
+                onToggleExpand={() =>
+                  setExpandedScannerId((prev) => (prev === scanner.id ? null : scanner.id))
+                }
+                isToggling={togglingScannerId === scanner.id}
+                onToggle={() => handleToggleScanner(scanner.id)}
+                isRunning={runningScannerId === scanner.id}
+                onRunNow={() => handleRunScannerNow(scanner.id, scanner.name)}
+                isSaving={savingScannerId === scanner.id}
+                onSave={(patch) => handleSaveScannerCard(scanner.id, patch)}
+                onDelete={() => handleDeleteScanner(scanner.id)}
+              />
+            ))}
           </div>
 
           {/* Modal / Dialog for Adding an Additional Scanner */}
@@ -1629,16 +1721,19 @@ function ScanHistoryContent() {
                   <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#e5ebe7] dark:border-zinc-800">
                     <button
                       type="button"
+                      disabled={addingScanner}
                       onClick={() => setIsAddScannerModalOpen(false)}
-                      className="cursor-pointer rounded-lg border border-[#cbd8d1] dark:border-zinc-800 px-4 py-2 text-xs font-semibold text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition"
+                      className="cursor-pointer rounded-lg border border-[#cbd8d1] dark:border-zinc-800 px-4 py-2 text-xs font-semibold text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="cursor-pointer rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-[#132820] dark:hover:bg-emerald-600 transition shadow-xs"
+                      disabled={addingScanner}
+                      className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-[#132820] dark:hover:bg-emerald-600 transition shadow-xs disabled:opacity-50"
                     >
-                      Add Scanner
+                      {addingScanner && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      <span>{addingScanner ? "Adding..." : "Add Scanner"}</span>
                     </button>
                   </div>
                 </form>
@@ -1646,266 +1741,70 @@ function ScanHistoryContent() {
             </div>
           )}
 
-          <div className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-            <h3 className="text-base font-bold text-[#1a2923] dark:text-zinc-100">
-              Data Retention & Housekeeping
-            </h3>
-            <p className="mt-1 text-xs text-[#64736b] dark:text-zinc-400">
-              Control how long scraped listings stay in the prospects database before becoming eligible for automatic purge.
-            </p>
-
-            <div className="mt-4 max-w-xs">
-              <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                Prospect Retention Period (Days)
-              </label>
-              <input
-                type="number"
-                min={7}
-                max={365}
-                disabled={!isRootOrAdmin}
-                value={siteConfig?.prospect_retention_days ?? 30}
-                onChange={(e) =>
-                  setSiteConfig((s) =>
-                    s
-                      ? {
-                          ...s,
-                          prospect_retention_days: parseInt(e.target.value) || 30,
-                        }
-                      : s
-                  )
-                }
-                className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60"
-              />
-            </div>
-          </div>
-
-          {isRootOrAdmin && (
-            <button
-              type="button"
-              onClick={handleSaveAutomation}
-              disabled={savingAutomation}
-              className="cursor-pointer inline-flex items-center gap-2 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-[#132820] dark:hover:bg-emerald-600 transition disabled:opacity-60"
-            >
-              {savingAutomation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              <span>{savingAutomation ? "Saving Changes..." : "Save Automation Settings"}</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Hub Tab 3: Presets & Portals */}
-      {hubTab === "presets" && (
-        <div className="space-y-6 max-w-4xl">
-          <div className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-            <div className="flex items-center justify-between">
+          {/* Data Retention & Housekeeping */}
+          <div className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2">
-                  <Bookmark className="h-5 w-5 text-[#19352b] dark:text-emerald-400" />
-                  <h2 className="text-lg font-bold text-[#1a2923] dark:text-zinc-100">
-                    Scan Presets & Watchlists
-                  </h2>
-                </div>
-                <p className="mt-1 text-xs text-[#64736b] dark:text-zinc-400">
-                  Shared search configurations accessible by the entire team across the Prospects and Scan drawers.
+                <h3 className="text-sm font-bold text-[#1a2923] dark:text-zinc-100">
+                  Data Retention & Housekeeping
+                </h3>
+                <p className="mt-0.5 text-xs text-[#64736b] dark:text-zinc-400">
+                  Control how long scraped listings stay in the prospects database before becoming eligible for automatic purge.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleResetPresets}
-                  className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition"
-                  title="Restore default recommended presets"
-                >
-                  <RotateCcw className="h-3.5 w-3.5 text-[#64736b] dark:text-zinc-400" />
-                  <span>Reset Defaults</span>
-                </button>
-                <span className="rounded-full bg-[#f4f6f4] dark:bg-zinc-800 px-3 py-1 text-xs font-semibold text-[#19352b] dark:text-zinc-300">
-                  {presets.length} Presets
-                </span>
+              <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={7}
+                    max={365}
+                    disabled={!isRootOrAdmin}
+                    value={siteConfig?.prospect_retention_days ?? 30}
+                    onChange={(e) =>
+                      setSiteConfig((s) =>
+                        s
+                          ? {
+                              ...s,
+                              prospect_retention_days: parseInt(e.target.value) || 30,
+                            }
+                          : s
+                      )
+                    }
+                    className="w-20 rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs sm:text-sm font-semibold outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60 text-center"
+                  />
+                  <span className="text-xs text-[#64736b] dark:text-zinc-400 font-medium">days</span>
+                </div>
+
+                {isRootOrAdmin && (
+                  <button
+                    type="button"
+                    onClick={handleSaveRetention}
+                    disabled={savingRetention}
+                    className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#132820] dark:hover:bg-emerald-600 transition disabled:opacity-50"
+                  >
+                    {savingRetention ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                    <span>{savingRetention ? "Saving..." : "Save Policy"}</span>
+                  </button>
+                )}
               </div>
             </div>
-
-            <div className="mt-6 space-y-2.5">
-              {presets.length > 0 ? (
-                presets.map((preset) => (
-                  <div
-                    key={preset.id}
-                    className="flex items-center justify-between rounded-lg border border-[#e5ebe7] dark:border-zinc-800 bg-[#fbfcfb] dark:bg-zinc-900/40 p-3.5 hover:border-[#19352b]/40 transition"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef3f0] dark:bg-zinc-800 text-[#19352b] dark:text-emerald-400 shrink-0">
-                        <MapPin className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-[#1a2923] dark:text-zinc-100">
-                            {preset.name}
-                          </span>
-                          <SourceBadge source={preset.source} />
-                          {preset.is_default && (
-                            <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:text-zinc-400">
-                              Built-in
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap text-xs text-[#64736b] dark:text-zinc-400 mt-1">
-                          <span>
-                            Target: <span className="font-semibold text-[#1a2923] dark:text-zinc-300">"{preset.keyword}"</span>
-                          </span>
-                          <span>•</span>
-                          <span className="font-medium">Categories:</span>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {(preset.categories && preset.categories.length > 0
-                              ? preset.categories
-                              : [preset.property_category || "all"]
-                            ).map((c) => (
-                              <span
-                                key={c}
-                                className="rounded bg-[#f4f6f4] dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-semibold capitalize text-[#19352b] dark:text-zinc-300 border border-[#dce4df] dark:border-zinc-700"
-                              >
-                                {c}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedPreset(preset);
-                          setIsScanDrawerOpen(true);
-                        }}
-                        className="cursor-pointer rounded-lg border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-[#19352b] dark:text-emerald-400 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition"
-                      >
-                        Launch
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePresetFromTab(preset.id)}
-                        className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-transparent hover:border-rose-200 dark:hover:border-rose-900/60 bg-transparent hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2 py-1 text-xs font-medium text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 transition"
-                        title={`Delete preset "${preset.name}"`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Delete</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-[#64736b] dark:text-zinc-400 italic">No presets configured.</p>
-              )}
-            </div>
-
-            <form onSubmit={handleAddPresetFromTab} className="mt-6 rounded-xl border border-dashed border-[#cbd8d1] dark:border-zinc-800 p-4 bg-[#f9faf9] dark:bg-zinc-900/30">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-3">
-                Create New Preset
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                    Preset Label
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Negombo Land Sales"
-                    value={newPresetName}
-                    onChange={(e) => setNewPresetName(e.target.value)}
-                    className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                    Target Location
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Negombo"
-                    value={newPresetKeyword}
-                    onChange={(e) => setNewPresetKeyword(e.target.value)}
-                    className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1.5">
-                    Target Property Categories (Multi-Select)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: "houses", label: "Houses" },
-                      { id: "apartments", label: "Apartments" },
-                      { id: "lands", label: "Lands" },
-                      { id: "commercial", label: "Commercial" },
-                    ].map((cat) => {
-                      const isSelected = newPresetCategories.includes(cat.id);
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => {
-                            setNewPresetCategories((prev) =>
-                              prev.includes(cat.id)
-                                ? prev.filter((c) => c !== cat.id)
-                                : [...prev, cat.id]
-                            );
-                          }}
-                          className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                            isSelected
-                              ? "border-[#19352b] dark:border-emerald-600 bg-[#eef3f0] dark:bg-emerald-950/40 text-[#19352b] dark:text-emerald-300"
-                              : "border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 text-[#1a2923] dark:text-zinc-300 hover:border-[#19352b]/50"
-                          }`}
-                        >
-                          {cat.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-1 text-[11px] text-[#64736b] dark:text-zinc-400">
-                    {newPresetCategories.length === 0
-                      ? "None selected — scans all property types in the area."
-                      : `Selected: ${newPresetCategories.join(", ")}`}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400 mb-1">
-                    Source Portal
-                  </label>
-                  <select
-                    value={newPresetSource}
-                    onChange={(e) => setNewPresetSource(e.target.value)}
-                    className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[#19352b] dark:text-zinc-200"
-                  >
-                    <option value="ikman">ikman.lk</option>
-                    <option value="lpw">LankaPropertyWeb (Upcoming)</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-[#19352b] dark:bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#132820] dark:hover:bg-emerald-600 transition"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Save New Preset</span>
-              </button>
-            </form>
           </div>
 
-          <div className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Globe className="h-5 w-5 text-[#19352b] dark:text-emerald-400" />
-              <h3 className="text-base font-bold text-[#1a2923] dark:text-zinc-100">
+          {/* Connected Data Sources & Portals */}
+          <div className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
+              <h3 className="text-sm font-bold text-[#1a2923] dark:text-zinc-100">
                 Connected Data Sources & Portals
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
@@ -1913,15 +1812,15 @@ function ScanHistoryContent() {
                       <Globe className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-[#1a2923] dark:text-zinc-100">ikman.lk</h4>
-                      <p className="text-xs text-[#64736b] dark:text-zinc-400">Classifieds Real Estate Portal</p>
+                      <h4 className="text-xs sm:text-sm font-bold text-[#1a2923] dark:text-zinc-100">ikman.lk</h4>
+                      <p className="text-[11px] text-[#64736b] dark:text-zinc-400">Classifieds Real Estate Portal</p>
                     </div>
                   </div>
                   <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:text-emerald-200">
                     Active
                   </span>
                 </div>
-                <div className="mt-3 text-xs text-[#64736b] dark:text-zinc-400 space-y-1">
+                <div className="mt-2.5 text-[11px] text-[#64736b] dark:text-zinc-400 space-y-1">
                   <p>• Fast search pagination & detailed ad page scraping</p>
                   <p>• Automated phone number retrieval & Gemini parsing</p>
                 </div>
@@ -1934,33 +1833,28 @@ function ScanHistoryContent() {
                       <Globe className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-[#1a2923] dark:text-zinc-100">LankaPropertyWeb</h4>
-                      <p className="text-xs text-[#64736b] dark:text-zinc-400">Dedicated Property Portal</p>
+                      <h4 className="text-xs sm:text-sm font-bold text-[#1a2923] dark:text-zinc-100">LankaPropertyWeb</h4>
+                      <p className="text-[11px] text-[#64736b] dark:text-zinc-400">Dedicated Property Portal</p>
                     </div>
                   </div>
                   <span className="inline-flex items-center rounded-full bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:text-zinc-300">
                     Upcoming
                   </span>
                 </div>
-                <div className="mt-3 text-xs text-[#64736b] dark:text-zinc-400 space-y-1">
+                <div className="mt-2.5 text-[11px] text-[#64736b] dark:text-zinc-400 space-y-1">
                   <p>• Schema-ready adapter for dedicated listings</p>
                   <p>• Scheduled for upcoming multi-source release</p>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+          </div>
+        )}
 
       {/* Drawer */}
       <ScanLauncherDrawer
         isOpen={isScanDrawerOpen}
-        onClose={() => {
-          setIsScanDrawerOpen(false);
-          setSelectedPreset(null);
-        }}
-        initialPreset={selectedPreset}
-        onPresetsChanged={setPresets}
+        onClose={() => setIsScanDrawerOpen(false)}
         onScanStarted={() => {
           fetchJobs();
         }}
