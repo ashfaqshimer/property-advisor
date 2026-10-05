@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.suburb import Suburb
-from app.services.market_valuation import calculate_suburb_market_value
+from app.services.market_valuation import (
+    KNOWN_SUB_AREAS,
+    calculate_suburb_market_value,
+)
 from app.services.suburb_seeds import seed_suburbs_data
 
 router = APIRouter(prefix="/market-values", tags=["market-values"])
@@ -20,7 +23,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 @router.get("/suburbs")
 def list_supported_suburbs(db: DbSession, district: str | None = None) -> list[dict[str, Any]]:
-    """Lists all canonical suburbs with their tiers, districts, and CBSL DS divisions."""
+    """Lists all canonical suburbs with their districts, CBSL DS divisions, and known micro-areas."""
     stmt = select(Suburb).where(Suburb.is_active.is_(True)).order_by(Suburb.district, Suburb.name)
     if district:
         stmt = stmt.where(Suburb.district.ilike(district.strip()))
@@ -32,8 +35,8 @@ def list_supported_suburbs(db: DbSession, district: str | None = None) -> list[d
             "slug": s.slug,
             "district": s.district,
             "ds_division": s.ds_division,
-            "tier": s.tier,
             "aliases": s.aliases,
+            "known_sub_areas": KNOWN_SUB_AREAS.get(s.slug.replace("-", " "), []),
             "baseline_land_perch_range": [
                 float(s.baseline_land_perch_min) if s.baseline_land_perch_min else None,
                 float(s.baseline_land_perch_max) if s.baseline_land_perch_max else None,
@@ -50,19 +53,23 @@ def list_supported_suburbs(db: DbSession, district: str | None = None) -> list[d
 @router.get("/estimate")
 def get_market_value_estimate(
     db: DbSession,
-    suburb: str = Query(..., description="Suburb or area name, e.g. 'Rajagiriya', 'Colombo 7', 'Nugegoda'"),
+    suburb: str = Query(..., description="Suburb or area name, e.g. 'Rajagiriya', 'Colombo 7', 'Dehiwala'"),
+    sub_area: str | None = Query(None, description="Optional micro-area, e.g. 'Attidiya', 'Kalubowila', 'Nedimala'"),
     property_type: str | None = Query(None, description="house, apartment, land, commercial"),
     listing_type: str = Query("sale", description="sale or rent"),
+    max_days: int = Query(90, description="Listing sourcing lookback window in days (default 90)"),
 ) -> dict[str, Any]:
     """
-    Returns estimated market value, asking medians, per-perch/sqft ranges,
-    and realization discounts for a given suburb or area.
+    Returns estimated market value, per-unit price percentiles (per perch/sqft),
+    sourcing breakdown, sub-area comparisons, and prospect grading thresholds.
     """
     return calculate_suburb_market_value(
         db=db,
         location_query=suburb,
+        sub_area_filter=sub_area,
         property_type=property_type,
         listing_type=listing_type,
+        max_days=max_days,
     )
 
 

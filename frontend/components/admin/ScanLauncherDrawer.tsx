@@ -7,10 +7,8 @@ import {
   MapPin,
   Filter,
   Sparkles,
-  Globe,
   Check,
   Loader2,
-  Building2,
   SlidersHorizontal,
   ChevronDown,
   ChevronUp,
@@ -22,6 +20,16 @@ import {
   startProspectScan,
   ScanPreset,
 } from "../../lib/api";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export const QUICK_LOCATIONS = [
   "Rajagiriya",
@@ -83,8 +91,6 @@ export function ScanLauncherDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
-  const drawerRef = useRef<HTMLDivElement>(null);
-
   // Handle initial preset if passed from outside
   useEffect(() => {
     if (initialPreset && isOpen) {
@@ -103,25 +109,6 @@ export function ScanLauncherDrawer({
       setScanTab("scoped");
     }
   }, [initialPreset, isOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen && !submitting) {
-        onClose();
-      }
-    };
-    if (isOpen) {
-      window.addEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "hidden";
-    }
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen, submitting, onClose]);
-
-  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,47 +184,38 @@ export function ScanLauncherDrawer({
   const previewDepth = scanAllPages ? "All matching pages" : `${scanPages} pages`;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs transition-opacity duration-200"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting) onClose();
-      }}
-      aria-modal="true"
-      role="dialog"
-      aria-labelledby="scan-drawer-title"
-    >
-      <div
-        ref={drawerRef}
-        className="flex h-full w-full flex-col bg-white dark:bg-zinc-950 sm:max-w-xl shadow-2xl border-l border-[#dce4df] dark:border-zinc-800 animate-in slide-in-from-right duration-250 ease-out"
+    <Sheet open={isOpen} onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
+      <SheetContent
+        side="right"
+        className="p-0 flex flex-col gap-0 sm:max-w-xl h-full border-l border-border bg-card [&>button.absolute]:hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#dce4df] dark:border-zinc-800 px-5 py-4 sm:px-6 bg-[#fbfcfb] dark:bg-zinc-900/60">
+        <SheetHeader className="flex flex-row items-center justify-between border-b border-border px-5 py-4 sm:px-6 bg-muted/40 space-y-0 text-left">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#19352b] dark:bg-emerald-600 text-white shadow-xs">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
               <Search className="h-4.5 w-4.5" />
             </div>
             <div>
-              <h2
-                id="scan-drawer-title"
-                className="text-base sm:text-lg font-bold tracking-tight text-[#1a2923] dark:text-zinc-100 flex items-center gap-2"
-              >
+              <SheetTitle className="text-base sm:text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
                 <span>Start Real Estate Scan</span>
-              </h2>
-              <p className="text-xs text-[#64736b] dark:text-zinc-400">
+              </SheetTitle>
+              <SheetDescription className="text-xs text-muted-foreground">
                 Discover and import new property listings from marketplace sources.
-              </p>
+              </SheetDescription>
             </div>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onClose}
             disabled={submitting}
-            className="cursor-pointer rounded-lg p-2 text-[#718078] dark:text-zinc-400 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 hover:text-[#1a2923] dark:hover:text-white transition"
+            className="cursor-pointer rounded-lg h-9 w-9 text-muted-foreground hover:bg-muted hover:text-foreground transition"
             aria-label="Close drawer"
           >
             <X className="h-5 w-5" />
-          </button>
-        </div>
+          </Button>
+        </SheetHeader>
 
         {/* Scrollable Form Body */}
         <form
@@ -247,7 +225,7 @@ export function ScanLauncherDrawer({
         >
           {/* Section 1: Target Portal */}
           <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Target Marketplace Portal
             </label>
 
@@ -258,8 +236,8 @@ export function ScanLauncherDrawer({
                 onClick={() => setSelectedSource("ikman")}
                 className={`relative flex items-center justify-between rounded-xl p-3 text-left transition cursor-pointer border ${
                   selectedSource === "ikman"
-                    ? "border-[#19352b] dark:border-emerald-500 bg-[#eef3f0]/80 dark:bg-emerald-950/40 ring-1 ring-[#19352b] dark:ring-emerald-500"
-                    : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-[#19352b]/40 text-[#64736b] dark:text-zinc-400"
+                    ? "border-primary bg-primary/10 ring-1 ring-primary"
+                    : "border-border bg-card hover:border-primary/40 text-muted-foreground"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -267,22 +245,22 @@ export function ScanLauncherDrawer({
                     className={`flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden ${
                       selectedSource === "ikman"
                         ? "bg-[#009B79] text-white shadow-xs"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     <IkmanIcon className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-[#1a2923] dark:text-zinc-100 flex items-center gap-1.5">
+                    <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
                       <span>ikman.lk</span>
                     </div>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
                       Active Portal
                     </span>
                   </div>
                 </div>
                 {selectedSource === "ikman" && (
-                  <div className="h-5 w-5 rounded-full bg-[#19352b] dark:bg-emerald-600 flex items-center justify-center text-white">
+                  <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                     <Check className="h-3 w-3 stroke-[3]" />
                   </div>
                 )}
@@ -293,8 +271,8 @@ export function ScanLauncherDrawer({
                 onClick={() => setSelectedSource("lpw")}
                 className={`relative flex items-center justify-between rounded-xl p-3 text-left transition cursor-pointer border ${
                   selectedSource === "lpw"
-                    ? "border-[#19352b] dark:border-emerald-500 bg-[#eef3f0]/80 dark:bg-emerald-950/40 ring-1 ring-[#19352b] dark:ring-emerald-500"
-                    : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-[#19352b]/40 text-[#64736b] dark:text-zinc-400"
+                    ? "border-primary bg-primary/10 ring-1 ring-primary"
+                    : "border-border bg-card hover:border-primary/40 text-muted-foreground"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -302,22 +280,22 @@ export function ScanLauncherDrawer({
                     className={`flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden ${
                       selectedSource === "lpw"
                         ? "bg-[#078F46] text-white shadow-xs"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     <LpwIcon className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-[#1a2923] dark:text-zinc-100 flex items-center gap-1.5">
+                    <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
                       <span>LankaPropertyWeb</span>
                     </div>
-                    <span className="text-[10px] text-blue-700 dark:text-blue-400 font-medium">
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
                       Dedicated
                     </span>
                   </div>
                 </div>
                 {selectedSource === "lpw" && (
-                  <div className="h-5 w-5 rounded-full bg-[#19352b] dark:bg-emerald-600 flex items-center justify-center text-white">
+                  <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                     <Check className="h-3 w-3 stroke-[3]" />
                   </div>
                 )}
@@ -326,238 +304,238 @@ export function ScanLauncherDrawer({
           </div>
 
           {/* Section 2: Strategy Switcher */}
-          <div className="space-y-3">
+          <Tabs
+            value={scanTab}
+            onValueChange={(val) => setScanTab(val as "scoped" | "categories")}
+            className="w-full space-y-3"
+          >
             <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 Search Mode
               </label>
             </div>
 
-            <div className="flex rounded-xl bg-[#f4f6f4] dark:bg-zinc-900 p-1 border border-[#dce4df] dark:border-zinc-800">
-              <button
-                type="button"
+            <TabsList className="grid w-full grid-cols-2 h-10 p-1 bg-muted">
+              <TabsTrigger
+                value="scoped"
+                role="button"
                 onClick={() => setScanTab("scoped")}
-                className={`flex-1 flex items-center justify-center gap-2 cursor-pointer rounded-lg py-2 text-xs font-semibold transition ${
-                  scanTab === "scoped"
-                    ? "bg-white dark:bg-zinc-950 text-[#19352b] dark:text-emerald-400 shadow-xs font-bold"
-                    : "text-[#64736b] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-white"
-                }`}
+                className="flex items-center justify-center gap-2 text-xs font-semibold"
               >
                 <MapPin className="h-3.5 w-3.5" />
                 <span>Scoped Location</span>
-              </button>
-              <button
-                type="button"
+              </TabsTrigger>
+              <TabsTrigger
+                value="categories"
+                role="button"
                 onClick={() => setScanTab("categories")}
-                className={`flex-1 flex items-center justify-center gap-2 cursor-pointer rounded-lg py-2 text-xs font-semibold transition ${
-                  scanTab === "categories"
-                    ? "bg-white dark:bg-zinc-950 text-[#19352b] dark:text-emerald-400 shadow-xs font-bold"
-                    : "text-[#64736b] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-white"
-                }`}
+                className="flex items-center justify-center gap-2 text-xs font-semibold"
               >
                 <Filter className="h-3.5 w-3.5" />
                 <span>Broad Categories</span>
-              </button>
-            </div>
+              </TabsTrigger>
+            </TabsList>
 
             {/* Mode 1: Scoped Location */}
-            {scanTab === "scoped" ? (
-              <div className="space-y-4 pt-1">
-                {/* Location Input */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#1a2923] dark:text-zinc-200 mb-1.5">
-                    Location / Suburb Keyword <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#718078] dark:text-zinc-400" />
-                    <input
-                      type="text"
-                      required
-                      value={scanLocationKeyword}
-                      onChange={(e) => setScanLocationKeyword(e.target.value)}
-                      placeholder="e.g. Rajagiriya, Colombo 7, Battaramulla, Kandy…"
-                      className="w-full rounded-xl border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 pl-10 pr-3.5 py-2.5 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 placeholder:text-[#a0aba4] dark:placeholder:text-zinc-500 text-[#1a2923] dark:text-zinc-200 transition shadow-2xs"
-                    />
-                  </div>
-
-                  {/* Popular Pills */}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] font-medium text-[#718078] dark:text-zinc-400 mr-0.5">
-                      Popular:
-                    </span>
-                    {QUICK_LOCATIONS.map((loc) => {
-                      const isMatch = scanLocationKeyword.toLowerCase() === loc.toLowerCase();
-                      return (
-                        <button
-                          key={loc}
-                          type="button"
-                          onClick={() => setScanLocationKeyword(loc)}
-                          className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition ${
-                            isMatch
-                              ? "border-[#19352b] dark:border-emerald-600 bg-[#19352b] text-white dark:bg-emerald-600 font-semibold"
-                              : "border-[#dce4df] dark:border-zinc-800 bg-[#f4f6f4] dark:bg-zinc-900 text-[#64736b] dark:text-zinc-400 hover:border-[#19352b] hover:text-[#1a2923] dark:hover:text-white"
-                          }`}
-                        >
-                          {loc}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Target Property Categories */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-xs font-semibold text-[#1a2923] dark:text-zinc-200">
-                      Target Property Categories
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setScopedCategories([])}
-                      className="text-[11px] text-[#64736b] dark:text-zinc-400 hover:text-[#19352b] dark:hover:text-emerald-400 cursor-pointer"
-                    >
-                      Reset (All)
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { id: "houses", label: "Houses" },
-                      { id: "apartments", label: "Apartments" },
-                      { id: "lands", label: "Lands" },
-                      { id: "commercial", label: "Commercial" },
-                    ].map((cat) => {
-                      const isChecked = scopedCategories.includes(cat.id);
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => {
-                            const next = isChecked
-                              ? scopedCategories.filter((c) => c !== cat.id)
-                              : [...scopedCategories, cat.id];
-                            setScopedCategories(next);
-                          }}
-                          className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-3 text-xs font-semibold cursor-pointer transition ${
-                            isChecked
-                              ? "border-[#19352b] dark:border-emerald-600 bg-[#eef3f0] dark:bg-emerald-950/40 text-[#19352b] dark:text-emerald-300 font-bold shadow-2xs"
-                              : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#1a2923] dark:text-zinc-300 hover:border-[#19352b]/40"
-                          }`}
-                        >
-                          {isChecked ? (
-                            <Check className="h-3.5 w-3.5 text-[#19352b] dark:text-emerald-400 stroke-[3]" />
-                          ) : (
-                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-                          )}
-                          <span>{cat.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <p className="mt-1.5 text-[11px] text-[#64736b] dark:text-zinc-400">
-                    {scopedCategories.length === 0
-                      ? "All property types included."
-                      : `Selected: ${scopedCategories.join(" & ")}`}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              /* Mode 2: Broad Categories */
-              <div className="space-y-4 pt-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2 rounded-xl border border-[#dce4df] dark:border-zinc-800 p-3.5 bg-[#fbfcfb] dark:bg-zinc-900/40">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-2">
-                      For Sale
-                    </div>
-                    {CATEGORIES.filter((c) => c.type === "sale").map((cat) => (
-                      <label key={cat.id} className="flex cursor-pointer items-center gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={scanCategories.includes(cat.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
-                            else setScanCategories(scanCategories.filter((c) => c !== cat.id));
-                          }}
-                          className="cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-emerald-600 focus:ring-[#19352b]"
-                        />
-                        <span className="text-xs font-medium text-[#1a2923] dark:text-zinc-200">
-                          {cat.label.replace(" for Sale", "")}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="space-y-2 rounded-xl border border-[#dce4df] dark:border-zinc-800 p-3.5 bg-[#fbfcfb] dark:bg-zinc-900/40">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#718078] dark:text-zinc-400 mb-2">
-                      Rentals
-                    </div>
-                    {CATEGORIES.filter((c) => c.type === "rent").map((cat) => (
-                      <label key={cat.id} className="flex cursor-pointer items-center gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={scanCategories.includes(cat.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
-                            else setScanCategories(scanCategories.filter((c) => c !== cat.id));
-                          }}
-                          className="cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-emerald-600 focus:ring-[#19352b]"
-                        />
-                        <span className="text-xs font-medium text-[#1a2923] dark:text-zinc-200">
-                          {cat.label.replace(" Rentals", "")}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#1a2923] dark:text-zinc-200 mb-1">
-                    Pages per Category (Max 50)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={scanPages}
-                    onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
-                    className="w-full rounded-xl border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+            <TabsContent value="scoped" className="space-y-4 pt-1 mt-0">
+              {/* Location Input */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1.5">
+                  Location / Suburb Keyword <span className="text-destructive">*</span>
+                </label>
+                <div className="relative">
+                  <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    required
+                    value={scanLocationKeyword}
+                    onChange={(e) => setScanLocationKeyword(e.target.value)}
+                    placeholder="e.g. Rajagiriya, Colombo 7, Battaramulla, Kandy…"
+                    className="pl-10 h-10 bg-background border-input text-foreground placeholder:text-muted-foreground"
                   />
-                  <p className="mt-1 text-[11px] text-[#718078] dark:text-zinc-400">
-                    25 listings per page per selected category.
-                  </p>
+                </div>
+
+                {/* Popular Pills */}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-medium text-muted-foreground mr-0.5">
+                    Popular:
+                  </span>
+                  {QUICK_LOCATIONS.map((loc) => {
+                    const isMatch = scanLocationKeyword.toLowerCase() === loc.toLowerCase();
+                    return (
+                      <Button
+                        key={loc}
+                        type="button"
+                        variant={isMatch ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setScanLocationKeyword(loc)}
+                        className={`h-6 rounded-full px-2.5 text-xs font-medium cursor-pointer ${
+                          isMatch
+                            ? "bg-primary text-primary-foreground font-semibold"
+                            : "border-border bg-muted/50 text-muted-foreground hover:border-primary hover:text-foreground"
+                        }`}
+                      >
+                        {loc}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Target Property Categories */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold text-foreground">
+                    Target Property Categories
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setScopedCategories([])}
+                    className="h-auto p-0 text-[11px] text-muted-foreground hover:text-primary hover:bg-transparent cursor-pointer"
+                  >
+                    Reset (All)
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "houses", label: "Houses" },
+                    { id: "apartments", label: "Apartments" },
+                    { id: "lands", label: "Lands" },
+                    { id: "commercial", label: "Commercial" },
+                  ].map((cat) => {
+                    const isChecked = scopedCategories.includes(cat.id);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          const next = isChecked
+                            ? scopedCategories.filter((c) => c !== cat.id)
+                            : [...scopedCategories, cat.id];
+                          setScopedCategories(next);
+                        }}
+                        className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-3 text-xs font-semibold cursor-pointer transition ${
+                          isChecked
+                            ? "border-primary bg-primary/10 text-primary dark:text-emerald-300 font-bold shadow-2xs"
+                            : "border-border bg-card text-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {isChecked ? (
+                          <Check className="h-3.5 w-3.5 text-primary dark:text-emerald-400 stroke-[3]" />
+                        ) : (
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                        )}
+                        <span>{cat.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {scopedCategories.length === 0
+                    ? "All property types included."
+                    : `Selected: ${scopedCategories.join(" & ")}`}
+                </p>
+              </div>
+            </TabsContent>
+
+            {/* Mode 2: Broad Categories */}
+            <TabsContent value="categories" className="space-y-4 pt-1 mt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2 rounded-xl border border-border p-3.5 bg-muted/30">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    For Sale
+                  </div>
+                  {CATEGORIES.filter((c) => c.type === "sale").map((cat) => (
+                    <label key={cat.id} className="flex cursor-pointer items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={scanCategories.includes(cat.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
+                          else setScanCategories(scanCategories.filter((c) => c !== cat.id));
+                        }}
+                        className="cursor-pointer rounded border-input text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-medium text-foreground">
+                        {cat.label.replace(" for Sale", "")}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-border p-3.5 bg-muted/30">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    Rentals
+                  </div>
+                  {CATEGORIES.filter((c) => c.type === "rent").map((cat) => (
+                    <label key={cat.id} className="flex cursor-pointer items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={scanCategories.includes(cat.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setScanCategories([...scanCategories, cat.id]);
+                          else setScanCategories(scanCategories.filter((c) => c !== cat.id));
+                        }}
+                        className="cursor-pointer rounded border-input text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-medium text-foreground">
+                        {cat.label.replace(" Rentals", "")}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Pages per Category (Max 50)
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={scanPages}
+                  onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
+                  className="bg-background border-input text-foreground"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  25 listings per page per selected category.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
 
           {/* Section 3: Progressive Disclosure Accordion for Crawler & Automation Settings */}
-          <div className="rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-[#fbfcfb] dark:bg-zinc-900/30 overflow-hidden">
+          <div className="rounded-xl border border-border bg-muted/20 overflow-hidden">
             <button
               type="button"
               onClick={() => setIsAdvancedOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between p-3.5 text-left cursor-pointer hover:bg-[#f4f6f4] dark:hover:bg-zinc-800/40 transition"
+              className="w-full flex items-center justify-between p-3.5 text-left cursor-pointer hover:bg-muted/40 transition"
               aria-expanded={isAdvancedOpen}
             >
               <div className="flex items-center gap-2">
-                <SlidersHorizontal className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
-                <span className="text-xs font-bold text-[#1a2923] dark:text-zinc-200">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                <span className="text-xs font-bold text-foreground">
                   Crawler & Lead Pipeline Settings
                 </span>
-                <span className="rounded-full bg-[#eef3f0] dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-[#19352b] dark:text-emerald-400">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                   {scanStrictLocation ? "Strict Match" : "Standard"} • {scanAllPages ? "All Pages" : `${scanPages}p`}
                   {autoFetchPhones ? " • Auto Phone" : ""}
                 </span>
               </div>
               {isAdvancedOpen ? (
-                <ChevronUp className="h-4 w-4 text-[#718078] dark:text-zinc-400" />
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-[#718078] dark:text-zinc-400" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
 
             {isAdvancedOpen && (
-              <div className="p-3.5 pt-0 space-y-3.5 border-t border-[#dce4df] dark:border-zinc-800/60 mt-1">
+              <div className="p-3.5 pt-0 space-y-3.5 border-t border-border mt-1">
                 {/* Strict Suburb Matching (Scoped Mode Only) */}
                 {scanTab === "scoped" && (
                   <div className="pt-2">
@@ -566,13 +544,13 @@ export function ScanLauncherDrawer({
                         type="checkbox"
                         checked={scanStrictLocation}
                         onChange={(e) => setScanStrictLocation(e.target.checked)}
-                        className="mt-0.5 cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-emerald-600 focus:ring-[#19352b]"
+                        className="mt-0.5 cursor-pointer rounded border-input text-primary focus:ring-primary"
                       />
                       <div className="text-xs">
-                        <span className="font-semibold text-[#1a2923] dark:text-zinc-200">
+                        <span className="font-semibold text-foreground">
                           Strict Suburb Matching (Recommended)
                         </span>
-                        <p className="mt-0.5 text-[#64736b] dark:text-zinc-400 leading-relaxed">
+                        <p className="mt-0.5 text-muted-foreground leading-relaxed">
                           Verifies the target location in the ad title or registered suburb to filter out description spam from distant locations.
                         </p>
                       </div>
@@ -582,9 +560,9 @@ export function ScanLauncherDrawer({
 
                 {/* Scan Depth in Scoped Mode */}
                 {scanTab === "scoped" && (
-                  <div className="pt-2 border-t border-[#dce4df]/60 dark:border-zinc-800/40">
+                  <div className="pt-2 border-t border-border/60">
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs font-semibold text-[#1a2923] dark:text-zinc-200">
+                      <label className="text-xs font-semibold text-foreground">
                         Scan Depth Limit
                       </label>
                       <label className="flex cursor-pointer items-center gap-1.5">
@@ -592,30 +570,30 @@ export function ScanLauncherDrawer({
                           type="checkbox"
                           checked={scanAllPages}
                           onChange={(e) => setScanAllPages(e.target.checked)}
-                          className="cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-emerald-600 focus:ring-[#19352b]"
+                          className="cursor-pointer rounded border-input text-primary focus:ring-primary"
                         />
-                        <span className="text-xs font-semibold text-[#19352b] dark:text-emerald-400">
+                        <span className="text-xs font-semibold text-primary">
                           Scan all matching pages
                         </span>
                       </label>
                     </div>
 
                     {scanAllPages ? (
-                      <p className="text-[11px] text-[#64736b] dark:text-zinc-400">
+                      <p className="text-[11px] text-muted-foreground">
                         Automatically discovers the total page count for this location and paginates in polite, rate-limited chunks.
                       </p>
                     ) : (
                       <div className="mt-1.5">
-                        <input
+                        <Input
                           type="number"
                           min="1"
                           max="500"
                           value={scanPages}
                           onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
                           placeholder="e.g. 10"
-                          className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
+                          className="h-8 text-xs bg-background border-input text-foreground"
                         />
-                        <p className="mt-1 text-[11px] text-[#718078] dark:text-zinc-400">
+                        <p className="mt-1 text-[11px] text-muted-foreground">
                           25 listings per page (e.g. 10 pages = up to 250 listings).
                         </p>
                       </div>
@@ -624,20 +602,20 @@ export function ScanLauncherDrawer({
                 )}
 
                 {/* Auto Fetch Phone Numbers */}
-                <div className="pt-2 border-t border-[#dce4df]/60 dark:border-zinc-800/40">
+                <div className="pt-2 border-t border-border/60">
                   <label className="flex cursor-pointer items-start gap-2.5">
                     <input
                       type="checkbox"
                       checked={autoFetchPhones}
                       onChange={(e) => setAutoFetchPhones(e.target.checked)}
-                      className="mt-0.5 cursor-pointer rounded border-[#cbd8d1] dark:border-zinc-700 text-[#19352b] dark:text-emerald-600 focus:ring-[#19352b]"
+                      className="mt-0.5 cursor-pointer rounded border-input text-primary focus:ring-primary"
                     />
                     <div className="text-xs">
-                      <span className="font-semibold text-[#1a2923] dark:text-zinc-200 flex items-center gap-1.5">
+                      <span className="font-semibold text-foreground flex items-center gap-1.5">
                         <PhoneCall className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                         <span>Auto-fetch owner contact numbers</span>
                       </span>
-                      <p className="mt-0.5 text-[#64736b] dark:text-zinc-400 leading-relaxed">
+                      <p className="mt-0.5 text-muted-foreground leading-relaxed">
                         Automatically schedules phone enrichment sync as soon as this scan job completes.
                       </p>
                     </div>
@@ -649,11 +627,11 @@ export function ScanLauncherDrawer({
         </form>
 
         {/* Live Preview Strip & Sticky Action Footer */}
-        <div className="border-t border-[#dce4df] dark:border-zinc-800 bg-[#fbfcfb] dark:bg-zinc-900/90 px-5 py-3.5 sm:px-6 space-y-2.5">
+        <div className="border-t border-border bg-card px-5 py-3.5 sm:px-6 space-y-2.5">
           {/* Real-time Launch Summary Pill */}
-          <div className="flex items-center justify-between text-xs rounded-lg bg-[#eef3f0]/70 dark:bg-zinc-800/60 px-3 py-2 text-[#19352b] dark:text-zinc-300">
+          <div className="flex items-center justify-between text-xs rounded-lg bg-muted/60 px-3 py-2 text-foreground">
             <div className="flex items-center gap-2 truncate">
-              <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
               <span className="truncate">
                 <span className="font-bold">{selectedSource === "ikman" ? "Ikman" : "LPW"}</span>
                 {" • "}
@@ -665,26 +643,27 @@ export function ScanLauncherDrawer({
               </span>
             </div>
             {autoFetchPhones && (
-              <span className="shrink-0 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider ml-2">
+              <span className="shrink-0 text-[10px] font-bold text-primary uppercase tracking-wider ml-2">
                 + Phone Sync
               </span>
             )}
           </div>
 
           <div className="flex items-center justify-end gap-2.5">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
               disabled={submitting}
-              className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-semibold text-[#64736b] dark:text-zinc-400 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 hover:text-[#1a2923] dark:hover:text-white transition"
+              className="cursor-pointer"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               form="scan-launcher-form"
               disabled={submitting}
-              className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl bg-[#19352b] dark:bg-emerald-600 px-6 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#132820] dark:hover:bg-emerald-500 disabled:opacity-50 transition min-w-[130px]"
+              className="min-w-[130px] font-semibold cursor-pointer"
             >
               {submitting ? (
                 <>
@@ -697,10 +676,10 @@ export function ScanLauncherDrawer({
                   <span>Launch Scan</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }

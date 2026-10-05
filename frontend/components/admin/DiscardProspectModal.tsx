@@ -1,8 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Bot, MapPinOff, UserX, Home, PhoneOff, Trash2, CheckCircle2 } from "lucide-react";
+import { Bot, MapPinOff, UserX, Home, PhoneOff, Trash2, CheckCircle2 } from "lucide-react";
 import { Prospect } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export interface DiscardReasonOption {
   id: string;
@@ -36,19 +45,19 @@ export const DISCARD_REASONS: DiscardReasonOption[] = [
     id: "already_sold",
     label: "Already Sold / Rented",
     description: "Property is no longer on the market or agreement already signed.",
-    icon: <Home className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />,
+    icon: <Home className="h-5 w-5 text-muted-foreground" />,
   },
   {
     id: "unreachable",
     label: "Unreachable / Invalid Contact",
     description: "Phone number is invalid, unreachable, or unresponsive.",
-    icon: <PhoneOff className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />,
+    icon: <PhoneOff className="h-5 w-5 text-muted-foreground" />,
   },
   {
     id: "duplicate",
     label: "Duplicate / Junk",
     description: "Duplicate submission, spam ad, or broken listing content.",
-    icon: <Trash2 className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />,
+    icon: <Trash2 className="h-5 w-5 text-muted-foreground" />,
   },
 ];
 
@@ -63,7 +72,7 @@ export function isBrokerSignalReason(reason?: string | null): boolean {
   return reason === "misclassified_broker";
 }
 
-interface DiscardProspectModalProps {
+export interface DiscardProspectModalProps {
   isOpen: boolean;
   prospect: Prospect | null;
   onClose: () => void;
@@ -80,7 +89,7 @@ export default function DiscardProspectModal({
 }: DiscardProspectModalProps) {
   const [selectedReason, setSelectedReason] = useState<string>("misclassified_broker");
 
-  if (!isOpen || !prospect) return null;
+  if (!prospect) return null;
 
   const handleConfirm = async () => {
     if (!selectedReason) return;
@@ -89,36 +98,21 @@ export default function DiscardProspectModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
-      <div 
-        className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 sm:p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="discard-modal-title"
-      >
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !loading) onClose(); }}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-6 gap-0">
         {/* Header */}
-        <div className="flex items-start justify-between pb-3 border-b border-[#e5ece8] dark:border-zinc-800">
-          <div>
-            <h3 id="discard-modal-title" className="text-lg font-bold text-[#1a2923] dark:text-zinc-100">
-              Discard Prospect
-            </h3>
-            <p className="text-xs text-[#64736b] dark:text-zinc-400 mt-0.5 line-clamp-1">
-              {prospect.title}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="p-1.5 rounded-lg text-[#718078] hover:text-[#1a2923] dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-900 transition cursor-pointer"
-            aria-label="Close modal"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        <DialogHeader className="pb-3 border-b border-border text-left">
+          <DialogTitle className="text-lg font-bold text-foreground">
+            Discard Prospect
+          </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+            {prospect.title}
+          </DialogDescription>
+        </DialogHeader>
 
         {/* Reason options */}
         <div className="py-4 overflow-y-auto space-y-2.5 flex-1 pr-1">
-          <p className="text-xs font-semibold text-[#718078] dark:text-zinc-400 uppercase tracking-wider mb-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Select a reason:
           </p>
 
@@ -132,39 +126,43 @@ export default function DiscardProspectModal({
                 className={`w-full text-left p-3.5 rounded-xl border transition flex items-start gap-3.5 cursor-pointer min-h-[52px] ${
                   isSelected
                     ? opt.isAiSignal
-                      ? "border-purple-400 bg-purple-50/70 dark:border-purple-700 dark:bg-purple-950/30"
-                      : "border-emerald-500 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/30"
-                    : "border-[#e5ece8] dark:border-zinc-800 hover:bg-[#f8faf8] dark:hover:bg-zinc-900"
+                      ? "border-purple-500 bg-purple-500/10 dark:border-purple-500/80 dark:bg-purple-950/40"
+                      : "border-emerald-500 bg-emerald-500/10 dark:border-emerald-500/80 dark:bg-emerald-950/40"
+                    : "border-border bg-card hover:bg-muted text-card-foreground"
                 }`}
               >
                 <div className="shrink-0 mt-0.5">{opt.icon}</div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-semibold ${
-                      isSelected
-                        ? opt.isAiSignal
-                          ? "text-purple-900 dark:text-purple-200"
-                          : "text-emerald-950 dark:text-emerald-200"
-                        : "text-[#1a2923] dark:text-zinc-200"
-                    }`}>
+                    <span
+                      className={`text-sm font-semibold ${
+                        isSelected
+                          ? opt.isAiSignal
+                            ? "text-purple-950 dark:text-purple-200"
+                            : "text-emerald-950 dark:text-emerald-200"
+                          : "text-foreground"
+                      }`}
+                    >
                       {opt.label}
                     </span>
                     {opt.isAiSignal && (
-                      <span className="rounded bg-purple-200/80 dark:bg-purple-900/60 px-1.5 py-0.2 text-[10px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider">
+                      <span className="rounded bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.5 text-[10px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider">
                         Scraper Signal
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#64736b] dark:text-zinc-400 mt-0.5 leading-snug">
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
                     {opt.description}
                   </p>
                 </div>
                 {isSelected && (
-                  <CheckCircle2 className={`h-5 w-5 shrink-0 mt-0.5 ${
-                    opt.isAiSignal
-                      ? "text-purple-600 dark:text-purple-400"
-                      : "text-emerald-600 dark:text-emerald-400"
-                  }`} />
+                  <CheckCircle2
+                    className={`h-5 w-5 shrink-0 mt-0.5 ${
+                      opt.isAiSignal
+                        ? "text-purple-600 dark:text-purple-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                    }`}
+                  />
                 )}
               </button>
             );
@@ -172,25 +170,27 @@ export default function DiscardProspectModal({
         </div>
 
         {/* Actions */}
-        <div className="pt-3 border-t border-[#e5ece8] dark:border-zinc-800 flex items-center justify-end gap-2.5">
-          <button
+        <DialogFooter className="pt-3 border-t border-border flex items-center justify-end gap-2.5 sm:space-x-0">
+          <Button
             type="button"
+            variant="outline"
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2.5 rounded-xl border border-[#cbd8d1] dark:border-zinc-700 text-sm font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-900 transition cursor-pointer min-h-[44px]"
+            className="min-h-[44px]"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="destructive"
             onClick={handleConfirm}
             disabled={loading || !selectedReason}
-            className="px-5 py-2.5 rounded-xl bg-red-600 dark:bg-red-700 text-sm font-semibold text-white hover:bg-red-700 dark:hover:bg-red-600 shadow-sm transition disabled:opacity-50 cursor-pointer min-h-[44px]"
+            className="min-h-[44px]"
           >
             {loading ? "Discarding..." : "Confirm Discard"}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,6 +1,105 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: #f4f6f4;
+  --foreground: #1a2923;
+  --card: #ffffff;
+  --card-foreground: #1a2923;
+  --popover: #ffffff;
+  --popover-foreground: #1a2923;
+  --primary: #28513f;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2ef;
+  --secondary-foreground: #1a2923;
+  --muted: #f0f3f1;
+  --muted-foreground: #64736b;
+  --accent: #eaf1ed;
+  --accent-foreground: #19352b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #dce4df;
+  --input: #d0dbd4;
+  --ring: #28513f;
+
+  --sidebar: #19352b;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #28513f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #23483b;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #4ade80;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-foreground: #f4f4f5;
+  --popover: #18181b;
+  --popover-foreground: #f4f4f5;
+  --primary: #10b981;
+  --primary-foreground: #064e3b;
+  --secondary: #27272a;
+  --secondary-foreground: #f4f4f5;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #f4f4f5;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #10b981;
+
+  --sidebar: #121215;
+  --sidebar-foreground: #f4f4f5;
+  --sidebar-primary: #10b981;
+  --sidebar-primary-foreground: #064e3b;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #f4f4f5;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #10b981;
+}
+
 /*
   Layout standards.
 
@@ -46,6 +145,11 @@
    own bands and are unaffected. */
 body {
   background-color: var(--color-page);
+}
+
+.dark body {
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /* Smooth scroll for the hero's `#chat` jump link. Opt-out, not opt-in — anyone

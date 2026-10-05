@@ -6,7 +6,7 @@ from app.agent import tools
 from app.agent.tools import ToolArgumentError, ToolContext
 from app.models import Conversation, Property, PropertyStatus, PropertyType, Suburb, Prospect
 from app.services.price_parser import parse_lkr_price
-from app.services.market_valuation import calculate_suburb_market_value
+from app.services.market_valuation import calculate_suburb_market_value, extract_sub_area
 from app.services.suburb_seeds import seed_suburbs_data
 
 
@@ -42,6 +42,22 @@ class TestPriceParser:
         assert is_pp
 
 
+class TestSubAreaExtractor:
+    def test_known_sub_area_extraction(self):
+        area = extract_sub_area("House with Shop in Attidiya, Dehiwala", "Dehiwala", "Dehiwala")
+        assert area == "Attidiya"
+
+        area2 = extract_sub_area("Valuable Land in Waidya Road Dehiwala", "Dehiwala", "Dehiwala")
+        assert area2 == "Waidya Road"
+
+        area3 = extract_sub_area("Commercial Property near Kalubowila Hospital", "Dehiwala", "Dehiwala")
+        assert area3 == "Kalubowila"
+
+    def test_fallback_sub_area(self):
+        area = extract_sub_area("Prime Land for Sale 30 Perches", "Dehiwala", "Dehiwala")
+        assert area == "Central Dehiwala"
+
+
 class TestMarketValuationService:
     def test_seeded_suburb_benchmarks(self, db_session: Session):
         seed_suburbs_data(db_session)
@@ -50,21 +66,21 @@ class TestMarketValuationService:
         res = calculate_suburb_market_value(db_session, "Rajagiriya", property_type="land")
         assert res["suburb"] == "Rajagiriya"
         assert res["district"] == "Colombo"
-        assert res["tier"] == "Inner Suburbs (Affluent)"
-        assert res["stats"]["price_per_perch_lkr"]["benchmark_range"] == [4500000.0, 7500000.0]
+        assert res["unit_pricing"]["primary_unit"] == "per_perch"
+        assert res["unit_pricing"]["benchmark_range"] == [4500000.0, 7500000.0]
 
-    def test_market_value_aggregation_with_live_listings(self, db_session: Session):
+    def test_market_value_aggregation_with_live_listings_and_sub_areas(self, db_session: Session):
         seed_suburbs_data(db_session)
 
-        # Add a Prospect in Rajagiriya
-        p = Prospect(
-            title="Prime Land in Rajagiriya",
-            price="Rs 5,000,000 per perch",
-            price_numeric=Decimal("5000000"),
+        # Add listings in Dehiwala with different sub-areas
+        p1 = Prospect(
+            title="House in Attidiya, Dehiwala",
+            price="Rs 2,600,000 per perch",
+            price_numeric=Decimal("2600000"),
             is_price_per_perch=True,
             land_size_perches=Decimal("10"),
-            location="Rajagiriya",
-            suburb="Rajagiriya",
+            location="Dehiwala",
+            suburb="Dehiwala",
             property_type="land",
             listing_type="sale",
             classification="owner",
@@ -73,14 +89,49 @@ class TestMarketValuationService:
             classification_method="heuristic",
             status="new",
         )
-        db_session.add(p)
+        p2 = Prospect(
+            title="Valuable Land in Waidya Road Dehiwala",
+            price="Rs 6,500,000 per perch",
+            price_numeric=Decimal("6500000"),
+            is_price_per_perch=True,
+            land_size_perches=Decimal("10"),
+            location="Dehiwala",
+            suburb="Dehiwala",
+            property_type="land",
+            listing_type="sale",
+            classification="owner",
+            confidence=90,
+            classification_reasons=["test"],
+            classification_method="heuristic",
+            status="new",
+        )
+        db_session.add_all([p1, p2])
         db_session.commit()
 
-        res = calculate_suburb_market_value(db_session, "Rajagiriya", property_type="land")
-        assert res["sample_size"] >= 1
-        assert res["stats"]["price_per_perch_lkr"]["asking_median"] == 5000000.0
-        # 10% realization discount applied
-        assert res["stats"]["price_per_perch_lkr"]["realized_estimate"] == 4500000.0
+        # Query entire Dehiwala
+        res = calculate_suburb_market_value(db_session, "Dehiwala", property_type="land")
+        assert res["sample_summary"]["total_sourced"] >= 2
+        assert res["unit_pricing"]["min"] == 2600000.0
+        assert res["unit_pricing"]["max"] == 6500000.0
+        # Sub-area breakdown present
+        sub_area_names = [sa["name"] for sa in res["sub_areas"]]
+        assert "Attidiya" in sub_area_names
+        assert "Waidya Road" in sub_area_names
+
+        # Grading thresholds computed
+        assert res["grading_thresholds"]["fair_value_min"] is not None
+        assert res["grading_thresholds"]["fair_value_max"] is not None
+
+        # Sourced listings breakdown
+        assert len(res["sourced_listings"]) >= 2
+        assert res["sample_summary"]["sources"]["ikman"] >= 2
+
+        # Query specific sub-area: Attidiya
+        res_attidiya = calculate_suburb_market_value(db_session, "Dehiwala", sub_area_filter="Attidiya", property_type="land")
+        assert res_attidiya["sample_summary"]["total_sourced"] == 1
+        assert res_attidiya["unit_pricing"]["median_asking"] == 2600000.0
+        # Realized deal price has 10% negotiation discount
+        assert res_attidiya["unit_pricing"]["realized_deal_target"] == 2340000.0
 
 
 class TestAgentMarketValueTool:
@@ -89,14 +140,16 @@ class TestAgentMarketValueTool:
         with pytest.raises(ToolArgumentError):
             tools.get_market_value(ctx, {})
 
-    def test_market_value_tool_execution(self, db_session: Session):
+    def test_market_value_tool_execution_with_sub_area(self, db_session: Session):
         seed_suburbs_data(db_session)
         ctx = _context(db_session)
         res = tools.execute_tool(
             "get_market_value",
-            {"location": "Colombo 7", "property_type": "apartment"},
+            {"location": "Dehiwala", "sub_area": "Attidiya", "property_type": "land"},
             ctx,
         )
         assert "error" not in res
-        assert res["suburb"] == "Colombo 7"
-        assert res["stats"]["price_per_sqft_lkr"]["benchmark_range"] == [70000.0, 130000.0]
+        assert res["suburb"] == "Dehiwala"
+        assert res["sub_area"] == "Attidiya"
+        assert "advisory_summary" in res
+        assert len(res["advisory_summary"]) > 20

@@ -559,6 +559,7 @@ def get_market_value(context: ToolContext, args: dict[str, Any]) -> dict[str, An
     if not location or not str(location).strip():
         raise ToolArgumentError("location is required to look up market value.")
 
+    sub_area = args.get("sub_area")
     property_type = args.get("property_type")
     listing_type = args.get("listing_type") or "sale"
 
@@ -567,6 +568,7 @@ def get_market_value(context: ToolContext, args: dict[str, Any]) -> dict[str, An
     result = calculate_suburb_market_value(
         db=context.db,
         location_query=str(location).strip(),
+        sub_area_filter=str(sub_area).strip() if sub_area else None,
         property_type=str(property_type).strip() if property_type else None,
         listing_type=str(listing_type).strip(),
     )
@@ -767,10 +769,10 @@ _DETAILS_DECLARATION = types.FunctionDeclaration(
 _MARKET_VALUE_DECLARATION = types.FunctionDeclaration(
     name=GET_MARKET_VALUE,
     description=(
-        "Get market valuation benchmarks, estimated median prices, and per-perch or per-sqft "
-        "going rates for a specific suburb, neighbourhood, or area (e.g. 'Rajagiriya', 'Colombo 7', "
-        "'Battaramulla', 'Nugegoda'). Call this when a user asks about property rates, land values, "
-        "or price expectations in an area. Returns asking medians, realized estimates, and benchmark ranges."
+        "Get market valuation benchmarks, realistic deal prices, and per-perch or per-sqft "
+        "going rates for a specific suburb or micro-area (e.g. 'Dehiwala', 'Attidiya', 'Kalubowila', 'Rajagiriya', 'Colombo 7'). "
+        "Call this when a user asks about property rates, land values, or price expectations. "
+        "Returns advisory summaries, unit rate ranges (min, median, max), and micro-area comparisons."
     ),
     parameters=types.Schema(
         type=types.Type.OBJECT,
@@ -778,6 +780,10 @@ _MARKET_VALUE_DECLARATION = types.FunctionDeclaration(
             "location": types.Schema(
                 type=types.Type.STRING,
                 description="The suburb, postal zone, or town name (e.g. 'Colombo 7', 'Rajagiriya', 'Dehiwala').",
+            ),
+            "sub_area": types.Schema(
+                type=types.Type.STRING,
+                description="Optional specific micro-area or road (e.g. 'Attidiya', 'Kalubowila', 'Nedimala', 'Waidya Road').",
             ),
             "property_type": types.Schema(
                 type=types.Type.STRING,

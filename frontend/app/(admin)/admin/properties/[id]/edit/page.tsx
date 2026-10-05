@@ -16,6 +16,13 @@ import {
 import { ContactForm } from '@/components/admin/ContactForm';
 import { Spinner } from '@/components/ui/spinner';
 import { AreaConverterInput } from '@/components/admin/AreaConverterInput';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 
 type FormValues = {
 	title: string;
@@ -416,63 +423,61 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 	if (loading) {
 		return (
 			<section className='mx-auto max-w-4xl py-12 text-center'>
-				<Spinner className='mx-auto h-8 w-8 text-[#28513f] dark:text-emerald-400' />
-				<p className='mt-4 text-sm text-[#75847c] dark:text-zinc-400'>Loading property details...</p>
+				<Spinner className='mx-auto h-8 w-8 text-primary' />
+				<p className='mt-4 text-sm text-muted-foreground'>Loading property details...</p>
 			</section>
 		);
 	}
 
 	if (notFound) {
 		return (
-			<div className='mx-auto max-w-2xl rounded-xl border border-[#cfe3d6] bg-white dark:bg-zinc-950 p-10 text-center shadow-sm'>
-				<h2 className='text-2xl font-semibold'>Property Not Found</h2>
-				<p className='mt-2 text-sm text-[#718078] dark:text-zinc-400'>
-					The property listing you requested could not be found.
-				</p>
-				<Link
-					href='/admin'
-					className='mt-7 inline-flex items-center gap-2 rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200'
-				>
-					<ArrowLeft className='h-4 w-4' /> Return to properties
-				</Link>
-			</div>
+			<Card className='mx-auto max-w-2xl p-10 text-center'>
+				<CardContent className='flex flex-col items-center p-0'>
+					<CardTitle className='text-2xl font-semibold'>Property Not Found</CardTitle>
+					<CardDescription className='mt-2 text-sm text-muted-foreground'>
+						The property listing you requested could not be found.
+					</CardDescription>
+					<Button asChild className='mt-7'>
+						<Link href='/admin' className='inline-flex items-center gap-2'>
+							<ArrowLeft className='h-4 w-4' /> Return to properties
+						</Link>
+					</Button>
+				</CardContent>
+			</Card>
 		);
 	}
 
 	if (success) {
 		return (
-			<div className='mx-auto max-w-2xl rounded-xl border border-[#cfe3d6] bg-white dark:bg-zinc-950 p-10 text-center shadow-sm'>
-				<div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#e0f1e7] dark:bg-green-950 text-xl text-[#28704b] dark:text-green-300'>
-					✓
-				</div>
-				<h2 className='mt-5 text-2xl font-semibold'>Property updated</h2>
-				<p className='mt-2 text-sm text-[#718078] dark:text-zinc-400'>
-					Your changes have been saved to the catalog.
-				</p>
-				<div className='mt-7 flex flex-wrap items-center justify-center gap-4'>
-					<button
-						type='button'
-						onClick={() => setSuccess(false)}
-						className='rounded-lg border border-[#d2ddd5] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-5 py-3 text-sm font-semibold text-[#53655b] dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-					>
-						Continue editing
-					</button>
-					<Link
-						href='/admin'
-						className='inline-flex rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200 hover:bg-[#1e4031] dark:hover:bg-emerald-600'
-					>
-						Return to properties
-					</Link>
-				</div>
-			</div>
+			<Card className='mx-auto max-w-2xl p-10 text-center'>
+				<CardContent className='flex flex-col items-center p-0'>
+					<div className='flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950 text-xl text-emerald-800 dark:text-emerald-300'>
+						✓
+					</div>
+					<CardTitle className='mt-5 text-2xl font-semibold'>Property updated</CardTitle>
+					<CardDescription className='mt-2 text-sm text-muted-foreground'>
+						Your changes have been saved to the catalog.
+					</CardDescription>
+					<div className='mt-7 flex flex-wrap items-center justify-center gap-4'>
+						<Button
+							type='button'
+							variant='outline'
+							onClick={() => setSuccess(false)}
+						>
+							Continue editing
+						</Button>
+						<Button asChild>
+							<Link href='/admin'>Return to properties</Link>
+						</Button>
+					</div>
+				</CardContent>
+			</Card>
 		);
 	}
 
-	const fieldClass =
-		'mt-2 w-full rounded-lg border border-[#d7e0da] bg-white dark:bg-zinc-950 px-3.5 py-3 text-sm text-[#243a2e] dark:text-zinc-200 outline-none transition placeholder:text-[#a2ada7] dark:placeholder:text-zinc-500 focus:border-[#5e8c73] dark:focus:border-emerald-600 focus:ring-2 focus:ring-[#dcebe1] dark:focus:ring-emerald-950/50';
 	const errorText = (field: string) =>
 		errors[field] ? (
-			<p className='mt-1 text-xs text-[#a34d4d] dark:text-red-400'>{errors[field]}</p>
+			<p className='mt-1 text-xs text-destructive'>{errors[field]}</p>
 		) : null;
 
 	return (
@@ -480,68 +485,71 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 			<div className='mb-8'>
 				<Link
 					href='/admin'
-					className='text-sm font-medium text-[#527664] dark:text-emerald-400 hover:underline inline-flex items-center gap-1.5'
+					className='text-sm font-medium text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-1.5'
 				>
 					<ArrowLeft className='h-4 w-4' /> Back to properties
 				</Link>
-				<h2 className='mt-5 text-3xl font-semibold tracking-tight'>
+				<h2 className='mt-5 text-3xl font-semibold tracking-tight text-foreground'>
 					Edit property
 				</h2>
-				<p className='mt-2 text-sm text-[#75847c] dark:text-zinc-400'>
+				<p className='mt-2 text-sm text-muted-foreground'>
 					Update listing specifications, details, pricing, and media.
 				</p>
 			</div>
 
 			{/* AI Smart Autofill Card */}
-			<div className='mb-8 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 p-5 sm:p-6 shadow-sm'>
-				<div className='flex items-center justify-between'>
-					<div className='flex items-center gap-2.5'>
-						<div className='flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'>
-							<Sparkles className='h-5 w-5' />
+			<Card className='mb-8 border-emerald-200 dark:border-emerald-900/60 bg-gradient-to-br from-emerald-50/70 via-background to-emerald-50/30 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950'>
+				<CardHeader className='pb-4'>
+					<div className='flex items-center justify-between'>
+						<div className='flex items-center gap-2.5'>
+							<div className='flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'>
+								<Sparkles className='h-5 w-5' />
+							</div>
+							<div>
+								<CardTitle className='text-base flex items-center gap-2'>
+									AI Smart Autofill
+									<span className='rounded-full bg-emerald-100 dark:bg-emerald-900/50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:text-emerald-300'>
+										Sinhala & English
+									</span>
+								</CardTitle>
+								<CardDescription className='text-xs text-muted-foreground'>
+									Paste unstructured text from WhatsApp, email, or SMS to update the form fields
+								</CardDescription>
+							</div>
 						</div>
-						<div>
-							<h3 className='text-base font-semibold text-[#19352b] dark:text-zinc-100 flex items-center gap-2'>
-								AI Smart Autofill
-								<span className='rounded-full bg-emerald-100 dark:bg-emerald-900/50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:text-emerald-300'>
-									Sinhala & English
-								</span>
-							</h3>
-							<p className='text-xs text-[#527664] dark:text-zinc-400'>
-								Paste unstructured text from WhatsApp, email, or SMS to update the form fields
-							</p>
-						</div>
+						<Button
+							type='button'
+							variant='ghost'
+							size='sm'
+							onClick={() => setIsAutofillOpen(!isAutofillOpen)}
+							className='text-xs font-medium text-muted-foreground hover:text-foreground h-auto py-1 px-2'
+						>
+							{isAutofillOpen ? (
+								<>Hide <ChevronUp className='h-3.5 w-3.5 ml-1' /></>
+							) : (
+								<>Expand <ChevronDown className='h-3.5 w-3.5 ml-1' /></>
+							)}
+						</Button>
 					</div>
-					<button
-						type='button'
-						onClick={() => setIsAutofillOpen(!isAutofillOpen)}
-						className='text-xs font-medium text-[#527664] dark:text-zinc-400 hover:text-[#19352b] dark:hover:text-zinc-200 flex items-center gap-1 cursor-pointer'
-					>
-						{isAutofillOpen ? (
-							<>Hide <ChevronUp className='h-3.5 w-3.5' /></>
-						) : (
-							<>Expand <ChevronDown className='h-3.5 w-3.5' /></>
-						)}
-					</button>
-				</div>
+				</CardHeader>
 
 				{isAutofillOpen && (
-					<div className='mt-4 space-y-3.5'>
-						<textarea
+					<CardContent className='space-y-3.5 pt-0'>
+						<Textarea
 							rows={4}
 							value={rawText}
 							onChange={(e) => setRawText(e.target.value)}
 							placeholder={`Paste WhatsApp listing, SMS, or email here...\nSupports English, Sinhala (e.g. "හෝමාගම පර්චස් 10ක කාමර 3ක නිවස විකිණීමට. ලක්ෂ 220යි..."), and Singlish.`}
-							className='w-full rounded-lg border border-[#d7e0da] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3 text-sm text-[#243a2e] dark:text-zinc-200 outline-none placeholder:text-[#a2ada7] dark:placeholder:text-zinc-500 focus:border-[#5e8c73] dark:focus:border-emerald-600 focus:ring-2 focus:ring-[#dcebe1] dark:focus:ring-emerald-950/50'
+							className='w-full'
 							disabled={extracting}
 						/>
 
 						<div className='flex flex-wrap items-center justify-between gap-3'>
 							<div className='flex items-center gap-2'>
-								<button
+								<Button
 									type='button'
 									onClick={handleExtract}
 									disabled={extracting || !rawText.trim()}
-									className='inline-flex items-center gap-2 rounded-lg bg-[#28513f] dark:bg-emerald-700 hover:bg-[#1e3e30] dark:hover:bg-emerald-600 disabled:opacity-50 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition cursor-pointer disabled:cursor-not-allowed'
 								>
 									{extracting ? (
 										<>
@@ -554,28 +562,30 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 											Autofill Form
 										</>
 									)}
-								</button>
+								</Button>
 								{rawText && (
-									<button
+									<Button
 										type='button'
+										variant='ghost'
+										size='sm'
 										onClick={() => {
 											setRawText('');
 											setExtractedContact(null);
 										}}
 										disabled={extracting}
-										className='text-xs text-[#718078] dark:text-zinc-400 hover:underline px-2 py-1 cursor-pointer'
+										className='text-xs text-muted-foreground hover:text-foreground'
 									>
 										Clear
-									</button>
+									</Button>
 								)}
 							</div>
-							<p className='text-[11px] text-[#718078] dark:text-zinc-400'>
+							<p className='text-[11px] text-muted-foreground'>
 								Auto-converts ලක්ෂ / කෝටි / M, translates Sinhala to English, and maps specs.
 							</p>
 						</div>
 
 						{extractedContact && (extractedContact.name || extractedContact.phone) && (
-							<div className='mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5 text-xs text-[#19352b] dark:text-zinc-300'>
+							<div className='mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5 text-xs text-foreground'>
 								<div className='flex items-center gap-1.5'>
 									<CheckCircle2 className='h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0' />
 									<span>
@@ -584,408 +594,445 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 									</span>
 								</div>
 								{!form.propertyContactId && extractedContact.phone && (
-									<button
+									<Button
 										type='button'
+										size='sm'
 										onClick={handleCreateExtractedContact}
 										disabled={creatingContact}
-										className='inline-flex items-center gap-1 rounded bg-[#28513f] dark:bg-emerald-700 hover:bg-[#1e3e30] px-2.5 py-1 text-xs font-medium text-white shadow-xs cursor-pointer'
+										className='h-7 text-xs px-2.5'
 									>
-										<UserPlus className='h-3 w-3' />
+										<UserPlus className='h-3 w-3 mr-1' />
 										{creatingContact ? 'Saving Contact...' : 'Save as Contact'}
-									</button>
+									</Button>
 								)}
 							</div>
 						)}
-					</div>
+					</CardContent>
 				)}
-			</div>
+			</Card>
 
 			<form onSubmit={submit} className='space-y-6'>
-				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
-					<h3 className='text-base font-semibold'>Basic information</h3>
-					<div className='mt-6 grid gap-5 sm:grid-cols-2'>
-						<label className='text-sm font-medium sm:col-span-2'>
-							Title
-							<input
-								className={fieldClass}
-								value={form.title}
-								onChange={(e) => updateField('title', e.target.value)}
-								placeholder='e.g. Modern villa in Colombo 7'
-							/>
-							{errorText('title')}
-						</label>
-						<label className='text-sm font-medium'>
-							Listing type
-							<select
-								className={fieldClass}
-								value={form.listingType}
-								onChange={(e) => updateField('listingType', e.target.value)}
-							>
-								<option value='sale'>For sale</option>
-								<option value='rent'>For rent</option>
-							</select>
-						</label>
-						<label className='text-sm font-medium'>
-							Property type
-							<select
-								className={fieldClass}
-								value={form.propertyType}
-								onChange={(e) => updateField('propertyType', e.target.value)}
-							>
-								<option value='house'>House</option>
-								<option value='apartment'>Apartment</option>
-								<option value='land'>Land</option>
-								<option value='commercial'>Commercial</option>
-								<option value='mixed_use'>Mixed Use</option>
-							</select>
-						</label>
-						<label className='text-sm font-medium'>
-							{form.pricePerPerch ? 'Price per perch (LKR)' : 'Total Price (LKR)'}
-							<input
-								className={fieldClass}
-								type='number'
-								min='0'
-								value={form.price}
-								onChange={(e) => updateField('price', e.target.value)}
-								placeholder='50000000'
-							/>
-							<label className='mt-2 flex items-center gap-2 text-xs font-normal text-[#65736b] dark:text-zinc-300'>
-								<input
-									type='checkbox'
-									checked={form.pricePerPerch}
-									onChange={(e) =>
-										updateField('pricePerPerch', e.target.checked)
-									}
+				<Card>
+					<CardHeader>
+						<CardTitle className='text-base font-semibold'>Basic information</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className='grid gap-5 sm:grid-cols-2'>
+							<div className='space-y-2 sm:col-span-2'>
+								<Label htmlFor='title'>Title</Label>
+								<Input
+									id='title'
+									value={form.title}
+									onChange={(e) => updateField('title', e.target.value)}
+									placeholder='e.g. Modern villa in Colombo 7'
 								/>
-								Price per perch
-							</label>
-							{errorText('price')}
-						</label>
-						<label className='text-sm font-medium sm:col-span-2'>
-							Location
-							<input
-								className={fieldClass}
-								value={form.location}
-								onChange={(e) => updateField('location', e.target.value)}
-								placeholder='Colombo 5'
-							/>
-							{errorText('location')}
-						</label>
-						<div className='sm:col-span-2'>
-							<div className='flex items-center justify-between mb-1'>
-								<label className='text-sm font-medium'>Contact (Owner / Broker)</label>
-								<button
-									type='button'
-									onClick={() => setShowContactForm(true)}
-									className='text-xs font-semibold text-[#35664f] dark:text-emerald-400 hover:underline'
-								>
-									+ Add new contact
-								</button>
+								{errorText('title')}
 							</div>
-							<select
-								className={fieldClass}
-								value={form.propertyContactId}
-								onChange={(e) => updateField('propertyContactId', e.target.value)}
-							>
-								<option value=''>— None —</option>
-								{contacts.map((c) => (
-									<option key={c.id} value={c.id}>
-										{c.full_name} {c.company_name ? `(${c.company_name})` : ''}
-									</option>
-								))}
-							</select>
-							{showContactForm && (
-								<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-									<div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-2xl">
-										<h3 className="mb-4 text-lg font-semibold">Add new contact</h3>
-										<ContactForm
-											onSave={handleCreateContact}
-											onCancel={() => setShowContactForm(false)}
-											saving={creatingContact}
+
+							<div className='space-y-2'>
+								<Label htmlFor='listingType'>Listing type</Label>
+								<Select
+									id='listingType'
+									value={form.listingType}
+									onChange={(e) => updateField('listingType', e.target.value)}
+								>
+									<option value='sale'>For sale</option>
+									<option value='rent'>For rent</option>
+								</Select>
+							</div>
+
+							<div className='space-y-2'>
+								<Label htmlFor='propertyType'>Property type</Label>
+								<Select
+									id='propertyType'
+									value={form.propertyType}
+									onChange={(e) => updateField('propertyType', e.target.value)}
+								>
+									<option value='house'>House</option>
+									<option value='apartment'>Apartment</option>
+									<option value='land'>Land</option>
+									<option value='commercial'>Commercial</option>
+									<option value='mixed_use'>Mixed Use</option>
+								</Select>
+							</div>
+
+							<div className='space-y-2'>
+								<Label htmlFor='price'>
+									{form.pricePerPerch ? 'Price per perch (LKR)' : 'Total Price (LKR)'}
+								</Label>
+								<Input
+									id='price'
+									type='number'
+									min='0'
+									value={form.price}
+									onChange={(e) => updateField('price', e.target.value)}
+									placeholder='50000000'
+								/>
+								<div className='flex items-center gap-2 pt-1'>
+									<Switch
+										id='pricePerPerch'
+										checked={form.pricePerPerch}
+										onCheckedChange={(checked) => updateField('pricePerPerch', checked)}
+									/>
+									<Label htmlFor='pricePerPerch' className='text-xs font-normal text-muted-foreground cursor-pointer'>
+										Price per perch
+									</Label>
+								</div>
+								{errorText('price')}
+							</div>
+
+							<div className='space-y-2 sm:col-span-2'>
+								<Label htmlFor='location'>Location</Label>
+								<Input
+									id='location'
+									value={form.location}
+									onChange={(e) => updateField('location', e.target.value)}
+									placeholder='Colombo 5'
+								/>
+								{errorText('location')}
+							</div>
+
+							<div className='space-y-2 sm:col-span-2'>
+								<div className='flex items-center justify-between'>
+									<Label htmlFor='propertyContactId'>Contact (Owner / Broker)</Label>
+									<Button
+										type='button'
+										variant='link'
+										size='sm'
+										onClick={() => setShowContactForm(true)}
+										className='h-auto p-0 text-xs font-semibold'
+									>
+										+ Add new contact
+									</Button>
+								</div>
+								<Select
+									id='propertyContactId'
+									value={form.propertyContactId}
+									onChange={(e) => updateField('propertyContactId', e.target.value)}
+								>
+									<option value=''>— None —</option>
+									{contacts.map((c) => (
+										<option key={c.id} value={c.id}>
+											{c.full_name} {c.company_name ? `(${c.company_name})` : ''}
+										</option>
+									))}
+								</Select>
+								{showContactForm && (
+									<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+										<div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+											<h3 className="mb-4 text-lg font-semibold text-foreground">Add new contact</h3>
+											<ContactForm
+												onSave={handleCreateContact}
+												onCancel={() => setShowContactForm(false)}
+												saving={creatingContact}
+											/>
+										</div>
+									</div>
+								)}
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle className='text-base font-semibold'>Specifications</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className='grid gap-5 sm:grid-cols-3'>
+							{form.propertyType !== 'land' && (
+								<>
+									<div className='space-y-2'>
+										<Label htmlFor='bedrooms'>Bedrooms</Label>
+										<Input
+											id='bedrooms'
+											type='number'
+											min='0'
+											value={form.bedrooms}
+											onChange={(e) => updateField('bedrooms', e.target.value)}
+											placeholder='3'
 										/>
 									</div>
+									<div className='space-y-2'>
+										<Label htmlFor='bathrooms'>Bathrooms</Label>
+										<Input
+											id='bathrooms'
+											type='number'
+											min='0'
+											value={form.bathrooms}
+											onChange={(e) => updateField('bathrooms', e.target.value)}
+											placeholder='2'
+										/>
+									</div>
+								</>
+							)}
+							<AreaConverterInput
+								label='Land size'
+								primaryUnit='perches'
+								value={form.landSizePerches}
+								onChange={(val) => updateField('landSizePerches', val)}
+								placeholder='10.5'
+								className='flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+							/>
+							{form.propertyType !== 'land' && (
+								<AreaConverterInput
+									label='Floor area / House size'
+									primaryUnit='sqft'
+									value={form.sqft}
+									onChange={(val) => updateField('sqft', val)}
+									placeholder='1800'
+									className='flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+								/>
+							)}
+							<div className='space-y-2'>
+								<Label htmlFor='parkingSpaces'>Parking spaces</Label>
+								<Input
+									id='parkingSpaces'
+									type='number'
+									min='0'
+									value={form.parkingSpaces}
+									onChange={(e) => updateField('parkingSpaces', e.target.value)}
+									placeholder='2'
+								/>
+							</div>
+							{form.propertyType !== 'land' && (
+								<div className='space-y-2'>
+									<Label htmlFor='buildYear'>Build year</Label>
+									<Input
+										id='buildYear'
+										type='number'
+										min='1800'
+										max={new Date().getFullYear() + 1}
+										value={form.buildYear}
+										onChange={(e) => updateField('buildYear', e.target.value)}
+										placeholder='2020'
+									/>
 								</div>
 							)}
-						</div>
-					</div>
-				</div>
-
-				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
-					<h3 className='text-base font-semibold'>Specifications</h3>
-					<div className='mt-6 grid gap-5 sm:grid-cols-3'>
-						{form.propertyType !== 'land' && (
-							<>
-								<label className='text-sm font-medium'>
-									Bedrooms
-									<input
-										className={fieldClass}
-										type='number'
-										min='0'
-										value={form.bedrooms}
-										onChange={(e) => updateField('bedrooms', e.target.value)}
-										placeholder='3'
-									/>
-								</label>
-								<label className='text-sm font-medium'>
-									Bathrooms
-									<input
-										className={fieldClass}
-										type='number'
-										min='0'
-										value={form.bathrooms}
-										onChange={(e) => updateField('bathrooms', e.target.value)}
-										placeholder='2'
-									/>
-								</label>
-							</>
-						)}
-						<AreaConverterInput
-							label='Land size'
-							primaryUnit='perches'
-							value={form.landSizePerches}
-							onChange={(val) => updateField('landSizePerches', val)}
-							placeholder='10.5'
-							className={fieldClass}
-						/>
-						{form.propertyType !== 'land' && (
-							<AreaConverterInput
-								label='Floor area / House size'
-								primaryUnit='sqft'
-								value={form.sqft}
-								onChange={(val) => updateField('sqft', val)}
-								placeholder='1800'
-								className={fieldClass}
-							/>
-						)}
-						<label className='text-sm font-medium'>
-							Parking spaces
-							<input
-								className={fieldClass}
-								type='number'
-								min='0'
-								value={form.parkingSpaces}
-								onChange={(e) => updateField('parkingSpaces', e.target.value)}
-								placeholder='2'
-							/>
-						</label>
-						{form.propertyType !== 'land' && (
-							<label className='text-sm font-medium'>
-								Build year
-								<input
-									className={fieldClass}
+							<div className='space-y-2'>
+								<Label htmlFor='roadAccessFt'>Road access (ft)</Label>
+								<Input
+									id='roadAccessFt'
 									type='number'
-									min='1800'
-									max={new Date().getFullYear() + 1}
-									value={form.buildYear}
-									onChange={(e) => updateField('buildYear', e.target.value)}
-									placeholder='2020'
+									min='0'
+									value={form.roadAccessFt}
+									onChange={(e) => updateField('roadAccessFt', e.target.value)}
+									placeholder='20'
 								/>
-							</label>
-						)}
-						<label className='text-sm font-medium'>
-							Road access (ft)
-							<input
-								className={fieldClass}
-								type='number'
-								min='0'
-								value={form.roadAccessFt}
-								onChange={(e) => updateField('roadAccessFt', e.target.value)}
-								placeholder='20'
-							/>
-						</label>
-					</div>
-				</div>
-
-				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
-					<h3 className='text-base font-semibold'>Description</h3>
-					<textarea
-						className={`${fieldClass} min-h-32 resize-y`}
-						value={form.description}
-						onChange={(e) => updateField('description', e.target.value)}
-						placeholder='Describe the property, its surroundings, and notable features.'
-					/>
-					{errorText('description')}
-					<div className='mt-5'>
-						<label className='block text-sm font-medium mb-3'>Amenities</label>
-						<div className='flex flex-wrap gap-3'>
-							{PREDEFINED_AMENITIES.map((amenity) => (
-								<label
-									key={amenity}
-									className={`flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-										form.amenities.includes(amenity)
-											? 'border-[#35664f] bg-[#e0f1e7] text-[#28513f] dark:border-emerald-600 dark:bg-emerald-950 dark:text-emerald-200'
-											: 'border-[#dce4df] bg-white text-[#65736b] hover:bg-[#f4f8f5] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900'
-									}`}
-								>
-									<input
-										type='checkbox'
-										className='hidden'
-										checked={form.amenities.includes(amenity)}
-										onChange={(e) => {
-											if (e.target.checked) {
-												updateField('amenities', [...form.amenities, amenity]);
-											} else {
-												updateField('amenities', form.amenities.filter((a) => a !== amenity));
-											}
-										}}
-									/>
-									{amenity}
-								</label>
-							))}
-						</div>
-					</div>
-				</div>
-
-				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
-					<h3 className='text-base font-semibold'>Status & visibility</h3>
-					<div className='mt-6 flex flex-col gap-5 sm:flex-row sm:items-end'>
-						<label className='text-sm font-medium sm:w-64'>
-							Status
-							<select
-								className={fieldClass}
-								value={form.status}
-								onChange={(e) => updateField('status', e.target.value)}
-							>
-								<option value='available'>Available</option>
-								<option value='under_offer'>Under offer</option>
-								<option value='sold'>Sold</option>
-							</select>
-						</label>
-						{form.propertyType !== 'land' && (
-							<label className='text-sm font-medium sm:w-64'>
-								Furnishing
-								<select
-									className={fieldClass}
-									value={form.furnishingStatus}
-									onChange={(e) =>
-										updateField('furnishingStatus', e.target.value)
-									}
-								>
-									<option value=''>Not specified</option>
-									<option value='unfurnished'>Unfurnished</option>
-									<option value='semi_furnished'>Semi-furnished</option>
-									<option value='fully_furnished'>Fully furnished</option>
-								</select>
-							</label>
-						)}
-						<label className='flex items-center gap-2 pb-3 text-sm font-medium'>
-							<input
-								type='checkbox'
-								checked={form.isFeatured}
-								onChange={(e) => updateField('isFeatured', e.target.checked)}
-							/>
-							Featured property
-						</label>
-					</div>
-				</div>
-
-				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
-					<h3 className='text-base font-semibold'>Images</h3>
-
-					{/* Existing images list */}
-					{existingImages.length > 0 && (
-						<div className='mt-4'>
-							<p className='text-xs font-medium text-[#75847c] dark:text-zinc-400 mb-2'>
-								Current photos ({existingImages.length})
-							</p>
-							<div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
-								{existingImages.map((imageUrl, idx) => (
-									<div
-										key={imageUrl + idx}
-										className='group relative aspect-square overflow-hidden rounded-lg bg-[#edf2ee] dark:bg-zinc-800 border border-[#dce4df] dark:border-zinc-700'
-									>
-										<img
-											src={imageUrl}
-											alt={`Property photo ${idx + 1}`}
-											className='h-full w-full object-cover'
-										/>
-										<button
-											type='button'
-											onClick={() => removeExistingImage(imageUrl)}
-											className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white dark:text-zinc-200 hover:bg-black/85 transition cursor-pointer'
-											aria-label={`Remove photo ${idx + 1}`}
-										>
-											×
-										</button>
-									</div>
-								))}
 							</div>
 						</div>
-					)}
+					</CardContent>
+				</Card>
 
-					{/* Drag-and-drop file upload */}
-					<label
-						onDragOver={handleDragOver}
-						onDragLeave={handleDragLeave}
-						onDrop={handleDrop}
-						className={`mt-5 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-5 text-center transition ${
-							isDragging
-								? 'border-[#35664f] bg-[#e0f1e7] dark:bg-emerald-950/30'
-								: 'border-[#cbd9d0] bg-[#f9fbf9] dark:border-zinc-700 dark:bg-zinc-900/50 hover:border-[#6c9a7d]'
-						}`}
-					>
-						<span className='text-sm font-semibold text-[#416b55] dark:text-emerald-400'>
-							Choose new image files or drag them here
-						</span>
-						<span className='mt-1 text-xs text-[#829088] dark:text-zinc-400'>
-							PNG, JPG, or WEBP
-						</span>
-						<input
-							type='file'
-							accept='image/*'
-							multiple
-							className='sr-only'
-							onChange={handleNewImages}
-						/>
-					</label>
+				<Card>
+					<CardHeader>
+						<CardTitle className='text-base font-semibold'>Description</CardTitle>
+					</CardHeader>
+					<CardContent className='space-y-5'>
+						<div className='space-y-2'>
+							<Label htmlFor='description'>Description</Label>
+							<Textarea
+								id='description'
+								className='min-h-32 resize-y'
+								value={form.description}
+								onChange={(e) => updateField('description', e.target.value)}
+								placeholder='Describe the property, its surroundings, and notable features.'
+							/>
+							{errorText('description')}
+						</div>
 
-					{/* New images previews */}
-					{newImages.length > 0 && (
-						<div className='mt-5'>
-							<p className='text-xs font-medium text-[#75847c] dark:text-zinc-400 mb-2'>
-								New photos to upload ({newImages.length})
-							</p>
-							<div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
-								{newImages.map((image) => (
-									<div
-										key={image.url}
-										className='group relative aspect-square overflow-hidden rounded-lg bg-[#edf2ee] dark:bg-zinc-800'
-									>
-										<img
-											src={image.url}
-											alt={image.file.name}
-											className='h-full w-full object-cover'
-										/>
-										<button
-											type='button'
-											onClick={() => removeNewImage(image.url)}
-											className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white dark:text-zinc-200 hover:bg-black/85 transition cursor-pointer'
-											aria-label={`Remove ${image.file.name}`}
+						<div>
+							<Label className='block mb-3'>Amenities</Label>
+							<div className='flex flex-wrap gap-2.5'>
+								{PREDEFINED_AMENITIES.map((amenity) => {
+									const isSelected = form.amenities.includes(amenity);
+									return (
+										<label
+											key={amenity}
+											className={`flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+												isSelected
+													? 'border-primary bg-primary/10 text-primary dark:bg-primary/20'
+													: 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+											}`}
 										>
-											×
-										</button>
-									</div>
-								))}
+											<input
+												type='checkbox'
+												className='hidden'
+												checked={isSelected}
+												onChange={(e) => {
+													if (e.target.checked) {
+														updateField('amenities', [...form.amenities, amenity]);
+													} else {
+														updateField('amenities', form.amenities.filter((a) => a !== amenity));
+													}
+												}}
+											/>
+											{amenity}
+										</label>
+									);
+								})}
 							</div>
 						</div>
-					)}
-				</div>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle className='text-base font-semibold'>Status & visibility</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className='flex flex-col gap-5 sm:flex-row sm:items-end'>
+							<div className='space-y-2 sm:w-64'>
+								<Label htmlFor='status'>Status</Label>
+								<Select
+									id='status'
+									value={form.status}
+									onChange={(e) => updateField('status', e.target.value)}
+								>
+									<option value='available'>Available</option>
+									<option value='under_offer'>Under offer</option>
+									<option value='sold'>Sold</option>
+								</Select>
+							</div>
+
+							{form.propertyType !== 'land' && (
+								<div className='space-y-2 sm:w-64'>
+									<Label htmlFor='furnishingStatus'>Furnishing</Label>
+									<Select
+										id='furnishingStatus'
+										value={form.furnishingStatus}
+										onChange={(e) =>
+											updateField('furnishingStatus', e.target.value)
+										}
+									>
+										<option value=''>Not specified</option>
+										<option value='unfurnished'>Unfurnished</option>
+										<option value='semi_furnished'>Semi-furnished</option>
+										<option value='fully_furnished'>Fully furnished</option>
+									</Select>
+								</div>
+							)}
+
+							<div className='flex items-center gap-2 pb-2'>
+								<Switch
+									id='isFeatured'
+									checked={form.isFeatured}
+									onCheckedChange={(checked) => updateField('isFeatured', checked)}
+								/>
+								<Label htmlFor='isFeatured' className='cursor-pointer text-sm font-medium'>
+									Featured property
+								</Label>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle className='text-base font-semibold'>Images</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{/* Existing images list */}
+						{existingImages.length > 0 && (
+							<div className='mb-6'>
+								<p className='text-xs font-medium text-muted-foreground mb-2'>
+									Current photos ({existingImages.length})
+								</p>
+								<div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
+									{existingImages.map((imageUrl, idx) => (
+										<div
+											key={imageUrl + idx}
+											className='group relative aspect-square overflow-hidden rounded-lg bg-muted border border-border'
+										>
+											<img
+												src={imageUrl}
+												alt={`Property photo ${idx + 1}`}
+												className='h-full w-full object-cover'
+											/>
+											<button
+												type='button'
+												onClick={() => removeExistingImage(imageUrl)}
+												className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer'
+												aria-label={`Remove photo ${idx + 1}`}
+											>
+												×
+											</button>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
+						{/* Drag-and-drop file upload */}
+						<label
+							onDragOver={handleDragOver}
+							onDragLeave={handleDragLeave}
+							onDrop={handleDrop}
+							className={`flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-5 text-center transition ${
+								isDragging
+									? 'border-primary bg-primary/10'
+									: 'border-border bg-muted/40 hover:border-primary/50'
+							}`}
+						>
+							<span className='text-sm font-semibold text-primary'>
+								Choose new image files or drag them here
+							</span>
+							<span className='mt-1 text-xs text-muted-foreground'>
+								PNG, JPG, or WEBP
+							</span>
+							<input
+								type='file'
+								accept='image/*'
+								multiple
+								className='sr-only'
+								onChange={handleNewImages}
+							/>
+						</label>
+
+						{/* New images previews */}
+						{newImages.length > 0 && (
+							<div className='mt-5'>
+								<p className='text-xs font-medium text-muted-foreground mb-2'>
+									New photos to upload ({newImages.length})
+								</p>
+								<div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
+									{newImages.map((image) => (
+										<div
+											key={image.url}
+											className='group relative aspect-square overflow-hidden rounded-lg bg-muted border border-border'
+										>
+											<img
+												src={image.url}
+												alt={image.file.name}
+												className='h-full w-full object-cover'
+											/>
+											<button
+												type='button'
+												onClick={() => removeNewImage(image.url)}
+												className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer'
+												aria-label={`Remove ${image.file.name}`}
+											>
+												×
+											</button>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+					</CardContent>
+				</Card>
 
 				{errors.form && (
-					<p className='text-right text-sm text-[#a34d4d] dark:text-red-400'>{errors.form}</p>
+					<p className='text-right text-sm text-destructive'>{errors.form}</p>
 				)}
 
 				<div className='flex justify-end gap-3 pb-8'>
-					<Link
-						href='/admin'
-						className='rounded-lg border border-[#d2ddd5] dark:border-zinc-700 bg-white dark:bg-zinc-950 px-5 py-3 text-sm font-semibold text-[#53655b] dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-					>
-						Cancel
-					</Link>
-					<button
+					<Button asChild variant='outline'>
+						<Link href='/admin'>Cancel</Link>
+					</Button>
+					<Button
 						type='submit'
 						disabled={saving}
-						className='rounded-lg bg-[#28513f] dark:bg-emerald-700 px-6 py-3 text-sm font-semibold text-white dark:text-zinc-200 transition hover:bg-[#1e4031] dark:hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 cursor-pointer'
 					>
 						{saving ? (
 							<>
@@ -995,7 +1042,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 						) : (
 							'Save changes'
 						)}
-					</button>
+					</Button>
 				</div>
 			</form>
 		</section>

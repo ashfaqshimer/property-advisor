@@ -1550,24 +1550,81 @@ export type SuburbItem = {
   slug: string;
   district: string;
   ds_division: string | null;
-  tier: string;
   aliases: string[];
+  known_sub_areas?: string[];
   baseline_land_perch_range: [number | null, number | null];
   baseline_apartment_sqft_range: [number | null, number | null];
 };
 
+export type SourcedListingItem = {
+  id: string;
+  title: string;
+  source: string;
+  source_url: string | null;
+  property_type: string;
+  total_price_lkr: number | null;
+  unit_rate_lkr: number | null;
+  unit_label: string | null;
+  sub_area: string;
+  date: string | null;
+};
+
+export type SubAreaComparisonItem = {
+  name: string;
+  sample_count: number;
+  median_unit_rate: number | null;
+  min_unit_rate: number | null;
+  max_unit_rate: number | null;
+  p25_unit_rate: number | null;
+  p75_unit_rate: number | null;
+};
+
 export type MarketValueEstimate = {
   suburb: string;
+  sub_area: string | null;
   district: string;
   ds_division: string | null;
-  tier: string;
   property_type: string;
   listing_type: string;
-  sample_size: number;
-  has_live_data: boolean;
-  confidence: "high" | "medium" | "benchmark_supported" | "indicative";
-  negotiation_discount_percent: number;
-  stats: {
+  timeframe: string;
+  sample_summary: {
+    total_sourced: number;
+    sources: Record<string, number>;
+    by_property_type: Record<string, number>;
+    confidence: "high" | "medium" | "low" | "benchmark_supported" | "indicative";
+  };
+  unit_pricing: {
+    primary_unit: "per_perch" | "per_sqft";
+    unit_label: string;
+    min: number | null;
+    p25_entry: number | null;
+    median_asking: number | null;
+    p75_premium: number | null;
+    max: number | null;
+    realized_deal_target: number | null;
+    benchmark_range: [number | null, number | null] | null;
+  };
+  total_pricing: {
+    min: number | null;
+    p25_entry: number | null;
+    median_asking: number | null;
+    p75_premium: number | null;
+    max: number | null;
+    realized_deal_target: number | null;
+  };
+  grading_thresholds: {
+    metric: string;
+    underpriced_max: number | null;
+    fair_value_min: number | null;
+    fair_value_max: number | null;
+    overpriced_min: number | null;
+  };
+  sub_areas: SubAreaComparisonItem[];
+  sourced_listings: SourcedListingItem[];
+  advisory_summary: string;
+  // Legacy backward compatibility
+  sample_size?: number;
+  stats?: {
     median_asking_price_lkr: number | null;
     estimated_realized_price_lkr: number | null;
     price_per_perch_lkr: {
@@ -1601,10 +1658,13 @@ export async function getSuburbs(district?: string): Promise<SuburbItem[]> {
 
 export async function getMarketValueEstimate(
   suburb: string,
+  subArea?: string | null,
   propertyType?: string,
-  listingType: string = "sale"
+  listingType: string = "sale",
+  maxDays: number = 90
 ): Promise<MarketValueEstimate> {
-  const params = new URLSearchParams({ suburb, listing_type: listingType });
+  const params = new URLSearchParams({ suburb, listing_type: listingType, max_days: maxDays.toString() });
+  if (subArea && subArea !== "all") params.set("sub_area", subArea);
   if (propertyType && propertyType !== "all") params.set("property_type", propertyType);
 
   const response = await fetch(
