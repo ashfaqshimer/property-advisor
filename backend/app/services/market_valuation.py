@@ -569,3 +569,143 @@ def calculate_suburb_market_value(
             },
         },
     }
+
+
+def grade_prospect_pricing(
+    db: Session,
+    prospect: Prospect,
+    valuation_cache: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Grades an individual prospect's pricing against market valuation benchmarks:
+    - underpriced (>15% below market)
+    - fair_market (within +/-15%)
+    - overpriced (>15% above market)
+    - unrated (insufficient specifications or missing price)
+    """
+    p_val = prospect.price_numeric
+    is_ppp = prospect.is_price_per_perch
+    if not p_val and prospect.price:
+        p_val, is_ppp = parse_lkr_price(prospect.price)
+
+    if not p_val or p_val <= 0:
+        return {
+            "price_grade": "unrated",
+            "price_grade_label": None,
+            "price_unit_rate": None,
+            "price_unit_label": None,
+            "market_median_unit_rate": None,
+            "price_diff_percent": None,
+        }
+
+    pt = (prospect.property_type or "land").lower()
+    unit_rate: float | None = None
+    unit_label: str | None = None
+
+    if pt == "land":
+        unit_label = "LKR / Perch"
+        if is_ppp:
+            unit_rate = float(p_val)
+        elif prospect.land_size_perches and prospect.land_size_perches > 0:
+            unit_rate = float(p_val / prospect.land_size_perches)
+    elif pt in ("apartment", "commercial"):
+        unit_label = "LKR / Sq.Ft."
+        if prospect.floor_area_sqft and prospect.floor_area_sqft > 0:
+            unit_rate = float(p_val / Decimal(prospect.floor_area_sqft))
+    else:  # house
+        if prospect.land_size_perches and prospect.land_size_perches > 0:
+            unit_label = "LKR / Perch"
+            unit_rate = float(p_val / prospect.land_size_perches)
+        elif prospect.floor_area_sqft and prospect.floor_area_sqft > 0:
+            unit_label = "LKR / Sq.Ft."
+            unit_rate = float(p_val / Decimal(prospect.floor_area_sqft))
+
+    if not unit_rate:
+        return {
+            "price_grade": "unrated",
+            "price_grade_label": None,
+            "price_unit_rate": None,
+            "price_unit_label": unit_label,
+            "market_median_unit_rate": None,
+            "price_diff_percent": None,
+        }
+
+    # Location lookup
+    target_loc = prospect.suburb or prospect.location or "Colombo"
+    cache_key = f"{target_loc.lower()}:{pt}"
+
+    if valuation_cache is not None and cache_key in valuation_cache:
+        valuation = valuation_cache[cache_key]
+    else:
+        valuation = calculate_suburb_market_value(
+            db=db,
+            location_query=target_loc,
+            property_type=pt,
+            listing_type="sale" if "sale" in (prospect.listing_type or "sale") else "rent",
+        )
+        if valuation_cache is not None:
+            valuation_cache[cache_key] = valuation
+
+    # Check for micro-area specific median
+    extracted_area = extract_sub_area(prospect.title or "", prospect.location or "", valuation.get("suburb", ""))
+    target_median: float | None = None
+
+    for sa in valuation.get("sub_areas", []):
+        if sa["name"].lower() == extracted_area.lower() and sa["median_unit_rate"]:
+            target_median = sa["median_unit_rate"]
+            break
+
+    if not target_median:
+        target_median = valuation.get("unit_pricing", {}).get("median_asking")
+
+    # Fallback to benchmark range midpoint if asking median is unavailable
+    if not target_median:
+        b_range = valuation.get("unit_pricing", {}).get("benchmark_range")
+        if b_range and b_range[0] and b_range[1]:
+            target_median = (b_range[0] + b_range[1]) / 2
+
+    if not target_median or target_median <= 0:
+        return {
+            "price_grade": "unrated",
+            "price_grade_label": None,
+            "price_unit_rate": round(unit_rate, 2),
+            "price_unit_label": unit_label,
+            "market_median_unit_rate": None,
+            "price_diff_percent": None,
+        }
+
+    diff_pct = round(((unit_rate - target_median) / target_median) * 100, 1)
+
+    if diff_pct < -15.0:
+        grade = "underpriced"
+        label = f"Deal: {abs(int(diff_pct))}% below market"
+    elif diff_pct > 15.0:
+        grade = "overpriced"
+        label = f"Overpriced: +{int(diff_pct)}%"
+    else:
+        grade = "fair_market"
+        label = f"Fair Market (±{abs(int(diff_pct))}%)" if abs(int(diff_pct)) > 0 else "Fair Market"
+
+    return {
+        "price_grade": grade,
+        "price_grade_label": label,
+        "price_unit_rate": round(unit_rate, 2),
+        "price_unit_label": unit_label,
+        "market_median_unit_rate": round(target_median, 2),
+        "price_diff_percent": diff_pct,
+    }
+
+
+def bulk_grade_prospects(
+    db: Session,
+    prospects: list[Prospect],
+) -> dict[Any, dict[str, Any]]:
+    """
+    Grades multiple prospects with caching across suburbs.
+    Returns mapping of prospect.id -> grade info.
+    """
+    cache: dict[str, Any] = {}
+    result: dict[Any, dict[str, Any]] = {}
+    for p in prospects:
+        result[p.id] = grade_prospect_pricing(db, p, cache)
+    return result

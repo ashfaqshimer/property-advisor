@@ -79,6 +79,13 @@ class ProspectRead(ProspectBase):
     last_seen_at: datetime
     assignment_status: str | None = None
     assignment_id: UUID | None = None
+    # Price grading fields
+    price_grade: str | None = None
+    price_grade_label: str | None = None
+    price_unit_rate: float | None = None
+    price_unit_label: str | None = None
+    market_median_unit_rate: float | None = None
+    price_diff_percent: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

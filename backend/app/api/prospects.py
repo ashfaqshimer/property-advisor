@@ -38,6 +38,7 @@ from app.scraper.location_extractor import extract_suburb
 from app.agent.client import get_gemini_extractor_client
 from app.schemas.extractor import ExtractedPropertyDraft, GeminiPropertyExtraction
 from app.services.geocoding import geocode_location
+from app.services.market_valuation import bulk_grade_prospects
 from app.services.price_parser import parse_lkr_price
 from app.services.prospect_contacts import (
     _enrich_location_from_detail,
@@ -1046,11 +1047,23 @@ def _attach_assignment_status(db: Session, prospects: list[Prospect]) -> list[Pr
             status_map[a.prospect_id] = a.status
             assignment_id_map[a.prospect_id] = a.id
 
+    grades_map = bulk_grade_prospects(db, prospects)
+
     reads: list[ProspectRead] = []
     for p in prospects:
         r = ProspectRead.model_validate(p)
         r.assignment_status = status_map.get(p.id)
         r.assignment_id = assignment_id_map.get(p.id)
+
+        grade_info = grades_map.get(p.id)
+        if grade_info:
+            r.price_grade = grade_info.get("price_grade")
+            r.price_grade_label = grade_info.get("price_grade_label")
+            r.price_unit_rate = grade_info.get("price_unit_rate")
+            r.price_unit_label = grade_info.get("price_unit_label")
+            r.market_median_unit_rate = grade_info.get("market_median_unit_rate")
+            r.price_diff_percent = grade_info.get("price_diff_percent")
+
         reads.append(r)
     return reads
 
@@ -1335,6 +1348,8 @@ def list_prospects(
     status: str | None = None,
     property_type: str | None = None,
     listing_type: str | None = None,
+    price_grade: str | None = None,
+    sort_by: str | None = None,
     q: str | None = None,
     page: int = 1,
     page_size: int = 50,
@@ -1401,11 +1416,16 @@ def list_prospects(
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = db.execute(count_stmt).scalar_one()
         items = db.execute(stmt.limit(100)).scalars().all()
+        reads = _attach_assignment_status(db, items)
+        if price_grade and price_grade != "all":
+            reads = [r for r in reads if r.price_grade == price_grade]
+        if sort_by == "best_deals":
+            reads.sort(key=lambda r: (r.price_diff_percent is None, r.price_diff_percent if r.price_diff_percent is not None else 999))
         settings = get_settings()
         tg_configured = settings.telegram_field_dispatch_configured
         return {
-            "items": _attach_assignment_status(db, items),
-            "total": total,
+            "items": reads,
+            "total": len(reads) if price_grade else total,
             "page": 1,
             "page_size": 100,
             "total_pages": 1,
@@ -1419,6 +1439,12 @@ def list_prospects(
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
 
     items = db.execute(stmt).scalars().all()
+    reads = _attach_assignment_status(db, items)
+
+    if price_grade and price_grade != "all":
+        reads = [r for r in reads if r.price_grade == price_grade]
+    if sort_by == "best_deals":
+        reads.sort(key=lambda r: (r.price_diff_percent is None, r.price_diff_percent if r.price_diff_percent is not None else 999))
 
     total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
 
@@ -1426,7 +1452,7 @@ def list_prospects(
     tg_configured = settings.telegram_field_dispatch_configured
 
     return {
-        "items": _attach_assignment_status(db, items),
+        "items": reads,
         "total": total,
         "page": page,
         "page_size": page_size,

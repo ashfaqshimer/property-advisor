@@ -153,3 +153,48 @@ class TestAgentMarketValueTool:
         assert res["sub_area"] == "Attidiya"
         assert "advisory_summary" in res
         assert len(res["advisory_summary"]) > 20
+
+
+class TestProspectPriceGrading:
+    def test_prospect_grading_deal_vs_overpriced(self, db_session: Session):
+        from app.services.market_valuation import grade_prospect_pricing
+        seed_suburbs_data(db_session)
+
+        # Baseline in Rajagiriya is 4.5M - 7.5M per perch (median ~6M)
+        # 1. Underpriced deal: 3.5M per perch (>15% below median 6M)
+        p_deal = Prospect(
+            title="Urgent Land Sale in Rajagiriya",
+            price="Rs 3,500,000 per perch",
+            price_numeric=Decimal("3500000"),
+            is_price_per_perch=True,
+            location="Rajagiriya",
+            suburb="Rajagiriya",
+            property_type="land",
+            listing_type="sale",
+            classification="owner",
+            confidence=90,
+            status="new",
+        )
+        grade_deal = grade_prospect_pricing(db_session, p_deal)
+        assert grade_deal["price_grade"] == "underpriced"
+        assert "Deal" in grade_deal["price_grade_label"]
+        assert grade_deal["price_diff_percent"] < -15
+
+        # 2. Overpriced listing: 9.5M per perch (>15% above median 6M)
+        p_over = Prospect(
+            title="Premium Commercial Land in Rajagiriya",
+            price="Rs 9,500,000 per perch",
+            price_numeric=Decimal("9500000"),
+            is_price_per_perch=True,
+            location="Rajagiriya",
+            suburb="Rajagiriya",
+            property_type="land",
+            listing_type="sale",
+            classification="owner",
+            confidence=90,
+            status="new",
+        )
+        grade_over = grade_prospect_pricing(db_session, p_over)
+        assert grade_over["price_grade"] == "overpriced"
+        assert "Overpriced" in grade_over["price_grade_label"]
+        assert grade_over["price_diff_percent"] > 15

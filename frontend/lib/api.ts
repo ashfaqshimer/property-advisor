@@ -1036,6 +1036,12 @@ export type Prospect = {
   discard_reason?: string | null;
   assignment_status?: string | null;
   assignment_id?: string | null;
+  price_grade?: "underpriced" | "fair_market" | "overpriced" | "unrated" | null;
+  price_grade_label?: string | null;
+  price_unit_rate?: number | null;
+  price_unit_label?: string | null;
+  market_median_unit_rate?: number | null;
+  price_diff_percent?: number | null;
 };
 
 export type PaginatedProspects = {
@@ -1076,11 +1082,22 @@ export interface PaginatedScanJobs {
   total_pages: number;
 }
 
-export async function getProspects(filters?: { status?: string; property_type?: string; listing_type?: string; page?: number; page_size?: number; q?: string }): Promise<PaginatedProspects> {
+export async function getProspects(filters?: {
+  status?: string;
+  property_type?: string;
+  listing_type?: string;
+  price_grade?: string;
+  sort_by?: string;
+  page?: number;
+  page_size?: number;
+  q?: string;
+}): Promise<PaginatedProspects> {
   const params = new URLSearchParams();
   if (filters?.status) params.append("status", filters.status);
   if (filters?.property_type) params.append("property_type", filters.property_type);
   if (filters?.listing_type) params.append("listing_type", filters.listing_type);
+  if (filters?.price_grade && filters.price_grade !== "all") params.append("price_grade", filters.price_grade);
+  if (filters?.sort_by) params.append("sort_by", filters.sort_by);
   if (filters?.q) params.append("q", filters.q);
   // Skip page/page_size when q is present — backend handles that
   if (!filters?.q) {

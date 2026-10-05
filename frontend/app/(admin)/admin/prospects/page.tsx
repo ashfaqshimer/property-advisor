@@ -49,6 +49,8 @@ export default function ProspectsPage() {
   const [filterSource, setFilterSource] = useState<string>("");
   const [transactionType, setTransactionType] = useState<"sale" | "rent">("sale");
   const [propertyType, setPropertyType] = useState<string>("all");
+  const [filterPriceGrade, setFilterPriceGrade] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("default");
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const autoFetchPhonesRef = useRef(false);
@@ -279,6 +281,8 @@ export default function ProspectsPage() {
         status: filterStatus || undefined,
         property_type,
         listing_type,
+        price_grade: filterPriceGrade === "all" ? undefined : filterPriceGrade,
+        sort_by: sortBy === "default" ? undefined : sortBy,
         page,
         page_size: 25,
         q: debouncedSearch || undefined,
@@ -297,7 +301,7 @@ export default function ProspectsPage() {
 
   useEffect(() => {
     fetchProspects();
-  }, [filterStatus, transactionType, propertyType, page, debouncedSearch]);
+  }, [filterStatus, transactionType, propertyType, filterPriceGrade, sortBy, page, debouncedSearch]);
 
   const refreshActiveJobs = async () => {
     try {
@@ -666,6 +670,25 @@ export default function ProspectsPage() {
           <option value="ikman">ikman.lk</option>
           <option value="lpw">LankaPropertyWeb</option>
         </Select>
+        <Select
+          value={filterPriceGrade}
+          onChange={(e) => { setFilterPriceGrade(e.target.value); setPage(1); }}
+          className="h-9 w-full sm:w-auto text-sm"
+        >
+          <option value="all">All Deal Grades</option>
+          <option value="underpriced">🔥 Hot Deals (Below Market)</option>
+          <option value="fair_market">Fair Market Value</option>
+          <option value="overpriced">Overpriced (Negotiable)</option>
+          <option value="unrated">Unrated</option>
+        </Select>
+        <Select
+          value={sortBy}
+          onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+          className="h-9 w-full sm:w-auto text-sm"
+        >
+          <option value="default">Newest Seen</option>
+          <option value="best_deals">🔥 Best Deals First</option>
+        </Select>
         {/* Segmented Control for Transaction Type */}
         <div className="flex shrink-0 items-center rounded-lg bg-muted p-1 w-full sm:w-auto">
           <button
@@ -849,8 +872,36 @@ export default function ProspectsPage() {
                   </div>
                 </div>
 
-                <div className="text-sm font-semibold text-foreground">
-                  {prospect.price || "Price not listed"}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-foreground">
+                      {prospect.price || "Price not listed"}
+                    </span>
+                    {prospect.price_grade && prospect.price_grade !== "unrated" && (
+                      <span
+                        title={
+                          prospect.price_unit_rate && prospect.market_median_unit_rate
+                            ? `Listing: LKR ${Math.round(prospect.price_unit_rate).toLocaleString()} | Market Median: LKR ${Math.round(prospect.market_median_unit_rate).toLocaleString()}`
+                            : undefined
+                        }
+                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold border ${
+                          prospect.price_grade === "underpriced"
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800"
+                            : prospect.price_grade === "overpriced"
+                            ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
+                            : "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
+                        }`}
+                      >
+                        {prospect.price_grade === "underpriced" && "🔥 "}
+                        {prospect.price_grade_label || prospect.price_grade}
+                      </span>
+                    )}
+                  </div>
+                  {prospect.price_unit_rate && (
+                    <span className="text-[11px] text-muted-foreground">
+                      ≈ LKR {Math.round(prospect.price_unit_rate).toLocaleString()} {prospect.price_unit_label || ""}
+                    </span>
+                  )}
                 </div>
 
                 <div className="rounded-lg bg-muted/50 p-3 text-sm flex flex-col gap-2">
@@ -1150,8 +1201,36 @@ export default function ProspectsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="px-6 py-4 font-medium text-foreground">
-                        {prospect.price || "-"}
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold text-foreground">
+                            {prospect.price || "-"}
+                          </span>
+                          {prospect.price_grade && prospect.price_grade !== "unrated" && (
+                            <span
+                              title={
+                                prospect.price_unit_rate && prospect.market_median_unit_rate
+                                  ? `Listing: LKR ${Math.round(prospect.price_unit_rate).toLocaleString()} | Market Median: LKR ${Math.round(prospect.market_median_unit_rate).toLocaleString()}`
+                                  : undefined
+                              }
+                              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold border w-fit ${
+                                prospect.price_grade === "underpriced"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800"
+                                  : prospect.price_grade === "overpriced"
+                                  ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
+                                  : "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
+                              }`}
+                            >
+                              {prospect.price_grade === "underpriced" && "🔥 "}
+                              {prospect.price_grade_label || prospect.price_grade}
+                            </span>
+                          )}
+                          {prospect.price_unit_rate && (
+                            <span className="text-[11px] text-muted-foreground">
+                              ≈ LKR {Math.round(prospect.price_unit_rate).toLocaleString()} {prospect.price_unit_label || ""}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="px-6 py-4">
                         {prospect.phone_number ? (
