@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { extractPropertyFromText, getAdminLeads, getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
+import {
+  extractPropertyFromText,
+  getAdminLeads,
+  getAdminProperty,
+  getFeaturedProperties,
+  updateAdminProperty,
+  type PropertyApiRecord,
+} from "@/lib/api";
 import { formatPrice, mapProperty } from "@/lib/properties";
 
 const record: PropertyApiRecord = {
@@ -166,6 +173,38 @@ describe("extractPropertyFromText API", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ text: "හෝමාගම පර්චස් 10ක කාමර 3ක නිවස විකිණීමට. ලක්ෂ 220යි." }),
+      }),
+    );
+  });
+});
+
+describe("getAdminProperty and updateAdminProperty API", () => {
+  it("fetches single admin property by id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const fetchSpy = vi.fn(async () => jsonResponse(200, record));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(getAdminProperty("property-1")).resolves.toEqual(record);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/admin/properties/property-1",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("updates an admin property with patch payload", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const updated = { ...record, title: "Updated Villa", price: 190000000 };
+    const fetchSpy = vi.fn(async () => jsonResponse(200, updated));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(
+      updateAdminProperty("property-1", { title: "Updated Villa", price: 190000000 }),
+    ).resolves.toEqual(updated);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/admin/properties/property-1",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ title: "Updated Villa", price: 190000000 }),
       }),
     );
   });

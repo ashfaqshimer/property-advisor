@@ -128,6 +128,9 @@ export type PropertyApiRecord = {
   created_at: string;
   property_contact_id: string | null;
   property_contact: PropertyContact | null;
+  has_maids_room?: boolean | null;
+  has_maids_toilet?: boolean | null;
+  is_gated_community?: boolean | null;
 };
 
 export type CreatePropertyPayload = {
@@ -868,6 +871,20 @@ export async function getAdminProperties(): Promise<PropertyApiRecord[]> {
   const result: unknown = await response.json();
   if (!isPropertyApiResponse(result)) {
     throw new ChatError("unexpected", "The backend returned an unrecognised property list.");
+  }
+  return result;
+}
+
+export async function getAdminProperty(propertyId: string): Promise<PropertyApiRecord> {
+  const response = await fetch(`${baseUrl()}/admin/properties/${propertyId}`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Property fetch failed (${response.status}).`, response.status);
+  const result: unknown = await response.json();
+  if (!isPropertyApiRecord(result)) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised property response.");
   }
   return result;
 }

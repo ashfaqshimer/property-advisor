@@ -255,7 +255,11 @@ def update_admin_property(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
 
     changes = payload.model_dump(exclude_unset=True)
-    if "location" in changes:
+    if "location" in changes and (
+        changes["location"] != property_record.location
+        or property_record.latitude is None
+        or property_record.longitude is None
+    ):
         coordinates = _geocode_location(changes["location"])
         changes["latitude"] = coordinates.latitude
         changes["longitude"] = coordinates.longitude

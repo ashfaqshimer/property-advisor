@@ -236,23 +236,23 @@ export default function AdminPropertiesPage() {
 									</td>
 									<td className='px-5 py-4 text-right'>
 										<div className="flex items-center justify-end gap-2">
-											{canDelete && <button
-												type='button'
-												disabled={busyProperty === property.id}
-												onClick={() => console.log('Edit property', property)}
+											<Link
+												href={`/admin/properties/${property.id}/edit`}
 												className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#35664f] dark:text-emerald-400 transition-colors hover:bg-[#e0f1e7] dark:hover:bg-emerald-950 cursor-pointer'
 											>
 												<Pencil className="h-3.5 w-3.5" />
 												Edit
-											</button>}
-											<button
-												type='button'
-												onClick={() => setDeleteConfirmId(property.id)}
-												className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer'
-											>
-												{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
-												Delete
-											</button>
+											</Link>
+											{canDelete && (
+												<button
+													type='button'
+													onClick={() => setDeleteConfirmId(property.id)}
+													className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer'
+												>
+													{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
+													Delete
+												</button>
+											)}
 										</div>
 									</td>
 								</tr>
@@ -310,25 +310,23 @@ export default function AdminPropertiesPage() {
 									{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
 								</button>
 								<div className='flex gap-2'>
+									<Link
+										href={`/admin/properties/${property.id}/edit`}
+										className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#35664f] dark:text-emerald-400 transition-colors hover:bg-[#e0f1e7] dark:hover:bg-emerald-950 cursor-pointer'
+									>
+										<Pencil className="h-3.5 w-3.5" />
+										Edit
+									</Link>
 									{canDelete && (
 										<button
 											type='button'
-											disabled={busyProperty === property.id}
-											onClick={() => console.log('Edit property', property)}
-											className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#35664f] dark:text-emerald-400 transition-colors hover:bg-[#e0f1e7] dark:hover:bg-emerald-950 cursor-pointer'
+											onClick={() => setDeleteConfirmId(property.id)}
+											className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer'
 										>
-											<Pencil className="h-3.5 w-3.5" />
-											Edit
+											{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
+											Delete
 										</button>
 									)}
-									<button
-										type='button'
-										onClick={() => setDeleteConfirmId(property.id)}
-										className='inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold text-[#a34d4d] dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer'
-									>
-										{busyProperty === property.id ? <Spinner className='inline h-3.5 w-3.5' /> : <Trash2 className="h-3.5 w-3.5" />}
-										Delete
-									</button>
 								</div>
 							</div>
 						</div>
