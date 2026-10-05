@@ -1336,6 +1336,7 @@ export type FieldAssignment = {
   prospect_classification: string | null;
   prospect_confidence: number | null;
   prospect_ikman_url: string | null;
+  prospect_source_url?: string | null;
   prospect_status: string | null;
 };
 
@@ -1405,6 +1406,101 @@ export async function resendFieldAssignment(assignmentId: string): Promise<Field
     throw new ChatError("unexpected", detail, response.status);
   }
   return (await response.json()) as FieldAssignment;
+}
+
+// --------------------------------------------------------------------------------------
+// Suburb Market Values & Benchmarks
+// --------------------------------------------------------------------------------------
+
+export type SuburbItem = {
+  id: string;
+  name: string;
+  slug: string;
+  district: string;
+  ds_division: string | null;
+  tier: string;
+  aliases: string[];
+  baseline_land_perch_range: [number | null, number | null];
+  baseline_apartment_sqft_range: [number | null, number | null];
+};
+
+export type MarketValueEstimate = {
+  suburb: string;
+  district: string;
+  ds_division: string | null;
+  tier: string;
+  property_type: string;
+  listing_type: string;
+  sample_size: number;
+  has_live_data: boolean;
+  confidence: "high" | "medium" | "benchmark_supported" | "indicative";
+  negotiation_discount_percent: number;
+  stats: {
+    median_asking_price_lkr: number | null;
+    estimated_realized_price_lkr: number | null;
+    price_per_perch_lkr: {
+      asking_median: number | null;
+      realized_estimate: number | null;
+      benchmark_range: [number | null, number | null] | null;
+    };
+    price_per_sqft_lkr: {
+      asking_median: number | null;
+      benchmark_range: [number | null, number | null] | null;
+    };
+  };
+};
+
+export async function getSuburbs(district?: string): Promise<SuburbItem[]> {
+  const params = new URLSearchParams();
+  if (district) params.set("district", district);
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/market-values/suburbs?${params}`,
+    {
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to fetch suburbs (${response.status}).`, response.status);
+  }
+  return (await response.json()) as SuburbItem[];
+}
+
+export async function getMarketValueEstimate(
+  suburb: string,
+  propertyType?: string,
+  listingType: string = "sale"
+): Promise<MarketValueEstimate> {
+  const params = new URLSearchParams({ suburb, listing_type: listingType });
+  if (propertyType && propertyType !== "all") params.set("property_type", propertyType);
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/market-values/estimate?${params}`,
+    {
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Market value estimation failed (${response.status}).`, response.status);
+  }
+  return (await response.json()) as MarketValueEstimate;
+}
+
+export async function seedSuburbs(): Promise<{ status: string; seeded_count: number }> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/admin/suburbs/seed`,
+    {
+      method: "POST",
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to seed suburbs (${response.status}).`, response.status);
+  }
+  return (await response.json()) as { status: string; seeded_count: number };
 }
 
 
