@@ -300,3 +300,64 @@ def test_delete_assignment_by_prospect(
     # Verify deleted from DB
     assert seeded.get(FieldAssignment, assignment.id) is None
 
+
+def test_build_classification_keyboard():
+    from app.services.telegram_dispatch import build_classification_keyboard
+
+    kb = build_classification_keyboard("test-assignment-id")
+    buttons = kb["inline_keyboard"]
+    assert len(buttons) == 2
+    row1 = buttons[0]
+    row2 = buttons[1]
+
+    assert row1[0]["text"] == "👤 Direct Owner"
+    assert row1[0]["callback_data"] == "fac:test-assignment-id:owner"
+    assert row1[1]["text"] == "🏢 Agent / Broker"
+    assert row1[1]["callback_data"] == "fac:test-assignment-id:broker"
+
+    assert row2[0]["text"] == "⏩ Skip / Unsure"
+    assert row2[0]["callback_data"] == "fac:test-assignment-id:skip"
+
+
+def test_format_assignment_message_status_and_verified():
+    from app.services.telegram_dispatch import format_assignment_message
+
+    msg = format_assignment_message(
+        poster_name="Sunil Perera",
+        phone_number="0771234567",
+        title="House in Thalawathugoda",
+        location="Thalawathugoda",
+        price="Rs 40,000,000",
+        property_type="house",
+        listing_type="for_sale",
+        classification="broker",
+        confidence=60,
+        status="contacted",
+        handled_by="Agent John",
+        verified_classification="owner",
+    )
+
+    assert "📋 <b>Prospect • ✅ Contacted</b>" in msg
+    assert "💡 <b>Contact Type:</b> Direct Owner <i>(Agent verified)</i>" in msg
+    assert "✍️ <b>Updated by:</b> Agent John" in msg
+
+
+def test_format_reminder_message_status_and_verified():
+    from app.services.telegram_dispatch import format_reminder_message
+
+    msg = format_reminder_message(
+        poster_name="Kamal",
+        phone_number="0779998888",
+        title="Apartment in Colombo 7",
+        location="Colombo 07",
+        price="Rs 80,000,000",
+        property_type="apartment",
+        listing_type="for_sale",
+        attempt_count=2,
+        status="no_answer",
+        handled_by="Agent Sarah",
+    )
+
+    assert "⏰ <b>Follow-up Reminder • 📵 No Answer</b>" in msg
+    assert "✍️ <b>Updated by:</b> Agent Sarah" in msg
+

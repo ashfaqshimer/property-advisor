@@ -212,7 +212,12 @@ def test_telegram_webhook_prospect_status_sync(seeded, client):
     seeded.add(assignment)
     seeded.commit()
 
-    with patch("app.api.telegram.answer_callback_query"), patch("app.api.telegram.send_confirmation"), patch("app.api.telegram._get_agent_chat_id", return_value="123456"):
+    with (
+        patch("app.api.telegram.answer_callback_query"),
+        patch("app.api.telegram.send_confirmation"),
+        patch("app.api.telegram.edit_assignment_card"),
+        patch("app.api.telegram._get_agent_chat_id", return_value="123456"),
+    ):
         # Agent taps "not_interested"
         resp = client.post(
             "/telegram/webhook",
@@ -298,6 +303,7 @@ def test_telegram_webhook_group_topic_sync(seeded, client):
     with (
         patch("app.api.telegram.answer_callback_query") as mock_answer,
         patch("app.api.telegram.send_confirmation") as mock_confirm,
+        patch("app.api.telegram.edit_assignment_card") as mock_edit_card,
         patch("app.api.telegram.get_settings") as mock_settings,
     ):
         mock_settings.return_value.telegram_bot_token = "123:ABC"
@@ -325,14 +331,102 @@ def test_telegram_webhook_group_topic_sync(seeded, client):
         )
         assert resp.status_code == 200
         mock_answer.assert_called_once_with("123:ABC", "cq-group-1")
+        mock_edit_card.assert_called_once_with(
+            "123:ABC",
+            "-100999",
+            55,
+            assignment=assignment,
+            status="contacted",
+            actor_name="Deen",
+        )
         mock_confirm.assert_called_once_with(
             "-100999",
             "123:ABC",
             "contacted",
             user_name="Deen",
             thread_id=42,
+            assignment_id=str(assignment.id),
         )
 
         seeded.refresh(assignment)
         assert assignment.status == "contacted"
         assert assignment.awaiting_notes is True
+
+
+def test_telegram_webhook_classification_callback(seeded, client):
+    from unittest.mock import patch
+    import uuid
+    from app.models.prospect import Prospect
+    from app.models.field_assignment import FieldAssignment
+
+    prospect = Prospect(
+        id=uuid.uuid4(),
+        title="Verification Test Property",
+        price="Rs 45,000,000",
+        location="Rajagiriya",
+        property_type="house",
+        listing_type="for_sale",
+        classification="broker",  # originally classified as broker
+        confidence=70,
+        classification_reasons=["agent_keyword"],
+        classification_method="heuristic",
+        status="contacted",
+    )
+    seeded.add(prospect)
+    seeded.flush()
+
+    assignment = FieldAssignment(
+        id=uuid.uuid4(),
+        prospect_id=prospect.id,
+        status="contacted",
+        telegram_message_id=9876,
+    )
+    seeded.add(assignment)
+    seeded.commit()
+
+    with (
+        patch("app.api.telegram.answer_callback_query") as mock_answer,
+        patch("app.api.telegram.edit_telegram_message") as mock_edit_msg,
+        patch("app.api.telegram.edit_assignment_card") as mock_edit_card,
+        patch("app.api.telegram.get_settings") as mock_settings,
+    ):
+        mock_settings.return_value.telegram_bot_token = "123:ABC"
+        mock_settings.return_value.telegram_assignments_chat_id = "-100999"
+        mock_settings.return_value.telegram_agent_chat_id = ""
+        mock_settings.return_value.telegram_chat_id = ""
+        mock_settings.return_value.telegram_webhook_secret = ""
+
+        # Agent taps "👤 Direct Owner"
+        resp = client.post(
+            "/telegram/webhook",
+            json={
+                "update_id": 11,
+                "callback_query": {
+                    "id": "cq-cls-1",
+                    "from": {"id": 8660126912, "first_name": "Deen"},
+                    "message": {
+                        "message_id": 66,  # confirmation prompt message
+                        "chat": {"id": -100999, "type": "supergroup"},
+                    },
+                    "data": f"fac:{assignment.id}:owner",
+                },
+            },
+        )
+        assert resp.status_code == 200
+        mock_answer.assert_called_once_with("123:ABC", "cq-cls-1", "Recorded as Direct Owner")
+        mock_edit_msg.assert_called_once()
+        mock_edit_card.assert_called_once_with(
+            "123:ABC",
+            "-100999",
+            9876,
+            assignment=assignment,
+            status="contacted",
+            actor_name="Deen",
+            verified_classification="owner",
+        )
+
+        seeded.refresh(prospect)
+        assert prospect.classification == "owner"
+        assert prospect.confidence == 100
+        assert prospect.classification_method == "manual"
+

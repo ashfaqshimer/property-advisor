@@ -69,6 +69,21 @@ def _build_assignment_keyboard(assignment_id: str) -> dict[str, Any]:
     return {"inline_keyboard": [buttons[:2], buttons[2:]]}
 
 
+def build_classification_keyboard(assignment_id: str) -> dict[str, Any]:
+    """Build an inline keyboard for classification verification (Owner vs Agent vs Skip)."""
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "👤 Direct Owner", "callback_data": f"fac:{assignment_id}:owner"},
+                {"text": "🏢 Agent / Broker", "callback_data": f"fac:{assignment_id}:broker"},
+            ],
+            [
+                {"text": "⏩ Skip / Unsure", "callback_data": f"fac:{assignment_id}:skip"},
+            ],
+        ]
+    }
+
+
 def format_assignment_message(
     *,
     poster_name: str | None,
@@ -82,8 +97,11 @@ def format_assignment_message(
     confidence: int | None = None,
     ikman_url: str | None = None,
     listing_url: str | None = None,
-    assignment_number: int,
-    total_assignments: int,
+    assignment_number: int = 1,
+    total_assignments: int = 1,
+    status: str | None = None,
+    handled_by: str | None = None,
+    verified_classification: str | None = None,
 ) -> str:
     """Build an HTML-formatted prospect card message for Telegram."""
     lt = listing_type.replace("for_", "").replace("_", " ").title()
@@ -97,8 +115,22 @@ def format_assignment_message(
     else:
         likely_label = None
 
+    status_labels = {
+        "contacted": "✅ Contacted",
+        "interested": "✅ Contacted",
+        "not_interested": "❌ Not Interested",
+        "no_answer": "📵 No Answer",
+        "callback_later": "🔄 Call Back Later",
+    }
+
+    if status and status != "pending":
+        st_text = status_labels.get(status, status.title())
+        header = f"📋 <b>Prospect • {st_text}</b>"
+    else:
+        header = f"📋 <b>New Prospect</b> ({assignment_number}/{total_assignments})"
+
     lines = [
-        f"📋 <b>New Prospect</b> ({assignment_number}/{total_assignments})",
+        header,
         "",
         f"👤 <b>Name:</b> {html.escape(poster_name or 'Unknown')}",
     ]
@@ -111,7 +143,16 @@ def format_assignment_message(
             clean_phone = "+94" + clean_phone
         lines.append(f"📞 <b>Phone:</b> {clean_phone}")
 
-    if likely_label:
+    if verified_classification:
+        vc_lower = verified_classification.lower()
+        if vc_lower == "owner":
+            vc_label = "Direct Owner"
+        elif vc_lower in ("agent", "broker"):
+            vc_label = "Another Agent / Broker"
+        else:
+            vc_label = verified_classification.title()
+        lines.append(f"💡 <b>Contact Type:</b> {vc_label} <i>(Agent verified)</i>")
+    elif likely_label:
         conf_suffix = ""
         if confidence is not None:
             conf_val = int(confidence * 100) if isinstance(confidence, float) and 0 < confidence <= 1 else int(confidence)
@@ -124,6 +165,9 @@ def format_assignment_message(
         f"💰 <b>Price:</b> {html.escape(price)}",
         f"🏷️ <b>Type:</b> {pt} • {lt}",
     ]
+
+    if handled_by:
+        lines.append(f"✍️ <b>Updated by:</b> {html.escape(handled_by)}")
 
     target_url = listing_url or ikman_url
     if target_url:
@@ -261,14 +305,118 @@ def send_notes_prompt(chat_id: str, token: str, thread_id: int | None = None) ->
         logger.warning("telegram_notes_prompt_error", error=str(exc))
 
 
+def edit_telegram_message(
+    token: str,
+    chat_id: str | int,
+    message_id: int,
+    text: str,
+    reply_markup: dict[str, Any] | None = None,
+) -> bool:
+    """Edit an existing Telegram message's text and/or inline keyboard."""
+    if not token or not chat_id or not message_id:
+        return False
+
+    payload: dict[str, Any] = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": "HTML",
+    }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+
+    try:
+        with httpx.Client(timeout=6.0) as client:
+            resp = client.post(_api_url(token, "editMessageText"), json=payload)
+            data = resp.json()
+            if not data.get("ok"):
+                desc = data.get("description", "")
+                if "message is not modified" not in desc:
+                    logger.warning("telegram_edit_message_failed", response=data, message_id=message_id)
+                return False
+            logger.info("telegram_message_edited", message_id=message_id)
+            return True
+    except Exception as exc:
+        logger.warning("telegram_edit_message_error", error=str(exc), message_id=message_id)
+        return False
+
+
+def edit_assignment_card(
+    token: str,
+    chat_id: str | int,
+    message_id: int,
+    *,
+    assignment: Any,
+    status: str,
+    actor_name: str | None = None,
+    verified_classification: str | None = None,
+    reply_markup: dict[str, Any] | None = None,
+) -> bool:
+    """Edit an assignment or reminder card in-place to reflect updated status and remove/change action buttons."""
+    prospect = getattr(assignment, "prospect", None)
+    if not prospect:
+        return False
+
+    is_reminder = bool(assignment.attempt_count and assignment.attempt_count > 1)
+    target_url = prospect.source_url or prospect.ikman_url
+    cls = verified_classification or prospect.classification
+    is_verified = bool(verified_classification or prospect.classification_method == "manual")
+
+    if is_reminder:
+        text = format_reminder_message(
+            poster_name=prospect.poster_name,
+            phone_number=prospect.phone_number,
+            title=prospect.title,
+            location=prospect.location,
+            price=prospect.price,
+            property_type=prospect.property_type,
+            listing_type=prospect.listing_type,
+            classification=cls,
+            confidence=prospect.confidence,
+            listing_url=target_url,
+            ikman_url=target_url,
+            attempt_count=assignment.attempt_count or 1,
+            status=status,
+            handled_by=actor_name,
+            verified_classification=cls if is_verified else None,
+        )
+    else:
+        text = format_assignment_message(
+            poster_name=prospect.poster_name,
+            phone_number=prospect.phone_number,
+            title=prospect.title,
+            location=prospect.location,
+            price=prospect.price,
+            property_type=prospect.property_type,
+            listing_type=prospect.listing_type,
+            classification=cls,
+            confidence=prospect.confidence,
+            listing_url=target_url,
+            ikman_url=target_url,
+            assignment_number=1,
+            total_assignments=1,
+            status=status,
+            handled_by=actor_name,
+            verified_classification=cls if is_verified else None,
+        )
+
+    markup = reply_markup if reply_markup is not None else {"inline_keyboard": []}
+    return edit_telegram_message(token, chat_id, message_id, text, reply_markup=markup)
+
+
 def send_confirmation(
     chat_id: str,
     token: str,
     status: str,
     user_name: str | None = None,
     thread_id: int | None = None,
-) -> None:
-    """Confirm the recorded outcome to the agent or team group."""
+    assignment_id: str | None = None,
+) -> int | None:
+    """Confirm the recorded outcome to the agent or team group.
+    
+    If status is 'contacted' and assignment_id is provided, includes inline buttons
+    asking whether the contact was the Direct Owner or an Agent/Broker.
+    """
     labels = {
         "contacted": "✅ Marked as Contacted",
         "interested": "✅ Marked as Contacted",
@@ -278,18 +426,39 @@ def send_confirmation(
     }
     label = labels.get(status, f"Recorded: {status}")
     by_suffix = f" by {html.escape(user_name)}" if user_name else ""
+
+    if status in ("contacted", "interested") and assignment_id:
+        text = (
+            f"{label}{by_suffix}\n\n"
+            f"<b>Who did you speak with?</b>\n"
+            f"Tap below to record the contact type, or reply with notes (or /skip):"
+        )
+        keyboard: dict[str, Any] | None = build_classification_keyboard(assignment_id)
+    else:
+        text = f"{label}{by_suffix}\n\nAny notes? Reply with details or send /skip"
+        keyboard = None
+
     payload: dict[str, Any] = {
         "chat_id": chat_id,
-        "text": f"{label}{by_suffix}\n\nAny notes? Reply with details or send /skip",
+        "text": text,
         "parse_mode": "HTML",
     }
+    if keyboard:
+        payload["reply_markup"] = keyboard
     if thread_id is not None and str(chat_id).startswith("-"):
         payload["message_thread_id"] = thread_id
+
     try:
         with httpx.Client(timeout=5.0) as client:
-            client.post(_api_url(token, "sendMessage"), json=payload)
+            resp = client.post(_api_url(token, "sendMessage"), json=payload)
+            data = resp.json()
+            if not data.get("ok"):
+                logger.warning("telegram_confirmation_send_failed", response=data)
+                return None
+            return data.get("result", {}).get("message_id")
     except Exception as exc:
         logger.warning("telegram_confirmation_send_error", error=str(exc))
+        return None
 
 
 def format_reminder_message(
@@ -306,6 +475,9 @@ def format_reminder_message(
     ikman_url: str | None = None,
     listing_url: str | None = None,
     attempt_count: int = 1,
+    status: str | None = None,
+    handled_by: str | None = None,
+    verified_classification: str | None = None,
 ) -> str:
     """Build an HTML-formatted reminder card message for Telegram."""
     lt = listing_type.replace("for_", "").replace("_", " ").title()
@@ -319,9 +491,26 @@ def format_reminder_message(
     else:
         likely_label = None
 
+    status_labels = {
+        "contacted": "✅ Contacted",
+        "interested": "✅ Contacted",
+        "not_interested": "❌ Not Interested",
+        "no_answer": "📵 No Answer",
+        "callback_later": "🔄 Call Back Later",
+    }
+
+    if status and status != "pending":
+        st_text = status_labels.get(status, status.title())
+        header = f"⏰ <b>Follow-up Reminder • {st_text}</b>"
+    else:
+        header = f"⏰ <b>Follow-up Reminder: Call Prospect</b> (Attempt #{attempt_count})"
+
     lines = [
-        f"⏰ <b>Follow-up Reminder: Call Prospect</b> (Attempt #{attempt_count})",
-        "<i>You marked this prospect as No Answer previously.</i>",
+        header,
+    ]
+    if not status or status == "pending":
+        lines.append("<i>You marked this prospect as No Answer previously.</i>")
+    lines += [
         "",
         f"👤 <b>Name:</b> {html.escape(poster_name or 'Unknown')}",
     ]
@@ -334,7 +523,16 @@ def format_reminder_message(
             clean_phone = "+94" + clean_phone
         lines.append(f"📞 <b>Phone:</b> {clean_phone}")
 
-    if likely_label:
+    if verified_classification:
+        vc_lower = verified_classification.lower()
+        if vc_lower == "owner":
+            vc_label = "Direct Owner"
+        elif vc_lower in ("agent", "broker"):
+            vc_label = "Another Agent / Broker"
+        else:
+            vc_label = verified_classification.title()
+        lines.append(f"💡 <b>Contact Type:</b> {vc_label} <i>(Agent verified)</i>")
+    elif likely_label:
         conf_suffix = ""
         if confidence is not None:
             conf_val = int(confidence * 100) if isinstance(confidence, float) and 0 < confidence <= 1 else int(confidence)
@@ -347,6 +545,9 @@ def format_reminder_message(
         f"💰 <b>Price:</b> {html.escape(price)}",
         f"🏷️ <b>Type:</b> {pt} • {lt}",
     ]
+
+    if handled_by:
+        lines.append(f"✍️ <b>Updated by:</b> {html.escape(handled_by)}")
 
     target_url = listing_url or ikman_url
     if target_url:

@@ -5,7 +5,9 @@ Handles:
   - message:        free-text note replies and /skip command
 """
 
+import html
 from typing import Annotated
+import uuid
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
@@ -19,7 +21,10 @@ from app.models.scan_job import ScanJob
 from app.services.telegram_dispatch import (
     PROSPECT_STATUS_MAP,
     answer_callback_query,
+    build_classification_keyboard,
     calculate_next_reminder_time,
+    edit_assignment_card,
+    edit_telegram_message,
     get_updates,
     process_due_reminders,
     register_webhook,
@@ -73,6 +78,7 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
     from_user = cq.get("from", {})
     user_id = str(from_user.get("id", ""))
     msg = cq.get("message") or {}
+    msg_id = msg.get("message_id")
     msg_chat = msg.get("chat") or {}
     origin_chat_id = str(msg_chat.get("id") or user_id)
     thread_id = msg.get("message_thread_id")
@@ -82,6 +88,84 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
     # Only accept callbacks from authorized chats/agents
     if not _is_authorized_chat(origin_chat_id, user_id):
         answer_callback_query(token, cq_id)
+        return
+
+    user_name = from_user.get("first_name") or from_user.get("username")
+
+    # Handle post-contact classification button taps: fac:<assignment_id>:<owner|broker|skip>
+    if data.startswith("fac:"):
+        parts = data.split(":")
+        if len(parts) != 3:
+            answer_callback_query(token, cq_id, "Unknown action.")
+            return
+
+        _, assignment_id_str, cls_choice = parts
+        try:
+            assignment_id = uuid.UUID(assignment_id_str)
+        except ValueError:
+            answer_callback_query(token, cq_id, "Invalid assignment ID.")
+            return
+
+        assignment = db.get(FieldAssignment, assignment_id)
+        if not assignment:
+            answer_callback_query(token, cq_id, "Assignment not found.")
+            return
+
+        by_suffix = f" by {html.escape(user_name)}" if user_name else ""
+        prospect = assignment.prospect
+
+        if cls_choice in ("owner", "broker"):
+            if prospect:
+                prospect.classification = cls_choice
+                prospect.confidence = 100
+                prospect.classification_method = "manual"
+                db.commit()
+
+            choice_label = "Direct Owner" if cls_choice == "owner" else "Another Agent / Broker"
+            answer_callback_query(token, cq_id, f"Recorded as {choice_label}")
+
+            # Edit confirmation message where buttons were tapped to remove buttons
+            if msg_id:
+                edit_telegram_message(
+                    token,
+                    origin_chat_id,
+                    msg_id,
+                    f"✅ Recorded as <b>{choice_label}</b>{by_suffix}\n\nAny notes? Reply with details or send /skip",
+                    reply_markup={"inline_keyboard": []},
+                )
+
+            # Edit the original prospect card in-place if tracked
+            card_msg_id = assignment.telegram_message_id
+            if card_msg_id and card_msg_id != msg_id:
+                edit_assignment_card(
+                    token,
+                    origin_chat_id,
+                    card_msg_id,
+                    assignment=assignment,
+                    status=assignment.status,
+                    actor_name=user_name,
+                    verified_classification=cls_choice,
+                )
+
+            logger.info(
+                "field_assignment_classification_recorded",
+                assignment_id=assignment_id_str,
+                classification=cls_choice,
+                actor_id=user_id,
+                actor_name=user_name,
+            )
+        elif cls_choice == "skip":
+            answer_callback_query(token, cq_id, "Classification skipped.")
+            if msg_id:
+                edit_telegram_message(
+                    token,
+                    origin_chat_id,
+                    msg_id,
+                    f"✅ Marked as Contacted{by_suffix}\n\nAny notes? Reply with details or send /skip",
+                    reply_markup={"inline_keyboard": []},
+                )
+        else:
+            answer_callback_query(token, cq_id, "Unknown choice.")
         return
 
     # Expected format: fa:<assignment_id>:<status>
@@ -98,7 +182,6 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
         return
 
     try:
-        import uuid
         assignment_id = uuid.UUID(assignment_id_str)
     except ValueError:
         answer_callback_query(token, cq_id, "Invalid assignment ID.")
@@ -143,14 +226,26 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
     assignment.awaiting_notes = True
     db.commit()
 
-    user_name = from_user.get("first_name") or from_user.get("username")
     answer_callback_query(token, cq_id)
+
+    # Edit the card message in-place to update status badge and remove action buttons
+    if msg_id:
+        edit_assignment_card(
+            token,
+            origin_chat_id,
+            msg_id,
+            assignment=assignment,
+            status=new_status,
+            actor_name=user_name,
+        )
+
     send_confirmation(
         origin_chat_id,
         token,
         new_status,
         user_name=user_name,
         thread_id=thread_id,
+        assignment_id=assignment_id_str,
     )
     logger.info(
         "field_assignment_outcome_received",
