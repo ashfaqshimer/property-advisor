@@ -27,7 +27,7 @@ class FieldAssignment(Base):
         nullable=True,
     )
 
-    # pending | no_answer | interested | not_interested | callback_later
+    # pending | no_answer | contacted | not_interested | callback_later
     status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

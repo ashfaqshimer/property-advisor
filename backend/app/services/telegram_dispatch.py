@@ -39,7 +39,7 @@ def calculate_next_reminder_time(
 
 # Outcome button definitions: (callback_data, display_label)
 OUTCOME_BUTTONS = [
-    ("interested", "✅ Interested"),
+    ("contacted", "✅ Contacted"),
     ("not_interested", "❌ Not Interested"),
     ("no_answer", "📵 No Answer"),
     ("callback_later", "🔄 Call Back Later"),
@@ -47,7 +47,8 @@ OUTCOME_BUTTONS = [
 
 # Maps assignment status → prospect status update
 PROSPECT_STATUS_MAP: dict[str, str | None] = {
-    "interested": "contacted",
+    "contacted": "contacted",
+    "interested": "contacted",  # legacy compatibility
     "not_interested": "discarded",
     "callback_later": "contacted",
     "no_answer": None,  # no change — eligible for retry
@@ -269,7 +270,8 @@ def send_confirmation(
 ) -> None:
     """Confirm the recorded outcome to the agent or team group."""
     labels = {
-        "interested": "✅ Marked as Interested",
+        "contacted": "✅ Marked as Contacted",
+        "interested": "✅ Marked as Contacted",
         "not_interested": "❌ Marked as Not Interested",
         "no_answer": "📵 Marked as No Answer\n⏰ Reminder scheduled for tomorrow around 10:00 AM",
         "callback_later": "🔄 Marked as Call Back Later",

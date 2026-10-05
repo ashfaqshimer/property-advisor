@@ -1320,7 +1320,7 @@ export type FieldAssignment = {
   id: string;
   prospect_id: string | null;
   assigned_by_id: string | null;
-  status: "pending" | "no_answer" | "interested" | "not_interested" | "callback_later";
+  status: "pending" | "no_answer" | "contacted" | "interested" | "not_interested" | "callback_later";
   notes: string | null;
   telegram_message_id: number | null;
   awaiting_notes: boolean;

@@ -874,10 +874,10 @@ export default function ProspectsPage() {
                             <span>Cancel</span>
                           </button>
                         </div>
-                      ) : prospect.assignment_status === "interested" ? (
+                      ) : prospect.assignment_status === "contacted" || prospect.assignment_status === "interested" ? (
                         <div className="flex-1 flex items-center justify-center gap-1.5 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 py-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
                           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                          <span>Agent Outcome: Interested</span>
+                          <span>Agent Outcome: Contacted</span>
                         </div>
                       ) : prospect.assignment_status === "not_interested" ? (
                         <div className="flex-1 flex items-center justify-center gap-1.5 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 py-1.5 text-xs font-medium text-red-800 dark:text-red-300">
@@ -1203,13 +1203,13 @@ export default function ProspectsPage() {
                                       <span>Cancel</span>
                                     </button>
                                   </div>
-                                ) : prospect.assignment_status === "interested" ? (
+                                ) : prospect.assignment_status === "contacted" || prospect.assignment_status === "interested" ? (
                                   <span
                                     className="inline-flex items-center gap-1 rounded border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-300"
-                                    title="Agent outcome: Interested"
+                                    title="Agent outcome: Contacted"
                                   >
                                     <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                                    <span>Interested</span>
+                                    <span>Contacted</span>
                                   </span>
                                 ) : prospect.assignment_status === "not_interested" ? (
                                   <span

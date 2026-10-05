@@ -25,8 +25,13 @@ const STATUS_CONFIG: Record<
     color: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
     dot: "bg-amber-400",
   },
+  contacted: {
+    label: "Contacted",
+    color: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800",
+    dot: "bg-emerald-500",
+  },
   interested: {
-    label: "Interested",
+    label: "Contacted",
     color: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800",
     dot: "bg-emerald-500",
   },
@@ -50,7 +55,7 @@ const STATUS_CONFIG: Record<
 const STATUS_FILTERS = [
   { value: "", label: "All" },
   { value: "pending", label: "Pending" },
-  { value: "interested", label: "Interested" },
+  { value: "contacted", label: "Contacted" },
   { value: "not_interested", label: "Not Interested" },
   { value: "no_answer", label: "No Answer" },
   { value: "callback_later", label: "Call Back" },
@@ -240,12 +245,12 @@ export default function AssignmentsPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
             { status: "pending", label: "Pending" },
-            { status: "interested", label: "Interested" },
+            { status: "contacted", label: "Contacted" },
             { status: "not_interested", label: "Not Interested" },
             { status: "no_answer", label: "No Answer" },
             { status: "callback_later", label: "Call Back" },
           ].map(({ status, label }) => {
-            const count = data.items.filter((a) => a.status === status).length;
+            const count = data.items.filter((a) => a.status === status || (status === "contacted" && a.status === "interested")).length;
             const cfg = STATUS_CONFIG[status];
             return (
               <button

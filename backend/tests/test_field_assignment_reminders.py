@@ -99,6 +99,41 @@ def test_telegram_callback_clears_reminder_on_other_status(
                 "message_id": 556,
                 "chat": {"id": 99999},
             },
+            "data": f"fa:{assignment.id}:contacted",
+        },
+    }
+
+    with (
+        patch("app.api.telegram._is_authorized_chat", return_value=True),
+        patch("app.api.telegram.answer_callback_query"),
+        patch("app.api.telegram.send_confirmation"),
+    ):
+        res = client.post("/telegram/webhook", json=callback_payload)
+        assert res.status_code == 200
+
+        seeded.refresh(assignment)
+        assert assignment.status == "contacted"
+        assert assignment.remind_at is None
+
+
+def test_telegram_callback_legacy_interested_converts_to_contacted(
+    seeded: Session,
+    client: TestClient,
+):
+    assignment = FieldAssignment(
+        id=uuid.uuid4(),
+        status="pending",
+        remind_at=datetime.now(timezone.utc) + timedelta(days=1),
+    )
+    seeded.add(assignment)
+    seeded.commit()
+
+    callback_payload = {
+        "update_id": 991,
+        "callback_query": {
+            "id": "cq_legacy_1",
+            "from": {"id": 99999, "first_name": "TestAgent"},
+            "message": {"message_id": 557, "chat": {"id": 99999}},
             "data": f"fa:{assignment.id}:interested",
         },
     }
@@ -112,8 +147,8 @@ def test_telegram_callback_clears_reminder_on_other_status(
         assert res.status_code == 200
 
         seeded.refresh(assignment)
-        assert assignment.status == "interested"
-        assert assignment.remind_at is None
+        assert assignment.status == "contacted"
+
 
 
 def test_process_due_reminders_sends_telegram_and_updates_db(

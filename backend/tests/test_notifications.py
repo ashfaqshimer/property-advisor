@@ -237,7 +237,7 @@ def test_telegram_webhook_prospect_status_sync(seeded, client):
         assert scan_job.new_count == 0
         assert scan_job.filtered_count == 1
 
-        # Agent taps "interested" (e.g. follow-up or re-open)
+        # Agent taps "contacted" (e.g. follow-up or re-open)
         resp2 = client.post(
             "/telegram/webhook",
             json={
@@ -245,7 +245,7 @@ def test_telegram_webhook_prospect_status_sync(seeded, client):
                 "callback_query": {
                     "id": "cq-2",
                     "from": {"id": 123456},
-                    "data": f"fa:{assignment.id}:interested",
+                    "data": f"fa:{assignment.id}:contacted",
                 },
             },
         )
@@ -255,7 +255,7 @@ def test_telegram_webhook_prospect_status_sync(seeded, client):
         seeded.refresh(scan_job)
         seeded.refresh(assignment)
 
-        assert assignment.status == "interested"
+        assert assignment.status == "contacted"
         assert prospect.status == "contacted"
         assert prospect.discard_reason is None
         assert scan_job.new_count == 1
@@ -306,7 +306,7 @@ def test_telegram_webhook_group_topic_sync(seeded, client):
         mock_settings.return_value.telegram_chat_id = ""
         mock_settings.return_value.telegram_webhook_secret = ""
 
-        # Group member taps "interested" in a topic thread
+        # Group member taps "contacted" in a topic thread
         resp = client.post(
             "/telegram/webhook",
             json={
@@ -319,7 +319,7 @@ def test_telegram_webhook_group_topic_sync(seeded, client):
                         "message_thread_id": 42,
                         "chat": {"id": -100999, "type": "supergroup"},
                     },
-                    "data": f"fa:{assignment.id}:interested",
+                    "data": f"fa:{assignment.id}:contacted",
                 },
             },
         )
@@ -328,11 +328,11 @@ def test_telegram_webhook_group_topic_sync(seeded, client):
         mock_confirm.assert_called_once_with(
             "-100999",
             "123:ABC",
-            "interested",
+            "contacted",
             user_name="Deen",
             thread_id=42,
         )
 
         seeded.refresh(assignment)
-        assert assignment.status == "interested"
+        assert assignment.status == "contacted"
         assert assignment.awaiting_notes is True

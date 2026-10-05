@@ -91,6 +91,8 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
         return
 
     _, assignment_id_str, new_status = parts
+    if new_status == "interested":
+        new_status = "contacted"
     if new_status not in PROSPECT_STATUS_MAP:
         answer_callback_query(token, cq_id, "Unknown status.")
         return
