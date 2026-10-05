@@ -18,8 +18,8 @@ import { ContactForm, type PhoneEntry } from '@/components/admin/ContactForm';
 
 const typeLabels = { owner: 'Owner', broker: 'Broker' } as const;
 const typeBadge = {
-	owner: 'bg-[#e0f1e7] dark:bg-green-950 text-[#28704b] dark:text-green-300',
-	broker: 'bg-[#e4ecf5] text-[#41627f]',
+	owner: 'bg-[#e0f1e7] dark:bg-emerald-950/80 text-[#28704b] dark:text-emerald-300 dark:border dark:border-emerald-800/40',
+	broker: 'bg-[#e4ecf5] dark:bg-sky-950/80 text-[#41627f] dark:text-sky-300 dark:border dark:border-sky-800/40',
 } as const;
 
 export default function AdminContactsPage() {
@@ -102,7 +102,7 @@ export default function AdminContactsPage() {
 					<button
 						type='button'
 						onClick={() => { setShowCreate(true); setEditingContact(null); }}
-						className='inline-flex items-center justify-center rounded-lg bg-[#28513f] dark:bg-emerald-700 px-5 py-3 text-sm font-semibold text-white dark:text-zinc-200 shadow-sm hover:bg-[#1e4031] dark:hover:bg-emerald-600'
+						className='inline-flex items-center justify-center rounded-lg bg-[#28513f] dark:bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#1e4031] dark:hover:bg-emerald-500 transition-colors cursor-pointer'
 					>
 						<span className='mr-2 text-lg leading-none'>+</span> Add Contact
 					</button>
@@ -112,7 +112,7 @@ export default function AdminContactsPage() {
 			{/* Create form */}
 			{showCreate && (
 				<div ref={formRef} className='mb-6 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm'>
-					<h3 className='mb-4 text-base font-semibold'>New contact</h3>
+					<h3 className='mb-4 text-base font-semibold text-[#253a30] dark:text-zinc-100'>New contact</h3>
 					<ContactForm
 						onSave={handleCreate}
 						onCancel={() => setShowCreate(false)}
@@ -202,7 +202,7 @@ export default function AdminContactsPage() {
 											</div>
 										</div>
 										{expandedId === contact.id && contact.notes && (
-											<p className='mt-2 rounded-lg bg-[#f4f8f5] px-3 py-2 text-sm text-[#475f52]'>
+											<p className='mt-2 rounded-lg bg-[#f4f8f5] dark:bg-zinc-900/70 border border-transparent dark:border-zinc-800/70 px-3 py-2 text-sm text-[#475f52] dark:text-zinc-300'>
 												{contact.notes}
 											</p>
 										)}
@@ -211,7 +211,7 @@ export default function AdminContactsPage() {
 
 								{/* Edit form inline */}
 								{editingContact?.id === contact.id && (
-									<div className='bg-[#fafcfa] px-5 py-5'>
+									<div className='bg-[#fafcfa] dark:bg-zinc-900/60 border-y border-[#e6ebe8] dark:border-zinc-800/80 px-5 py-5 transition-colors'>
 										<p className='mb-4 text-sm font-semibold text-[#253a30] dark:text-zinc-200'>Editing {contact.full_name}</p>
 										<ContactForm
 											initial={contact}

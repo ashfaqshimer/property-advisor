@@ -552,7 +552,7 @@ export default function NewPropertyPage() {
 							{showContactForm && (
 								<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
 									<div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-2xl">
-										<h3 className="mb-4 text-lg font-semibold">Add new contact</h3>
+										<h3 className="mb-4 text-lg font-semibold text-[#253a30] dark:text-zinc-100">Add new contact</h3>
 										<ContactForm
 											onSave={handleCreateContact}
 											onCancel={() => setShowContactForm(false)}
