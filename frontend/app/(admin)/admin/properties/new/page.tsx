@@ -3,7 +3,15 @@
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { createProperty, createPropertyContact, getPropertyContacts, uploadPropertyImages, type PropertyContact } from '@/lib/api';
+import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2 } from 'lucide-react';
+import {
+	createProperty,
+	createPropertyContact,
+	getPropertyContacts,
+	uploadPropertyImages,
+	extractPropertyFromText,
+	type PropertyContact,
+} from '@/lib/api';
 import { ContactForm } from '@/components/admin/ContactForm';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -64,6 +72,17 @@ export default function NewPropertyPage() {
 	const [showContactForm, setShowContactForm] = useState(false);
 	const [creatingContact, setCreatingContact] = useState(false);
 	const [isDragging, setIsDragging] = useState(false);
+
+	// AI Smart Autofill state
+	const [rawText, setRawText] = useState('');
+	const [extracting, setExtracting] = useState(false);
+	const [isAutofillOpen, setIsAutofillOpen] = useState(true);
+	const [extractedContact, setExtractedContact] = useState<{
+		name?: string | null;
+		phone?: string | null;
+		type?: 'owner' | 'broker' | null;
+	} | null>(null);
+
 	useEffect(() => {
 		getPropertyContacts().then(setContacts).catch(() => {});
 		return () =>
@@ -72,6 +91,100 @@ export default function NewPropertyPage() {
 	function updateField(field: keyof FormValues, value: string | boolean | string[]) {
 		setForm((current) => ({ ...current, [field]: value }));
 		setErrors((current) => ({ ...current, [field]: '' }));
+	}
+
+	async function handleExtract() {
+		const trimmed = rawText.trim();
+		if (!trimmed || trimmed.length < 5) {
+			toast.error('Please enter at least 5 characters of listing details.');
+			return;
+		}
+		setExtracting(true);
+		try {
+			const draft = await extractPropertyFromText(trimmed);
+
+			// Map extracted amenities
+			const newAmenities: string[] = [];
+			if (draft.has_maids_room) newAmenities.push('Maid Room');
+			if (draft.amenities) {
+				if (draft.amenities.pool) newAmenities.push('Pool');
+				if (draft.amenities.garden) newAmenities.push('Garden');
+				if (draft.amenities.ac || draft.amenities['a/c']) newAmenities.push('A/C');
+				if (draft.amenities.gym) newAmenities.push('Gym');
+				if (draft.amenities.generator) newAmenities.push('Generator');
+				if (draft.amenities.security) newAmenities.push('Security');
+			}
+
+			// Match or propose contact
+			let matchedContactId = form.propertyContactId;
+			if (draft.contact_phone || draft.contact_name) {
+				const match = contacts.find((c) => {
+					const cleanDraftPhone = draft.contact_phone?.replace(/\D/g, '') || '';
+					const phoneMatch = cleanDraftPhone && c.phones?.some(
+						(p) => p.phone.replace(/\D/g, '') === cleanDraftPhone,
+					);
+					const nameMatch = draft.contact_name && c.full_name.toLowerCase().includes(draft.contact_name.toLowerCase());
+					return phoneMatch || nameMatch;
+				});
+
+				if (match) {
+					matchedContactId = match.id;
+				}
+				setExtractedContact({
+					name: draft.contact_name,
+					phone: draft.contact_phone,
+					type: draft.contact_type,
+				});
+			}
+
+			setForm((current) => ({
+				...current,
+				title: draft.title || current.title,
+				propertyType: draft.property_type || current.propertyType,
+				listingType: draft.listing_type || current.listingType,
+				price: draft.price ? String(draft.price) : current.price,
+				pricePerPerch: Boolean(draft.is_price_per_perch),
+				location: draft.location || current.location,
+				bedrooms: draft.bedrooms != null ? String(draft.bedrooms) : current.bedrooms,
+				bathrooms: draft.bathrooms != null ? String(draft.bathrooms) : current.bathrooms,
+				landSizePerches: draft.land_size_perches != null ? String(draft.land_size_perches) : current.landSizePerches,
+				sqft: draft.floor_area_sqft != null ? String(draft.floor_area_sqft) : current.sqft,
+				parkingSpaces: draft.parking_spaces != null ? String(draft.parking_spaces) : current.parkingSpaces,
+				buildYear: draft.build_year != null ? String(draft.build_year) : current.buildYear,
+				roadAccessFt: draft.road_access_ft != null ? String(draft.road_access_ft) : current.roadAccessFt,
+				furnishingStatus: draft.furnishing_status || current.furnishingStatus,
+				amenities: Array.from(new Set([...current.amenities, ...newAmenities])),
+				description: draft.description || current.description,
+				propertyContactId: matchedContactId,
+			}));
+
+			setErrors({});
+			toast.success('Property details extracted and autofilled! Please review below.');
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Could not extract property details.');
+		} finally {
+			setExtracting(false);
+		}
+	}
+
+	async function handleCreateExtractedContact() {
+		if (!extractedContact?.phone && !extractedContact?.name) return;
+		setCreatingContact(true);
+		try {
+			const created = await createPropertyContact({
+				full_name: extractedContact.name || 'Owner',
+				contact_type: extractedContact.type === 'broker' ? 'broker' : 'owner',
+				phones: extractedContact.phone ? [{ phone: extractedContact.phone }] : [],
+				notes: 'Auto-created via AI Smart Autofill.',
+			});
+			setContacts((prev) => [created, ...prev]);
+			updateField('propertyContactId', created.id);
+			toast.success(`Contact "${created.full_name}" created and assigned.`);
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Could not create contact.');
+		} finally {
+			setCreatingContact(false);
+		}
 	}
 
 	async function handleCreateContact(data: Parameters<typeof createPropertyContact>[0]) {
@@ -234,6 +347,115 @@ export default function NewPropertyPage() {
 					Create a listing for the Property Advisor catalog.
 				</p>
 			</div>
+
+			{/* AI Smart Autofill Card */}
+			<div className='mb-8 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 p-5 sm:p-6 shadow-sm'>
+				<div className='flex items-center justify-between'>
+					<div className='flex items-center gap-2.5'>
+						<div className='flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'>
+							<Sparkles className='h-5 w-5' />
+						</div>
+						<div>
+							<h3 className='text-base font-semibold text-[#19352b] dark:text-zinc-100 flex items-center gap-2'>
+								AI Smart Autofill
+								<span className='rounded-full bg-emerald-100 dark:bg-emerald-900/50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:text-emerald-300'>
+									Sinhala & English
+								</span>
+							</h3>
+							<p className='text-xs text-[#527664] dark:text-zinc-400'>
+								Paste unstructured text from WhatsApp, email, or SMS to auto-fill the form
+							</p>
+						</div>
+					</div>
+					<button
+						type='button'
+						onClick={() => setIsAutofillOpen(!isAutofillOpen)}
+						className='text-xs font-medium text-[#527664] dark:text-zinc-400 hover:text-[#19352b] dark:hover:text-zinc-200 flex items-center gap-1 cursor-pointer'
+					>
+						{isAutofillOpen ? (
+							<>Hide <ChevronUp className='h-3.5 w-3.5' /></>
+						) : (
+							<>Expand <ChevronDown className='h-3.5 w-3.5' /></>
+						)}
+					</button>
+				</div>
+
+				{isAutofillOpen && (
+					<div className='mt-4 space-y-3.5'>
+						<textarea
+							rows={4}
+							value={rawText}
+							onChange={(e) => setRawText(e.target.value)}
+							placeholder={`Paste WhatsApp listing, SMS, or email here...\nSupports English, Sinhala (e.g. "හෝමාගම පර්චස් 10ක කාමර 3ක නිවස විකිණීමට. ලක්ෂ 220යි..."), and Singlish.`}
+							className='w-full rounded-lg border border-[#d7e0da] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3 text-sm text-[#243a2e] dark:text-zinc-200 outline-none placeholder:text-[#a2ada7] dark:placeholder:text-zinc-500 focus:border-[#5e8c73] dark:focus:border-emerald-600 focus:ring-2 focus:ring-[#dcebe1] dark:focus:ring-emerald-950/50'
+							disabled={extracting}
+						/>
+
+						<div className='flex flex-wrap items-center justify-between gap-3'>
+							<div className='flex items-center gap-2'>
+								<button
+									type='button'
+									onClick={handleExtract}
+									disabled={extracting || !rawText.trim()}
+									className='inline-flex items-center gap-2 rounded-lg bg-[#28513f] dark:bg-emerald-700 hover:bg-[#1e3e30] dark:hover:bg-emerald-600 disabled:opacity-50 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition cursor-pointer disabled:cursor-not-allowed'
+								>
+									{extracting ? (
+										<>
+											<Spinner className='h-4 w-4' />
+											Extracting with Gemini...
+										</>
+									) : (
+										<>
+											<Sparkles className='h-4 w-4' />
+											Autofill Form
+										</>
+									)}
+								</button>
+								{rawText && (
+									<button
+										type='button'
+										onClick={() => {
+											setRawText('');
+											setExtractedContact(null);
+										}}
+										disabled={extracting}
+										className='text-xs text-[#718078] dark:text-zinc-400 hover:underline px-2 py-1 cursor-pointer'
+									>
+										Clear
+									</button>
+								)}
+							</div>
+							<p className='text-[11px] text-[#718078] dark:text-zinc-400'>
+								Auto-converts ලක්ෂ / කෝටි / M, translates Sinhala to English, and maps specs.
+							</p>
+						</div>
+
+						{extractedContact && (extractedContact.name || extractedContact.phone) && (
+							<div className='mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5 text-xs text-[#19352b] dark:text-zinc-300'>
+								<div className='flex items-center gap-1.5'>
+									<CheckCircle2 className='h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0' />
+									<span>
+										<strong>Contact detected:</strong> {extractedContact.name || 'Unnamed'} {extractedContact.phone ? `(${extractedContact.phone})` : ''} {extractedContact.type ? `• ${extractedContact.type}` : ''}
+										{form.propertyContactId && <span className='ml-1 text-emerald-600 dark:text-emerald-400 font-medium'>(Linked to existing contact)</span>}
+									</span>
+								</div>
+								{!form.propertyContactId && extractedContact.phone && (
+									<button
+										type='button'
+										onClick={handleCreateExtractedContact}
+										disabled={creatingContact}
+										className='inline-flex items-center gap-1 rounded bg-[#28513f] dark:bg-emerald-700 hover:bg-[#1e3e30] px-2.5 py-1 text-xs font-medium text-white shadow-xs cursor-pointer'
+									>
+										<UserPlus className='h-3 w-3' />
+										{creatingContact ? 'Saving Contact...' : 'Save as Contact'}
+									</button>
+								)}
+							</div>
+						)}
+					</div>
+				)}
+			</div>
+
 			<form onSubmit={submit} className='space-y-6'>
 				<div className='rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm sm:p-8'>
 					<h3 className='text-base font-semibold'>Basic information</h3>

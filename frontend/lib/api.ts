@@ -1314,6 +1314,55 @@ export async function generatePropertyDraft(id: string): Promise<any> {
   return await response.json();
 }
 
+export type ExtractedPropertyDraft = {
+  title: string;
+  description: string;
+  listing_type: 'sale' | 'rent';
+  price: number;
+  is_price_per_perch: boolean;
+  location: string;
+  property_type: 'house' | 'apartment' | 'land' | 'commercial';
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  land_size_perches?: number | null;
+  floor_area_sqft?: number | null;
+  parking_spaces?: number | null;
+  build_year?: number | null;
+  road_access_ft?: number | null;
+  furnishing_status?: 'unfurnished' | 'semi_furnished' | 'fully_furnished' | null;
+  amenities?: Record<string, boolean> | null;
+  has_maids_room?: boolean;
+  has_maids_toilet?: boolean;
+  is_gated_community?: boolean;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_type?: 'owner' | 'broker' | null;
+  image_alt?: string;
+  source_platform?: string | null;
+  source_url?: string | null;
+  source_id?: string | null;
+  prospect_id?: string | null;
+};
+
+export async function extractPropertyFromText(text: string): Promise<ExtractedPropertyDraft> {
+  const response = await fetch(`${baseUrl()}/admin/properties/extract-from-text`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    let detail = `Text extraction failed (${response.status}).`;
+    try {
+      const payload = await response.json();
+      if (payload.detail) detail = payload.detail;
+    } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return await response.json();
+}
+
 // ── Field Assignments ──────────────────────────────────────────────────────
 
 export type FieldAssignment = {

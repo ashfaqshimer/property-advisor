@@ -40,17 +40,23 @@ class ExtractedPropertyDraft(BaseModel):
     image_alt: str
 
 
+class ExtractPropertyTextRequest(BaseModel):
+    """Payload for extracting property details from raw pasted text (WhatsApp, email, etc.)."""
+
+    text: str = Field(..., min_length=5, description="Unstructured text describing a property in English, Sinhala, or Singlish.")
+
+
 class GeminiPropertyExtraction(BaseModel):
     """Schema provided to Gemini for extracting structured property data. 
     Uses list[str] for amenities to avoid Gemini dict/additionalProperties errors.
     """
 
-    title: str = Field(description="A clean, professional title for the property listing.")
-    description: str = Field(description="A professional, well-formatted description of the property, removing any ad boilerplate.")
+    title: str = Field(description="A clean, professional title in English for the property listing.")
+    description: str = Field(description="A professional, well-formatted description in English, removing any ad boilerplate.")
     listing_type: ListingType = Field(description="Whether the property is for sale or rent.")
-    price: float = Field(description="The price of the property as a raw number (e.g., 150000).")
+    price: float = Field(description="The price of the property as a raw number in LKR. If in Laksha, multiply by 100,000; if in Koti, multiply by 10,000,000; if in Millions, multiply by 1,000,000.")
     is_price_per_perch: bool = Field(description="True if the price is listed per perch (common for land).")
-    location: str = Field(description="The city or neighborhood location of the property.")
+    location: str = Field(description="The city or neighborhood location of the property in English.")
     property_type: PropertyType = Field(description="The type of property.")
     
     bedrooms: int | None = Field(None, description="Number of bedrooms, if applicable.")
@@ -66,6 +72,10 @@ class GeminiPropertyExtraction(BaseModel):
     has_maids_toilet: bool = Field(False, description="True if a maid's toilet or servant's bathroom is explicitly mentioned.")
     is_gated_community: bool = Field(False, description="True if the property is located in a gated community or complex.")
     
-    amenities: list[str] | None = Field(None, description="A list of amenities (e.g., ['ac', 'pool', 'hot_water']).")
+    amenities: list[str] | None = Field(None, description="A list of amenities (e.g., ['ac', 'pool', 'hot_water', 'garden', 'gym', 'generator', 'security']).")
     
-    image_alt: str = Field(description="A short descriptive alt text for the main image (e.g., 'A two-story house with a garden').")
+    contact_name: str | None = Field(None, description="Name of the contact person or owner/broker if mentioned.")
+    contact_phone: str | None = Field(None, description="Phone number of the contact person if mentioned.")
+    contact_type: str | None = Field(None, description="'owner' or 'broker' if discernible from context, or None.")
+
+    image_alt: str = Field(description="A short descriptive alt text in English for the main image (e.g., 'A two-story house with a garden').")

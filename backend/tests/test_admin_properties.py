@@ -92,3 +92,70 @@ def test_admin_missing_property_is_404(authenticated_client: TestClient) -> None
     response = authenticated_client.get("/admin/properties/00000000-0000-0000-0000-000000000000")
 
     assert response.status_code == 404
+
+
+def test_admin_extract_from_text_requires_auth(client: TestClient) -> None:
+    response = client.post("/admin/properties/extract-from-text", json={"text": "some listing text"})
+    assert response.status_code == 401
+
+
+def test_admin_extract_from_text_validation_error(authenticated_client: TestClient) -> None:
+    response = authenticated_client.post("/admin/properties/extract-from-text", json={"text": "hi"})
+    assert response.status_code == 422
+
+
+def test_admin_extract_from_text_success(authenticated_client: TestClient, monkeypatch) -> None:
+    from app.models.property import ListingType, PropertyType
+    from app.schemas.extractor import GeminiPropertyExtraction
+
+    mock_extraction = GeminiPropertyExtraction(
+        title="Modern 3-Bedroom House in Homagama",
+        description="Newly built modern two-story house in Homagama.",
+        listing_type=ListingType.SALE,
+        price=22000000.0,
+        is_price_per_perch=False,
+        location="Homagama",
+        property_type=PropertyType.HOUSE,
+        bedrooms=3,
+        bathrooms=2,
+        land_size_perches=10.0,
+        floor_area_sqft=1600,
+        parking_spaces=2,
+        amenities=["garden"],
+        has_maids_room=False,
+        has_maids_toilet=True,
+        is_gated_community=False,
+        contact_name="Ranjith",
+        contact_phone="0771234567",
+        contact_type="owner",
+        image_alt="Two-story house with front garden",
+    )
+
+    class MockExtractor:
+        def generate_structured(self, prompt: str, schema: type) -> GeminiPropertyExtraction:
+            return mock_extraction
+
+    monkeypatch.setattr("app.api.properties.get_gemini_extractor_client", lambda: MockExtractor())
+
+    sinhala_text = (
+        "හෝමාගම පර්චස් 10ක ඉඩම සහ කාමර 3ක අලුත් නිවස විකිණීමට. "
+        "ලක්ෂ 220යි. නාන කාමර 2, සේවක වැසිකිළිය ඇත. අමතන්න රංජිත් 0771234567"
+    )
+    response = authenticated_client.post(
+        "/admin/properties/extract-from-text",
+        json={"text": sinhala_text},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Modern 3-Bedroom House in Homagama"
+    assert data["price"] == 22000000.0
+    assert data["location"] == "Homagama"
+    assert data["bedrooms"] == 3
+    assert data["bathrooms"] == 2
+    assert data["land_size_perches"] == 10.0
+    assert data["has_maids_toilet"] is True
+    assert data["amenities"] == {"garden": True}
+    assert data["contact_name"] == "Ranjith"
+    assert data["contact_phone"] == "0771234567"
+    assert data["contact_type"] == "owner"

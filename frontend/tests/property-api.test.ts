@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getAdminLeads, getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
+import { extractPropertyFromText, getAdminLeads, getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
 import { formatPrice, mapProperty } from "@/lib/properties";
 
 const record: PropertyApiRecord = {
@@ -139,5 +139,34 @@ describe("property mapping", () => {
 
   it("formats non-million prices without rounding them away", () => {
     expect(formatPrice(185500000, "LKR")).toBe("LKR 185,500,000");
+  });
+});
+
+describe("extractPropertyFromText API", () => {
+  it("sends raw text to the backend and returns the extracted draft", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const mockDraft = {
+      title: "Modern 3-Bedroom House in Homagama",
+      description: "Newly built modern house.",
+      listing_type: "sale",
+      price: 22000000,
+      is_price_per_perch: false,
+      location: "Homagama",
+      property_type: "house",
+      bedrooms: 3,
+      bathrooms: 2,
+    };
+    const fetchSpy = vi.fn(async () => jsonResponse(200, mockDraft));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await extractPropertyFromText("හෝමාගම පර්චස් 10ක කාමර 3ක නිවස විකිණීමට. ලක්ෂ 220යි.");
+    expect(result).toEqual(mockDraft);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/admin/properties/extract-from-text",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ text: "හෝමාගම පර්චස් 10ක කාමර 3ක නිවස විකිණීමට. ලක්ෂ 220යි." }),
+      }),
+    );
   });
 });

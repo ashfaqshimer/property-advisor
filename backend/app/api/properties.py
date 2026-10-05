@@ -8,14 +8,23 @@ import cloudinary
 import cloudinary.uploader
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
+import structlog
 
+from app.agent.client import get_gemini_extractor_client
 from app.config import get_settings
 from app.auth import CurrentStaffUser, RootStaffUser
 from app.db import queries
 from app.db.session import get_db
 from app.geocoding import Coordinates, GeocodingError, GoogleGeocoder
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
+from app.schemas.extractor import (
+    ExtractedPropertyDraft,
+    ExtractPropertyTextRequest,
+    GeminiPropertyExtraction,
+)
 from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/properties", tags=["properties"])
 admin_router = APIRouter(prefix="/admin/properties", tags=["admin-properties"])
@@ -93,6 +102,103 @@ def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffU
     db.commit()
     db.refresh(property_record)
     return property_record
+
+
+@admin_router.post("/extract-from-text", response_model=ExtractedPropertyDraft)
+def extract_property_from_text(
+    payload: ExtractPropertyTextRequest,
+    _user: CurrentStaffUser,
+) -> ExtractedPropertyDraft:
+    """Extract a structured property draft from unstructured text (e.g. WhatsApp, SMS, email).
+
+    Supports English, Sinhala (සිංහල script), and Singlish. Converts Sri Lankan units
+    (Laksha / Koti / Millions, per-perch pricing) and generates polished English listing text.
+    """
+    raw_text = payload.text.strip()
+    if not raw_text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pasted text cannot be empty.",
+        )
+
+    prompt = f"""
+    You are an expert real estate data extractor for Sri Lankan properties.
+    Extract a structured real estate listing from the provided unstructured text.
+    The input text may be written in English, Sinhala (සිංහල script), Singlish (Sinhala written in Latin script), or a blend.
+
+    Unstructured Input:
+    \"\"\"{raw_text}\"\"\"
+
+    Instructions:
+    1. Language & Output:
+       - Regardless of whether the input is in Sinhala, Singlish, or English, generate the 'title' and 'description' in polished, professional English suitable for a Colombo-focused real estate catalog.
+       - Title should be concise and descriptive (e.g. "Newly Built 3-Bedroom House in Homagama", "Luxury 2-Bedroom Apartment in Colombo 3").
+       - Description should be well-written, informative English highlighting key property features, specifications, and neighborhood context, while omitting conversational/chat noise (e.g. "call quickly", "urgent sale", "genuine buyers only").
+       - 'location' should be the standard Sri Lankan town or neighborhood name in English (e.g. "Homagama", "Colombo 4", "Rajagiriya", "Kaduwela", "Nugegoda", "Galle").
+
+    2. Sri Lankan Currency & Price Conversion (CRITICAL):
+       - Convert all prices into standard numerical LKR values.
+       - "ලක්ෂ" / "Lakh" / "Laksha" / "Laks": 1 Lakh = 100,000 LKR.
+         Examples:
+         - "ලක්ෂ 280" / "280 Lakhs" -> 28000000.0 (28 Million)
+         - "ලක්ෂ 85" / "85 Lakhs" -> 8500000.0 (8.5 Million)
+         - "ලක්ෂ 12.5" -> 1250000.0
+       - "කෝටි" / "Koti" / "Crore": 1 Koti = 10,000,000 LKR (10 Million).
+         Examples:
+         - "කෝටි 2" -> 20000000.0
+         - "කෝටි 3.5" -> 35000000.0
+       - "මිලියන" / "Million" / "M": 1 Million = 1,000,000 LKR.
+         Example: "45 Million" / "45M" -> 45000000.0
+       - Price per perch: If the price is stated per perch (e.g., "පර්චසය ලක්ෂ 15", "15 lakhs per perch", "1.5M pp"), set is_price_per_perch = True, and set price to the per-perch amount (e.g. 1500000.0). Otherwise set is_price_per_perch = False.
+       - Rent: If the property is for rent / lease (e.g., "කුලියට", "rent", "monthly"), set listing_type = 'rent', and price to the monthly rent amount (e.g. 85000.0).
+
+    3. Property & Listing Type:
+       - property_type: 'house' ("නිවස", "ගෙයක්"), 'apartment' ("මහල් නිවාසය"), 'land' ("ඉඩම"), or 'commercial' ("වෙළඳසැල", "ගොඩනැගිල්ල", "කාර්යාලය").
+       - listing_type: 'sale' ("විකිණීමට") or 'rent' ("කුලියට").
+
+    4. Features & Specs:
+       - bedrooms ("කාමර", "නිදන කාමර")
+       - bathrooms ("නාන කාමර")
+       - land_size_perches ("පර්චස්", "perches")
+       - floor_area_sqft ("වර්ග අඩි", "sqft")
+       - parking_spaces ("වාහන නැවැත්වීම", "parking", "garage spaces")
+       - road_access_ft ("අඩි පාර", "road width in feet")
+       - furnishing_status: 'unfurnished', 'semi_furnished', or 'fully_furnished' ("සම්පූර්ණ ගෘහ භාණ්ඩ සහිත")
+       - has_maids_room: True if maid's/servant's room or quarters is mentioned ("සේවක කාමරය")
+       - has_maids_toilet: True if maid's/servant's toilet or bathroom is mentioned ("සේවක වැසිකිළිය")
+       - is_gated_community: True if gated community or secured housing scheme
+
+    5. Amenities:
+       - Extract standard amenities into a list of lowercase keys: "ac", "pool", "gym", "generator", "security", "garden", "hot_water".
+
+    6. Contact Information:
+       - If a contact name or phone number is mentioned in the text:
+         - contact_name (e.g. "Ranjith", "Mrs. Silva")
+         - contact_phone (e.g. "0771234567")
+         - contact_type: "owner" if owner ("අයිතිකරු"), "broker" if broker ("බ්‍රෝකර්", "නියෝජිත"), or None.
+
+    7. image_alt:
+       - A short descriptive alt text in English for the primary listing photo (e.g. "Modern two-story house in Homagama").
+    """
+
+    extractor = get_gemini_extractor_client()
+    try:
+        raw_draft = extractor.generate_structured(prompt=prompt, schema=GeminiPropertyExtraction)
+
+        amenities_dict = None
+        if raw_draft.amenities:
+            amenities_dict = {a: True for a in raw_draft.amenities}
+
+        draft_dict = raw_draft.model_dump()
+        draft_dict["amenities"] = amenities_dict
+
+        return ExtractedPropertyDraft(**draft_dict)
+    except Exception as exc:
+        logger.exception("admin_property_extract_failed", error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Property extraction failed: {str(exc)}",
+        ) from exc
 
 
 # Keep this above any future "/{property_id}" route, or "featured" gets parsed as a
