@@ -260,3 +260,79 @@ def test_telegram_webhook_prospect_status_sync(seeded, client):
         assert prospect.discard_reason is None
         assert scan_job.new_count == 1
         assert scan_job.filtered_count == 0
+
+
+def test_telegram_webhook_group_topic_sync(seeded, client):
+    from unittest.mock import patch
+    import uuid
+    from app.models.prospect import Prospect
+    from app.models.field_assignment import FieldAssignment
+
+    prospect = Prospect(
+        id=uuid.uuid4(),
+        ikman_ad_id="ad-topic-tg",
+        ikman_url="https://ikman.lk/en/ad/topic-tg",
+        ikman_slug="topic-tg",
+        title="Topic Property",
+        price="Rs 30,000,000",
+        location="Dehiwala",
+        property_type="land",
+        listing_type="for_sale",
+        classification="owner",
+        confidence=90,
+        classification_reasons=["direct_owner"],
+        classification_method="heuristic",
+        status="new",
+    )
+    seeded.add(prospect)
+    seeded.flush()
+
+    assignment = FieldAssignment(
+        id=uuid.uuid4(),
+        prospect_id=prospect.id,
+        status="pending",
+    )
+    seeded.add(assignment)
+    seeded.commit()
+
+    with (
+        patch("app.api.telegram.answer_callback_query") as mock_answer,
+        patch("app.api.telegram.send_confirmation") as mock_confirm,
+        patch("app.api.telegram.get_settings") as mock_settings,
+    ):
+        mock_settings.return_value.telegram_bot_token = "123:ABC"
+        mock_settings.return_value.telegram_assignments_chat_id = "-100999"
+        mock_settings.return_value.telegram_agent_chat_id = ""
+        mock_settings.return_value.telegram_chat_id = ""
+        mock_settings.return_value.telegram_webhook_secret = ""
+
+        # Group member taps "interested" in a topic thread
+        resp = client.post(
+            "/telegram/webhook",
+            json={
+                "update_id": 10,
+                "callback_query": {
+                    "id": "cq-group-1",
+                    "from": {"id": 8660126912, "first_name": "Deen"},
+                    "message": {
+                        "message_id": 55,
+                        "message_thread_id": 42,
+                        "chat": {"id": -100999, "type": "supergroup"},
+                    },
+                    "data": f"fa:{assignment.id}:interested",
+                },
+            },
+        )
+        assert resp.status_code == 200
+        mock_answer.assert_called_once_with("123:ABC", "cq-group-1")
+        mock_confirm.assert_called_once_with(
+            "-100999",
+            "123:ABC",
+            "interested",
+            user_name="Deen",
+            thread_id=42,
+        )
+
+        seeded.refresh(assignment)
+        assert assignment.status == "interested"
+        assert assignment.awaiting_notes is True

@@ -48,6 +48,7 @@ from app.services.notifications import send_lead_alert
 SEARCH_PROPERTIES = "search_properties"
 GET_PROPERTY_DETAILS = "get_property_details"
 CAPTURE_LEAD = "capture_lead"
+GET_MARKET_VALUE = "get_market_value"
 
 logger = structlog.get_logger()
 
@@ -543,10 +544,31 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def get_market_value(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    """Retrieves suburb market valuations, median prices, and benchmark ranges."""
+    location = args.get("location")
+    if not location or not str(location).strip():
+        raise ToolArgumentError("location is required to look up market value.")
+
+    property_type = args.get("property_type")
+    listing_type = args.get("listing_type") or "sale"
+
+    from app.services.market_valuation import calculate_suburb_market_value
+
+    result = calculate_suburb_market_value(
+        db=context.db,
+        location_query=str(location).strip(),
+        property_type=str(property_type).strip() if property_type else None,
+        listing_type=str(listing_type).strip(),
+    )
+    return result
+
+
 IMPLEMENTATIONS = {
     SEARCH_PROPERTIES: search_properties,
     GET_PROPERTY_DETAILS: get_property_details,
     CAPTURE_LEAD: capture_lead,
+    GET_MARKET_VALUE: get_market_value,
 }
 
 
@@ -733,13 +755,43 @@ _DETAILS_DECLARATION = types.FunctionDeclaration(
     ),
 )
 
-# One Tool holding both declarations, which is what GenerateContentConfig(tools=...) wants.
+_MARKET_VALUE_DECLARATION = types.FunctionDeclaration(
+    name=GET_MARKET_VALUE,
+    description=(
+        "Get market valuation benchmarks, estimated median prices, and per-perch or per-sqft "
+        "going rates for a specific suburb, neighbourhood, or area (e.g. 'Rajagiriya', 'Colombo 7', "
+        "'Battaramulla', 'Nugegoda'). Call this when a user asks about property rates, land values, "
+        "or price expectations in an area. Returns asking medians, realized estimates, and benchmark ranges."
+    ),
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "location": types.Schema(
+                type=types.Type.STRING,
+                description="The suburb, postal zone, or town name (e.g. 'Colombo 7', 'Rajagiriya', 'Dehiwala').",
+            ),
+            "property_type": types.Schema(
+                type=types.Type.STRING,
+                enum=[member.value for member in PropertyType],
+                description="Optional: house, apartment, land, commercial.",
+            ),
+            "listing_type": types.Schema(
+                type=types.Type.STRING,
+                enum=["sale", "rent"],
+                description="Optional: 'sale' (default) or 'rent'.",
+            ),
+        },
+        required=["location"],
+    ),
+)
+
 TOOL_DECLARATIONS: list[types.Tool] = [
     types.Tool(
         function_declarations=[
             _SEARCH_DECLARATION,
             _DETAILS_DECLARATION,
             _CAPTURE_DECLARATION,
+            _MARKET_VALUE_DECLARATION,
         ]
     )
 ]

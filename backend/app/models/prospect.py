@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime
 
+from decimal import Decimal
+
 import sqlalchemy as sa
-from sqlalchemy import Boolean, DateTime, SmallInteger, String, Text, Uuid, func, Float, ForeignKey
+from sqlalchemy import Boolean, DateTime, Integer, Numeric, SmallInteger, String, Text, Uuid, func, Float, ForeignKey
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -36,6 +38,12 @@ class Prospect(Base):
     # Listing data
     title: Mapped[str] = mapped_column(Text)
     price: Mapped[str] = mapped_column(String(128))
+    price_numeric: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True, index=True)
+    is_price_per_perch: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    land_size_perches: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    floor_area_sqft: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bedrooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bathrooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     location: Mapped[str] = mapped_column(String(128))
     suburb: Mapped[str | None] = mapped_column(String(128), nullable=True)
     suburb_source: Mapped[str | None] = mapped_column(String(32), nullable=True)

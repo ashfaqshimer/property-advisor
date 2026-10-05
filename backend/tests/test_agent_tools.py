@@ -401,6 +401,7 @@ class TestExecuteTool:
         assert "error" in result
         assert result["available_tools"] == [
             "capture_lead",
+            "get_market_value",
             "get_property_details",
             "search_properties",
         ]
@@ -432,7 +433,7 @@ class TestExecuteTool:
 
 
 class TestDeclarations:
-    def test_both_tools_are_declared(self):
+    def test_tools_are_declared(self):
         names = {
             declaration.name
             for tool in tools.TOOL_DECLARATIONS
@@ -442,6 +443,7 @@ class TestDeclarations:
             "search_properties",
             "get_property_details",
             "capture_lead",
+            "get_market_value",
         }
 
     def test_search_declaration_warns_the_model_about_empty_results(self):

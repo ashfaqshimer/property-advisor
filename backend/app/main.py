@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.agent.client import GeminiNotConfigured
-from app.api import auth, chat, leads, properties, property_contacts, site_configuration, prospects, field_assignments, telegram
+from app.api import auth, chat, leads, properties, property_contacts, site_configuration, prospects, field_assignments, telegram, market_values
 from app.config import get_settings
 
 structlog.configure(
@@ -97,6 +97,8 @@ app.include_router(auth.admin_router)
 app.include_router(prospects.admin_router)
 app.include_router(field_assignments.router)
 app.include_router(telegram.router)
+app.include_router(market_values.router)
+app.include_router(market_values.admin_router)
 
 
 @app.exception_handler(GeminiNotConfigured)

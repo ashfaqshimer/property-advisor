@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -35,6 +36,12 @@ class ProspectBase(BaseModel):
         return data
     title: str
     price: str
+    price_numeric: Decimal | None = None
+    is_price_per_perch: bool = False
+    land_size_perches: Decimal | None = None
+    floor_area_sqft: int | None = None
+    bedrooms: int | None = None
+    bathrooms: int | None = None
     location: str
     suburb: str | None = None
     suburb_source: str | None = None

@@ -38,6 +38,7 @@ from app.scraper.location_extractor import extract_suburb
 from app.agent.client import get_gemini_extractor_client
 from app.schemas.extractor import ExtractedPropertyDraft, GeminiPropertyExtraction
 from app.services.geocoding import geocode_location
+from app.services.price_parser import parse_lkr_price
 import json
 
 logger = structlog.get_logger(__name__)
@@ -285,6 +286,18 @@ def _save_prospects_sync(
             if geo_target:
                 lat, lng = geocode_location(db, geo_target)
 
+            parsed_price, is_ppp = parse_lkr_price(ad.price)
+            p_floor_sqft = None
+            p_bedrooms = None
+            if is_lpw:
+                raw_sqft = getattr(ad, "floor_area_sqft", None)
+                if raw_sqft is not None:
+                    try:
+                        p_floor_sqft = int(raw_sqft)
+                    except (ValueError, TypeError):
+                        pass
+                p_bedrooms = getattr(ad, "bedrooms", None)
+
             new_prospect = Prospect(
                 source=source_name,
                 source_id=ad_id,
@@ -294,6 +307,10 @@ def _save_prospects_sync(
                 ikman_slug=ad_slug,
                 title=ad.title or "",
                 price=ad.price or "",
+                price_numeric=parsed_price,
+                is_price_per_perch=is_ppp,
+                floor_area_sqft=p_floor_sqft,
+                bedrooms=p_bedrooms,
                 location=loc_str,
                 suburb=suburb,
                 suburb_source=suburb_source,
@@ -1102,7 +1119,7 @@ def list_scan_job_prospects(
     total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
 
     settings = get_settings()
-    tg_configured = bool(settings.telegram_bot_token.strip() and settings.telegram_agent_chat_id.strip())
+    tg_configured = settings.telegram_field_dispatch_configured
 
     return {
         "items": _attach_assignment_status(db, items),
@@ -1462,7 +1479,7 @@ def list_prospects(
         total = db.execute(count_stmt).scalar_one()
         items = db.execute(stmt.limit(100)).scalars().all()
         settings = get_settings()
-        tg_configured = bool(settings.telegram_bot_token.strip() and settings.telegram_agent_chat_id.strip())
+        tg_configured = settings.telegram_field_dispatch_configured
         return {
             "items": _attach_assignment_status(db, items),
             "total": total,
@@ -1483,7 +1500,7 @@ def list_prospects(
     total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
 
     settings = get_settings()
-    tg_configured = bool(settings.telegram_bot_token.strip() and settings.telegram_agent_chat_id.strip())
+    tg_configured = settings.telegram_field_dispatch_configured
 
     return {
         "items": _attach_assignment_status(db, items),

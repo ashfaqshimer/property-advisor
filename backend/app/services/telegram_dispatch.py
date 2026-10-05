@@ -120,7 +120,12 @@ def send_assignment_message(
     """Send an assignment message to the agent. Returns the Telegram message_id or None on failure."""
     settings = get_settings()
     token = settings.telegram_bot_token.strip()
-    chat_id = settings.telegram_agent_chat_id.strip() or settings.telegram_chat_id.strip()
+    chat_id = (
+        settings.telegram_assignments_chat_id.strip()
+        or settings.telegram_agent_chat_id.strip()
+        or settings.telegram_chat_id.strip()
+    )
+    thread_id = settings.telegram_assignments_thread_id
 
     if not token or not chat_id:
         logger.warning("telegram_agent_dispatch_skipped.unconfigured")
@@ -147,6 +152,8 @@ def send_assignment_message(
         "parse_mode": "HTML",
         "reply_markup": keyboard,
     }
+    if thread_id is not None and str(chat_id).startswith("-"):
+        payload["message_thread_id"] = thread_id
 
     try:
         with httpx.Client(timeout=8.0) as client:
@@ -175,13 +182,15 @@ def answer_callback_query(token: str, callback_query_id: str, text: str = "") ->
         logger.warning("telegram_answer_callback_error", error=str(exc))
 
 
-def send_notes_prompt(chat_id: str, token: str) -> None:
+def send_notes_prompt(chat_id: str, token: str, thread_id: int | None = None) -> None:
     """Ask the agent for optional notes after they tap an outcome button."""
     payload: dict[str, Any] = {
         "chat_id": chat_id,
         "text": "Any notes? Reply with details or send /skip",
         "parse_mode": "HTML",
     }
+    if thread_id is not None and str(chat_id).startswith("-"):
+        payload["message_thread_id"] = thread_id
     try:
         with httpx.Client(timeout=5.0) as client:
             client.post(_api_url(token, "sendMessage"), json=payload)
@@ -189,8 +198,14 @@ def send_notes_prompt(chat_id: str, token: str) -> None:
         logger.warning("telegram_notes_prompt_error", error=str(exc))
 
 
-def send_confirmation(chat_id: str, token: str, status: str) -> None:
-    """Confirm the recorded outcome to the agent."""
+def send_confirmation(
+    chat_id: str,
+    token: str,
+    status: str,
+    user_name: str | None = None,
+    thread_id: int | None = None,
+) -> None:
+    """Confirm the recorded outcome to the agent or team group."""
     labels = {
         "interested": "✅ Marked as Interested",
         "not_interested": "❌ Marked as Not Interested",
@@ -198,11 +213,14 @@ def send_confirmation(chat_id: str, token: str, status: str) -> None:
         "callback_later": "🔄 Marked as Call Back Later",
     }
     label = labels.get(status, f"Recorded: {status}")
+    by_suffix = f" by {html.escape(user_name)}" if user_name else ""
     payload: dict[str, Any] = {
         "chat_id": chat_id,
-        "text": f"{label}\n\nAny notes? Reply with details or send /skip",
+        "text": f"{label}{by_suffix}\n\nAny notes? Reply with details or send /skip",
         "parse_mode": "HTML",
     }
+    if thread_id is not None and str(chat_id).startswith("-"):
+        payload["message_thread_id"] = thread_id
     try:
         with httpx.Client(timeout=5.0) as client:
             client.post(_api_url(token, "sendMessage"), json=payload)
@@ -210,13 +228,15 @@ def send_confirmation(chat_id: str, token: str, status: str) -> None:
         logger.warning("telegram_confirmation_send_error", error=str(exc))
 
 
-def send_notes_saved(chat_id: str, token: str) -> None:
+def send_notes_saved(chat_id: str, token: str, thread_id: int | None = None) -> None:
     """Acknowledge that notes were saved."""
     payload: dict[str, Any] = {
         "chat_id": chat_id,
         "text": "✓ Notes saved.",
         "parse_mode": "HTML",
     }
+    if thread_id is not None and str(chat_id).startswith("-"):
+        payload["message_thread_id"] = thread_id
     try:
         with httpx.Client(timeout=5.0) as client:
             client.post(_api_url(token, "sendMessage"), json=payload)

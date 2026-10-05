@@ -66,6 +66,7 @@ class TestPlainReply:
             "search_properties",
             "get_property_details",
             "capture_lead",
+            "get_market_value",
         }
 
     def test_empty_user_message_spends_no_model_call(self, seeded: Session):

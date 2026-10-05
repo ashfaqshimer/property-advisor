@@ -34,6 +34,24 @@ def _get_agent_chat_id() -> str:
     return get_settings().telegram_agent_chat_id.strip()
 
 
+def _is_authorized_chat(chat_id: str, sender_id: str) -> bool:
+    """Allow updates if they come from the designated assignment chat, agent DM, or general chat."""
+    settings = get_settings()
+    legacy_agent_id = _get_agent_chat_id()
+    allowed = {
+        c.strip()
+        for c in (
+            settings.telegram_assignments_chat_id,
+            legacy_agent_id,
+            settings.telegram_chat_id,
+        )
+        if c.strip()
+    }
+    if not allowed:
+        return True  # Dev mode / unconfigured — accept all
+    return chat_id in allowed or sender_id in allowed
+
+
 def _get_token() -> str:
     return get_settings().telegram_bot_token.strip()
 
@@ -48,14 +66,19 @@ def _validate_secret(x_telegram_bot_api_secret_token: str | None) -> None:
 
 
 def _handle_callback_query(db: Session, cq: dict) -> None:
-    """Process an inline button tap from the agent."""
+    """Process an inline button tap from the agent or team group."""
     cq_id: str = cq["id"]
-    chat_id: str = str(cq["from"]["id"])
+    from_user = cq.get("from", {})
+    user_id = str(from_user.get("id", ""))
+    msg = cq.get("message") or {}
+    msg_chat = msg.get("chat") or {}
+    origin_chat_id = str(msg_chat.get("id") or user_id)
+    thread_id = msg.get("message_thread_id")
     data: str = cq.get("data", "")
     token = _get_token()
 
-    # Only accept callbacks from the configured agent
-    if chat_id != _get_agent_chat_id():
+    # Only accept callbacks from authorized chats/agents
+    if not _is_authorized_chat(origin_chat_id, user_id):
         answer_callback_query(token, cq_id)
         return
 
@@ -111,23 +134,35 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
     assignment.awaiting_notes = True
     db.commit()
 
+    user_name = from_user.get("first_name") or from_user.get("username")
     answer_callback_query(token, cq_id)
-    send_confirmation(chat_id, token, new_status)
+    send_confirmation(
+        origin_chat_id,
+        token,
+        new_status,
+        user_name=user_name,
+        thread_id=thread_id,
+    )
     logger.info(
         "field_assignment_outcome_received",
         assignment_id=assignment_id_str,
         status=new_status,
+        actor_id=user_id,
+        actor_name=user_name,
     )
 
 
 def _handle_message(db: Session, msg: dict) -> None:
-    """Process a text reply (notes or /skip) from the agent."""
+    """Process a text reply (notes or /skip) from the agent or team group."""
     chat_id: str = str(msg["chat"]["id"])
+    from_user = msg.get("from", {})
+    user_id = str(from_user.get("id", ""))
+    thread_id = msg.get("message_thread_id")
     text: str = (msg.get("text") or "").strip()
     token = _get_token()
 
-    # Only accept messages from the configured agent
-    if chat_id != _get_agent_chat_id():
+    # Only accept messages from authorized chats/agents
+    if not _is_authorized_chat(chat_id, user_id):
         return
 
     # Find the most recent assignment awaiting notes
@@ -142,12 +177,12 @@ def _handle_message(db: Session, msg: dict) -> None:
     if text.lower() == "/skip" or not text:
         assignment.awaiting_notes = False
         db.commit()
-        send_notes_saved(chat_id, token)
+        send_notes_saved(chat_id, token, thread_id=thread_id)
     else:
         assignment.notes = text
         assignment.awaiting_notes = False
         db.commit()
-        send_notes_saved(chat_id, token)
+        send_notes_saved(chat_id, token, thread_id=thread_id)
         logger.info(
             "field_assignment_notes_saved",
             assignment_id=str(assignment.id),
