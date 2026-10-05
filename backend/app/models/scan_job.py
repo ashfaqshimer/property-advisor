@@ -21,7 +21,7 @@ class ScanJob(Base):
     # Target & Scoping
     source: Mapped[str] = mapped_column(String(32), default="ikman", server_default="ikman", index=True)
     keyword: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    property_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    property_category: Mapped[str | None] = mapped_column(Text, nullable=True)
     
     # Outcome Metrics
     pages_scanned: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

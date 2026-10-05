@@ -184,6 +184,32 @@ def test_start_scoped_scan_creates_job(authenticated_client: TestClient) -> None
         assert "Rajagiriya" in status_data["progress"]
 
 
+def test_start_scan_with_long_categories_list_lpw(authenticated_client: TestClient) -> None:
+    from unittest.mock import patch
+    payload = {
+        "source": "lpw",
+        "categories": [
+            "land-for-sale",
+            "houses-for-sale",
+            "apartments-for-sale",
+            "house-rentals",
+            "apartment-rentals",
+        ],
+        "pages_per_category": 3,
+    }
+    with patch("app.api.prospects._run_scan_job"):
+        resp = authenticated_client.post("/admin/prospects/scan", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "job_id" in data
+
+        # Check status
+        status_resp = authenticated_client.get(f"/admin/prospects/scan/{data['job_id']}/status")
+        assert status_resp.status_code == 200
+        status_data = status_resp.json()
+        assert status_data["status"] == "running"
+
+
 def test_resolve_ikman_location_slug() -> None:
     from app.scraper.ikman_locations import resolve_ikman_location_slug
 

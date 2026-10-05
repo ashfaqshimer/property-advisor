@@ -363,12 +363,19 @@ async def _run_lpw_scan_job(job_id: str, request: ScanRequest) -> None:
         "property": ["House", "Apartment"],
         "houses": ["House"],
         "house": ["House"],
+        "houses-for-sale": ["House"],
+        "house-rentals": ["House"],
         "apartments": ["Apartment"],
         "apartment": ["Apartment"],
+        "apartments-for-sale": ["Apartment"],
+        "apartment-rentals": ["Apartment"],
         "land": ["Land"],
         "lands": ["Land"],
+        "land-for-sale": ["Land"],
         "commercial": ["Commercial"],
         "commercial-property": ["Commercial"],
+        "commercial-property-sale": ["Commercial"],
+        "commercial-property-rent": ["Commercial"],
     }
 
     target_categories: list[str] = []
@@ -394,10 +401,14 @@ async def _run_lpw_scan_job(job_id: str, request: ScanRequest) -> None:
     # Determine listing types (sale, rent, or both)
     listing_types = ["sale"]
     req_cats_str = " ".join(request.categories or []).lower()
-    if "rent" in req_cats_str or "rent" in (request.property_category or "").lower():
+    has_rent = "rent" in req_cats_str or "rent" in (request.property_category or "").lower()
+    has_sale = "sale" in req_cats_str or "sale" in (request.property_category or "").lower()
+    if has_rent and has_sale:
+        listing_types = ["sale", "rent"]
+    elif has_rent:
         listing_types = ["rent"]
-        if "sale" in req_cats_str:
-            listing_types = ["sale", "rent"]
+    else:
+        listing_types = ["sale"]
 
     pages_to_scan = request.pages_per_category or (10 if request.scan_all else 5)
     total_target_pages = len(target_categories) * len(listing_types) * pages_to_scan
