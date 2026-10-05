@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, CheckSquare, Send, Bookmark, Bot } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, CheckSquare, Send, Bookmark, Bot, Trash2 } from "lucide-react";
 
 import {
   Prospect,
@@ -21,6 +21,8 @@ import {
   createPropertyContact,
   getCurrentUser,
   createFieldAssignments,
+  deleteFieldAssignment,
+  deleteFieldAssignmentByProspect,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
@@ -163,6 +165,34 @@ export default function ProspectsPage() {
       toast.error(err.message || "Failed to dispatch assignment to agent.");
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  const [removingAssignmentProspectId, setRemovingAssignmentProspectId] = useState<string | null>(null);
+
+  const handleRemoveAssignment = async (prospect: Prospect) => {
+    if (!window.confirm(`Remove sent assignment for "${prospect.poster_name || prospect.title}" and delete message from Telegram?`)) {
+      return;
+    }
+    setRemovingAssignmentProspectId(prospect.id);
+    try {
+      if (prospect.assignment_id) {
+        await deleteFieldAssignment(prospect.assignment_id);
+      } else {
+        await deleteFieldAssignmentByProspect(prospect.id);
+      }
+      toast.success("Assignment removed.");
+      setProspects((prev) =>
+        prev.map((p) =>
+          p.id === prospect.id
+            ? { ...p, assignment_status: null, assignment_id: null }
+            : p
+        )
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove assignment.");
+    } finally {
+      setRemovingAssignmentProspectId(null);
     }
   };
 
@@ -828,9 +858,21 @@ export default function ProspectsPage() {
                   {isAdminOrRoot && telegramAgentConfigured && !isTerminal && (
                     <div className="pt-2 border-t border-[#dce4df] dark:border-zinc-800 flex items-center gap-2">
                       {prospect.assignment_status === "pending" ? (
-                        <div className="flex-1 flex items-center justify-center gap-1.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
-                          <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                          <span>Assigned (Awaiting Response)</span>
+                        <div className="flex-1 flex items-center justify-between gap-1.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                            <span>Assigned (Awaiting Response)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAssignment(prospect)}
+                            disabled={removingAssignmentProspectId === prospect.id}
+                            className="inline-flex items-center gap-1 rounded bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-700/60 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition cursor-pointer"
+                            title="Remove sent assignment from agent"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Cancel</span>
+                          </button>
                         </div>
                       ) : prospect.assignment_status === "interested" ? (
                         <div className="flex-1 flex items-center justify-center gap-1.5 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 py-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
@@ -1142,13 +1184,25 @@ export default function ProspectsPage() {
                             <div className="flex items-center gap-1.5">
                               {isAdminOrRoot && telegramAgentConfigured && (
                                 prospect.assignment_status === "pending" ? (
-                                  <span
-                                    className="inline-flex items-center gap-1 rounded border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300"
-                                    title="Dispatched to agent — awaiting response"
-                                  >
-                                    <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                                    <span>Assigned</span>
-                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <span
+                                      className="inline-flex items-center gap-1 rounded border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 text-xs font-medium text-amber-800 dark:text-amber-300"
+                                      title="Dispatched to agent — awaiting response"
+                                    >
+                                      <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                      <span>Assigned</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveAssignment(prospect)}
+                                      disabled={removingAssignmentProspectId === prospect.id}
+                                      className="inline-flex items-center gap-1 rounded border border-amber-300 dark:border-amber-700/60 bg-white dark:bg-zinc-900 px-2 py-1 text-xs font-medium text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition cursor-pointer"
+                                      title="Remove sent assignment from agent"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                      <span>Cancel</span>
+                                    </button>
+                                  </div>
                                 ) : prospect.assignment_status === "interested" ? (
                                   <span
                                     className="inline-flex items-center gap-1 rounded border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-300"

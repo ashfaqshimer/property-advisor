@@ -406,6 +406,18 @@ def _get_config_with_retry():
         result = session.execute(select(SiteConfiguration).limit(1))
         return result.scalar_one_or_none()
 
+def check_due_field_assignment_reminders():
+    """Periodic job to check and dispatch due field assignment follow-up reminders."""
+    try:
+        from app.services.telegram_dispatch import process_due_reminders
+        with SessionLocal() as session:
+            processed = process_due_reminders(session)
+            if processed:
+                logger.info("scanner_scheduler.reminders_dispatched", count=len(processed))
+    except Exception as exc:
+        logger.error("scanner_scheduler.reminders_check_failed", error=str(exc))
+
+
 def init_scheduler():
     """Initializes the scheduler based on current DB config."""
     try:
@@ -430,8 +442,19 @@ def init_scheduler():
         except Exception as e:
             logger.warning("init_scheduler.save_next_run_failed", error=str(e))
 
+    # Schedule recurring field assignment reminder checker (runs every 5 minutes)
+    if not scheduler.get_job("field_assignment_reminders_job"):
+        scheduler.add_job(
+            check_due_field_assignment_reminders,
+            "interval",
+            minutes=5,
+            id="field_assignment_reminders_job",
+            replace_existing=True,
+        )
+
     if not scheduler.running:
         scheduler.start()
+
 
 def shutdown_scheduler():
     """Shuts down the scheduler."""

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from fastapi_users_db_sqlalchemy.generics import GUID
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -35,6 +35,15 @@ class FieldAssignment(Base):
     # Telegram message tracking
     telegram_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     awaiting_notes: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Next-day follow-up reminder tracking
+    remind_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

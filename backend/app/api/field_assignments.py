@@ -2,7 +2,7 @@
 
 import math
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,6 +22,8 @@ from app.schemas.field_assignment import (
 from app.services.prospect_contacts import fetch_prospect_contact_details
 from app.services.telegram_dispatch import (
     PROSPECT_STATUS_MAP,
+    delete_assignment_message,
+    process_due_reminders,
     send_assignment_message,
 )
 
@@ -42,6 +44,9 @@ def _assignment_to_read(a: FieldAssignment) -> FieldAssignmentRead:
         notes=a.notes,
         telegram_message_id=a.telegram_message_id,
         awaiting_notes=a.awaiting_notes,
+        remind_at=a.remind_at,
+        reminder_sent_at=a.reminder_sent_at,
+        attempt_count=a.attempt_count or 1,
         created_at=a.created_at,
         updated_at=a.updated_at,
         prospect_title=p.title if p else None,
@@ -252,3 +257,71 @@ async def resend_assignment(
 
     logger.info("field_assignment_resent", assignment_id=str(assignment_id), message_id=message_id)
     return _assignment_to_read(assignment)
+
+
+def _delete_assignment_record(assignment: FieldAssignment, db: Session) -> dict[str, Any]:
+    assignment_id = str(assignment.id)
+    if assignment.telegram_message_id:
+        try:
+            delete_assignment_message(assignment.telegram_message_id)
+        except Exception as exc:
+            logger.warning(
+                "field_assignment_telegram_delete_error",
+                error=str(exc),
+                assignment_id=assignment_id,
+            )
+    db.delete(assignment)
+    db.commit()
+    logger.info("field_assignment_deleted", assignment_id=assignment_id)
+    return {"ok": True, "id": assignment_id}
+
+
+@router.delete("/by-prospect/{prospect_id}")
+def delete_assignment_by_prospect(
+    prospect_id: uuid.UUID,
+    db: DbSession,
+    current_user: CurrentStaffUser,
+) -> dict[str, Any]:
+    """Remove sent assignment for a prospect and delete message from Telegram."""
+    if current_user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Only root and admin users can delete field assignments.")
+
+    assignment = db.scalar(
+        select(FieldAssignment)
+        .where(FieldAssignment.prospect_id == prospect_id)
+        .order_by(desc(FieldAssignment.created_at))
+    )
+    if not assignment:
+        raise HTTPException(status_code=404, detail="No assignment found for this prospect.")
+
+    return _delete_assignment_record(assignment, db)
+
+
+@router.post("/process-reminders")
+def process_field_assignment_reminders(
+    db: DbSession,
+    current_user: CurrentStaffUser,
+) -> dict[str, Any]:
+    """Process all due follow-up reminders immediately (admin manual trigger or testing)."""
+    if current_user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Only root and admin users can trigger reminder sweeps.")
+    processed = process_due_reminders(db)
+    return {"ok": True, "processed": processed, "count": len(processed)}
+
+
+@router.delete("/{assignment_id}")
+def delete_assignment(
+    assignment_id: uuid.UUID,
+    db: DbSession,
+    current_user: CurrentStaffUser,
+) -> dict[str, Any]:
+    """Remove sent assignment by ID and delete message from Telegram."""
+    if current_user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Only root and admin users can delete field assignments.")
+
+    assignment = db.get(FieldAssignment, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found.")
+
+    return _delete_assignment_record(assignment, db)
+

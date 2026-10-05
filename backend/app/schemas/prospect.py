@@ -78,6 +78,7 @@ class ProspectRead(ProspectBase):
     first_seen_at: datetime
     last_seen_at: datetime
     assignment_status: str | None = None
+    assignment_id: UUID | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

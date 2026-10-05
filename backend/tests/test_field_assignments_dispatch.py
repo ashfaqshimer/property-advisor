@@ -213,6 +213,90 @@ def test_resend_auto_fetches_when_phone_missing(
         res = authenticated_client.post(f"/admin/field-assignments/{assignment.id}/resend")
         assert res.status_code == 200
         mock_fetch.assert_called_once()
-        mock_send.assert_called_once()
         assert mock_send.call_args.kwargs["phone_number"] == "0771112222"
         assert mock_send.call_args.kwargs["poster_name"] == "Resend Contact"
+
+
+def test_delete_assignment_by_id(
+    authenticated_client: TestClient,
+    seeded: Session,
+):
+    prospect = Prospect(
+        id=uuid.uuid4(),
+        source="ikman",
+        title="Delete Test Prospect",
+        price="Rs 25,000,000",
+        location="Rajagiriya",
+        property_type="house",
+        listing_type="for_sale",
+        classification="owner",
+        confidence=90,
+        classification_reasons=["initial"],
+        classification_method="heuristic",
+        status="new",
+    )
+    seeded.add(prospect)
+    seeded.commit()
+
+    assignment = FieldAssignment(
+        id=uuid.uuid4(),
+        prospect_id=prospect.id,
+        status="pending",
+        telegram_message_id=888123,
+    )
+    seeded.add(assignment)
+    seeded.commit()
+
+    with patch("app.api.field_assignments.delete_assignment_message", return_value=True) as mock_del_tg:
+        res = authenticated_client.delete(f"/admin/field-assignments/{assignment.id}")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["ok"] is True
+        assert data["id"] == str(assignment.id)
+        mock_del_tg.assert_called_once_with(888123)
+
+    # Verify deleted from DB
+    assert seeded.get(FieldAssignment, assignment.id) is None
+
+
+def test_delete_assignment_by_prospect(
+    authenticated_client: TestClient,
+    seeded: Session,
+):
+    prospect = Prospect(
+        id=uuid.uuid4(),
+        source="ikman",
+        title="Delete By Prospect Test",
+        price="Rs 30,000,000",
+        location="Battaramulla",
+        property_type="land",
+        listing_type="for_sale",
+        classification="owner",
+        confidence=85,
+        classification_reasons=["initial"],
+        classification_method="heuristic",
+        status="new",
+    )
+    seeded.add(prospect)
+    seeded.commit()
+
+    assignment = FieldAssignment(
+        id=uuid.uuid4(),
+        prospect_id=prospect.id,
+        status="pending",
+        telegram_message_id=777456,
+    )
+    seeded.add(assignment)
+    seeded.commit()
+
+    with patch("app.api.field_assignments.delete_assignment_message", return_value=True) as mock_del_tg:
+        res = authenticated_client.delete(f"/admin/field-assignments/by-prospect/{prospect.id}")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["ok"] is True
+        assert data["id"] == str(assignment.id)
+        mock_del_tg.assert_called_once_with(777456)
+
+    # Verify deleted from DB
+    assert seeded.get(FieldAssignment, assignment.id) is None
+

@@ -16,6 +16,9 @@ class FieldAssignmentRead(BaseModel):
     notes: str | None
     telegram_message_id: int | None
     awaiting_notes: bool
+    remind_at: datetime | None = None
+    reminder_sent_at: datetime | None = None
+    attempt_count: int = 1
     created_at: datetime
     updated_at: datetime
 

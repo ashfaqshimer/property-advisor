@@ -1040,14 +1040,17 @@ def _attach_assignment_status(db: Session, prospects: list[Prospect]) -> list[Pr
     ).all()
 
     status_map: dict[uuid.UUID, str] = {}
+    assignment_id_map: dict[uuid.UUID, uuid.UUID] = {}
     for a in assignments:
         if a.prospect_id and a.prospect_id not in status_map:
             status_map[a.prospect_id] = a.status
+            assignment_id_map[a.prospect_id] = a.id
 
     reads: list[ProspectRead] = []
     for p in prospects:
         r = ProspectRead.model_validate(p)
         r.assignment_status = status_map.get(p.id)
+        r.assignment_id = assignment_id_map.get(p.id)
         reads.append(r)
     return reads
 

@@ -1018,6 +1018,7 @@ export type Prospect = {
   first_scan_job_id?: string | null;
   discard_reason?: string | null;
   assignment_status?: string | null;
+  assignment_id?: string | null;
 };
 
 export type PaginatedProspects = {
@@ -1323,6 +1324,9 @@ export type FieldAssignment = {
   notes: string | null;
   telegram_message_id: number | null;
   awaiting_notes: boolean;
+  remind_at?: string | null;
+  reminder_sent_at?: string | null;
+  attempt_count?: number;
   created_at: string;
   updated_at: string;
   // Flattened prospect fields
@@ -1407,6 +1411,67 @@ export async function resendFieldAssignment(assignmentId: string): Promise<Field
   }
   return (await response.json()) as FieldAssignment;
 }
+
+export async function deleteFieldAssignment(assignmentId: string): Promise<{ ok: boolean; id: string }> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/admin/field-assignments/${assignmentId}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    let detail = `Failed to remove assignment (${response.status}).`;
+    try {
+      const p = await response.json();
+      if (p.detail) detail = p.detail;
+    } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return (await response.json()) as { ok: boolean; id: string };
+}
+
+export async function deleteFieldAssignmentByProspect(prospectId: string): Promise<{ ok: boolean; id: string }> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/admin/field-assignments/by-prospect/${prospectId}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    let detail = `Failed to remove assignment (${response.status}).`;
+    try {
+      const p = await response.json();
+      if (p.detail) detail = p.detail;
+    } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return (await response.json()) as { ok: boolean; id: string };
+}
+
+export async function processDueFieldAssignmentReminders(): Promise<{ ok: boolean; processed: string[]; count: number }> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/admin/field-assignments/process-reminders`,
+    {
+      method: "POST",
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    let detail = `Failed to process due reminders (${response.status}).`;
+    try {
+      const p = await response.json();
+      if (p.detail) detail = p.detail;
+    } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return (await response.json()) as { ok: boolean; processed: string[]; count: number };
+}
+
 
 // --------------------------------------------------------------------------------------
 // Suburb Market Values & Benchmarks

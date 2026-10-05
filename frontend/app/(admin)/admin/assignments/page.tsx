@@ -4,13 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, MessageSquare, Phone, Send } from "lucide-react";
+import { ExternalLink, RefreshCw, MessageSquare, Phone, Send, Trash2, Clock } from "lucide-react";
 import {
   FieldAssignment,
   PaginatedFieldAssignments,
   getCurrentUser,
   getFieldAssignments,
   resendFieldAssignment,
+  deleteFieldAssignment,
+  processDueFieldAssignmentReminders,
 } from "../../../../lib/api";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
 
@@ -73,6 +75,9 @@ export default function AssignmentsPage() {
   const [data, setData] = useState<PaginatedFieldAssignments | null>(null);
   const [loading, setLoading] = useState(true);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [deleteConfirmAssignment, setDeleteConfirmAssignment] = useState<FieldAssignment | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [processingReminders, setProcessingReminders] = useState(false);
   const [filterStatus, setFilterStatus] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
@@ -108,6 +113,45 @@ export default function AssignmentsPage() {
       toast.error(err.message || "Failed to resend assignment.");
     } finally {
       setResendingId(null);
+    }
+  };
+
+  const handleDelete = async (assignment: FieldAssignment) => {
+    setDeletingId(assignment.id);
+    try {
+      await deleteFieldAssignment(assignment.id);
+      toast.success("Assignment removed successfully.");
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.filter((item) => item.id !== assignment.id),
+              total: Math.max(0, prev.total - 1),
+            }
+          : null
+      );
+      setDeleteConfirmAssignment(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove assignment.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleProcessReminders = async () => {
+    setProcessingReminders(true);
+    try {
+      const res = await processDueFieldAssignmentReminders();
+      if (res.count > 0) {
+        toast.success(`Dispatched ${res.count} follow-up reminder(s) to Telegram.`);
+      } else {
+        toast.info("No follow-up reminders are currently due.");
+      }
+      fetchAssignments();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process reminders.");
+    } finally {
+      setProcessingReminders(false);
     }
   };
 
@@ -152,14 +196,25 @@ export default function AssignmentsPage() {
             Prospects dispatched to the field agent via Telegram
           </p>
         </div>
-        <button
-          onClick={fetchAssignments}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-lg border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleProcessReminders}
+            disabled={processingReminders || loading}
+            title="Check and dispatch all due 10:00 AM reminders now"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer"
+          >
+            <Clock className={`h-3.5 w-3.5 text-amber-600 dark:text-amber-400 ${processingReminders ? "animate-spin" : ""}`} />
+            Check Due Reminders
+          </button>
+          <button
+            onClick={fetchAssignments}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Status filter tabs */}
@@ -305,7 +360,28 @@ export default function AssignmentsPage() {
 
                     {/* Status */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <StatusBadge status={a.status} />
+                      <div className="flex flex-col gap-1 items-start">
+                        <StatusBadge status={a.status} />
+                        {a.status === "no_answer" && (
+                          <div className="flex items-center gap-1 text-[11px]">
+                            {a.remind_at ? (
+                              <span className="text-amber-700 dark:text-amber-400 font-medium inline-flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Next call: {new Date(a.remind_at).toLocaleDateString([], { month: "short", day: "numeric" })} 10:00 AM
+                              </span>
+                            ) : a.reminder_sent_at ? (
+                              <span className="text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Reminder sent (Attempt #{a.attempt_count ?? 1})
+                              </span>
+                            ) : (
+                              <span className="text-zinc-500 dark:text-zinc-400">
+                                Attempt #{a.attempt_count ?? 1}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* Notes */}
@@ -328,15 +404,24 @@ export default function AssignmentsPage() {
 
                     {/* Actions */}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-2 justify-end">
+                      <div className="inline-flex items-center gap-1.5 justify-end">
                         <button
                           onClick={() => handleResend(a.id)}
-                          disabled={resendingId === a.id}
+                          disabled={resendingId === a.id || deletingId === a.id}
                           title="Resend to Telegram agent"
                           className="inline-flex items-center gap-1.5 rounded-lg border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1 text-xs font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-700 transition disabled:opacity-50"
                         >
                           <Send className={`h-3 w-3 ${resendingId === a.id ? "animate-pulse" : ""}`} />
                           <span>{resendingId === a.id ? "Sending…" : "Resend"}</span>
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmAssignment(a)}
+                          disabled={deletingId === a.id || resendingId === a.id}
+                          title="Remove assignment and delete from Telegram"
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/20 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition disabled:opacity-50 cursor-pointer"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Remove</span>
                         </button>
                         {a.prospect_ikman_url && (
                           <SourceBadge
@@ -375,6 +460,55 @@ export default function AssignmentsPage() {
             >
               Next
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmAssignment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-[#dce4df] dark:border-zinc-800 shadow-xl w-full max-w-md p-6 transform transition-all">
+            <h3 className="text-lg font-semibold text-[#1a2923] dark:text-zinc-100">
+              Remove Assignment?
+            </h3>
+            <p className="mt-2 text-sm text-[#718078] dark:text-zinc-400">
+              Are you sure you want to remove the sent assignment for{" "}
+              <strong className="text-[#1a2923] dark:text-zinc-200">
+                {deleteConfirmAssignment.prospect_poster_name || deleteConfirmAssignment.prospect_title || "this prospect"}
+              </strong>
+              ?
+            </p>
+            <p className="mt-2 text-xs text-[#8c9e94] dark:text-zinc-500">
+              This will delete the assignment record and attempt to remove the card from the Telegram agent chat. The prospect will return to unassigned status.
+            </p>
+            <div className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={deletingId === deleteConfirmAssignment.id}
+                onClick={() => setDeleteConfirmAssignment(null)}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-medium text-[#1a2923] dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-[#dce4df] dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingId === deleteConfirmAssignment.id}
+                onClick={() => handleDelete(deleteConfirmAssignment)}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-lg transition cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+              >
+                {deletingId === deleteConfirmAssignment.id ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Removing…</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remove Assignment</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

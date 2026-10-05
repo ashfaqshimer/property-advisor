@@ -19,7 +19,9 @@ from app.models.scan_job import ScanJob
 from app.services.telegram_dispatch import (
     PROSPECT_STATUS_MAP,
     answer_callback_query,
+    calculate_next_reminder_time,
     get_updates,
+    process_due_reminders,
     register_webhook,
     send_confirmation,
     send_notes_saved,
@@ -107,6 +109,11 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
 
     # Update status
     assignment.status = new_status
+    if new_status == "no_answer":
+        assignment.remind_at = calculate_next_reminder_time()
+        assignment.reminder_sent_at = None
+    else:
+        assignment.remind_at = None
 
     # Sync prospect status if applicable
     prospect_new_status = PROSPECT_STATUS_MAP.get(new_status)
@@ -208,6 +215,17 @@ async def telegram_webhook(
         _handle_message(db, msg)
 
     return {"ok": True}
+
+
+@router.post("/reminders/process")
+def trigger_due_reminders(
+    db: Annotated[Session, Depends(get_db)],
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+) -> dict:
+    """Trigger processing of all due field assignment follow-up reminders. Can be called via cron."""
+    _validate_secret(x_telegram_bot_api_secret_token)
+    processed = process_due_reminders(db)
+    return {"ok": True, "processed": processed, "count": len(processed)}
 
 
 @router.post("/setup/webhook")
