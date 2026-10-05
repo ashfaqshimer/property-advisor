@@ -112,9 +112,20 @@ export default function ProspectsPage() {
       const result = await createFieldAssignments(ids);
       toast.success(`Dispatched ${result.length} prospect(s) to agent on Telegram.`);
       setProspects((prev) =>
-        prev.map((p) =>
-          selectedProspectIds.has(p.id) ? { ...p, assignment_status: "pending" } : p
-        )
+        prev.map((p) => {
+          const assignment = result.find((a) => a.prospect_id === p.id);
+          if (assignment) {
+            return {
+              ...p,
+              assignment_status: "pending",
+              phone_number: assignment.prospect_phone_number || p.phone_number,
+              poster_name: assignment.prospect_poster_name || p.poster_name,
+              classification: assignment.prospect_classification || p.classification,
+              confidence: assignment.prospect_confidence ?? p.confidence,
+            };
+          }
+          return p;
+        })
       );
       setSelectedProspectIds(new Set());
     } catch (err: any) {
@@ -129,10 +140,20 @@ export default function ProspectsPage() {
     try {
       const result = await createFieldAssignments([prospectId]);
       if (result.length > 0) {
+        const assignment = result[0];
         toast.success("Dispatched to agent on Telegram.");
         setProspects((prev) =>
           prev.map((p) =>
-            p.id === prospectId ? { ...p, assignment_status: "pending" } : p
+            p.id === prospectId
+              ? {
+                  ...p,
+                  assignment_status: "pending",
+                  phone_number: assignment.prospect_phone_number || p.phone_number,
+                  poster_name: assignment.prospect_poster_name || p.poster_name,
+                  classification: assignment.prospect_classification || p.classification,
+                  confidence: assignment.prospect_confidence ?? p.confidence,
+                }
+              : p
           )
         );
       } else {

@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 
+from fastapi_users_db_sqlalchemy.generics import GUID
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,7 +22,7 @@ class FieldAssignment(Base):
         index=True,
     )
     assigned_by_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
+        GUID,
         ForeignKey("staff_users.id", ondelete="SET NULL"),
         nullable=True,
     )

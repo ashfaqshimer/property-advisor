@@ -58,7 +58,8 @@ def format_assignment_message(
     listing_type: str,
     classification: str | None = None,
     confidence: int | None = None,
-    ikman_url: str,
+    ikman_url: str | None = None,
+    listing_url: str | None = None,
     assignment_number: int,
     total_assignments: int,
 ) -> str:
@@ -89,15 +90,23 @@ def format_assignment_message(
         lines.append(f"📞 <b>Phone:</b> {clean_phone}")
 
     if likely_label:
-        lines.append(f"💡 <b>Probably:</b> {likely_label}")
+        conf_suffix = ""
+        if confidence is not None:
+            conf_val = int(confidence * 100) if isinstance(confidence, float) and 0 < confidence <= 1 else int(confidence)
+            conf_suffix = f" ({conf_val}% confidence)"
+        lines.append(f"💡 <b>Probably:</b> {likely_label}{conf_suffix}")
 
     lines += [
         f"🏠 <b>Property:</b> {html.escape(title)}",
         f"📍 <b>Location:</b> {html.escape(location)}",
         f"💰 <b>Price:</b> {html.escape(price)}",
         f"🏷️ <b>Type:</b> {pt} • {lt}",
-        f'🔗 <a href="{html.escape(ikman_url)}">View on ikman</a>',
     ]
+
+    target_url = listing_url or ikman_url
+    if target_url:
+        lines.append(f'🔗 <a href="{html.escape(target_url)}">View Listing</a>')
+
     return "\n".join(lines)
 
 
@@ -113,7 +122,8 @@ def send_assignment_message(
     listing_type: str,
     classification: str | None = None,
     confidence: int | None = None,
-    ikman_url: str,
+    ikman_url: str | None = None,
+    listing_url: str | None = None,
     assignment_number: int = 1,
     total_assignments: int = 1,
 ) -> int | None:
@@ -142,6 +152,7 @@ def send_assignment_message(
         classification=classification,
         confidence=confidence,
         ikman_url=ikman_url,
+        listing_url=listing_url,
         assignment_number=assignment_number,
         total_assignments=total_assignments,
     )

@@ -30,6 +30,7 @@ class FieldAssignmentRead(BaseModel):
     prospect_classification: str | None = None
     prospect_confidence: int | None = None
     prospect_ikman_url: str | None = None
+    prospect_source_url: str | None = None
     prospect_status: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

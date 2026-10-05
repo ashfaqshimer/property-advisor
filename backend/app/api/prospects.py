@@ -39,53 +39,16 @@ from app.agent.client import get_gemini_extractor_client
 from app.schemas.extractor import ExtractedPropertyDraft, GeminiPropertyExtraction
 from app.services.geocoding import geocode_location
 from app.services.price_parser import parse_lkr_price
+from app.services.prospect_contacts import (
+    _enrich_location_from_detail,
+    fetch_prospect_contact_details,
+)
 import json
 
 logger = structlog.get_logger(__name__)
 
 admin_router = APIRouter(prefix="/admin/prospects", tags=["Admin Prospects"])
 DbSession = Annotated[Session, Depends(get_db)]
-
-
-def _enrich_location_from_detail(db: Session, prospect: Prospect, detail: Any) -> bool:
-    """Enriches prospect suburb, location and geocodes from Ikman ad detail payload."""
-    changed = False
-    if not detail or not detail.location:
-        return False
-
-    loc_obj = detail.location
-    suburb_name = None
-    parent_district = None
-
-    if isinstance(loc_obj, dict):
-        suburb_name = loc_obj.get("name")
-        parent = loc_obj.get("parent")
-        if isinstance(parent, dict):
-            parent_district = parent.get("name")
-    elif hasattr(loc_obj, "name"):
-        suburb_name = loc_obj.name
-        if hasattr(loc_obj, "parent") and loc_obj.parent:
-            parent_district = loc_obj.parent.get("name") if isinstance(loc_obj.parent, dict) else getattr(loc_obj.parent, "name", None)
-
-    if suburb_name:
-        if prospect.suburb != suburb_name or prospect.suburb_source != "ikman_detail":
-            prospect.suburb = suburb_name
-            prospect.suburb_source = "ikman_detail"
-            changed = True
-
-        if parent_district and prospect.location != parent_district:
-            prospect.location = parent_district
-            changed = True
-
-        # Re-geocode with verified suburb
-        target = f"{suburb_name}, {prospect.location}" if prospect.location else suburb_name
-        lat, lng = geocode_location(db, target)
-        if lat is not None and (prospect.latitude != lat or prospect.longitude != lng):
-            prospect.latitude = lat
-            prospect.longitude = lng
-            changed = True
-
-    return changed
 
 
 def _update_job_status(
@@ -1244,60 +1207,17 @@ async def fetch_single_prospect_phone(
         raise HTTPException(status_code=404, detail="Prospect not found")
 
     is_lpw = prospect.source == "lpw" or bool(prospect.source_url and "lankapropertyweb" in prospect.source_url)
-    if is_lpw:
-        target_url = prospect.source_url or prospect.ikman_url
-        if not target_url:
-            raise HTTPException(status_code=400, detail="Prospect has no URL to fetch")
-        client = LankaPropertyWebClient(delay=0)
-        try:
-            detail = await client.fetch_ad_detail(target_url)
-            if detail:
-                if detail.phone_number:
-                    prospect.phone_number = detail.phone_number
-                if detail.poster_name:
-                    prospect.poster_name = detail.poster_name
-                if detail.agent_type:
-                    dummy_ad = LpwAd(
-                        id=prospect.source_id or str(prospect.id),
-                        title=prospect.title,
-                        url=target_url,
-                    )
-                    c_cls, c_conf, c_reas = classify_lpw_listing_heuristics(dummy_ad, detail=detail)
-                    prospect.classification = c_cls
-                    prospect.confidence = c_conf
-                    prospect.classification_reasons = c_reas
-                db.commit()
-                db.refresh(prospect)
-                return prospect
-            else:
-                raise HTTPException(status_code=404, detail="Ad detail not found on LankaPropertyWeb")
-        finally:
-            await client.close()
-    else:
-        if not prospect.ikman_slug:
-            raise HTTPException(status_code=400, detail="Prospect has no ikman slug to fetch")
-            
-        client = IkmanClient(delay=0) # Single manual fetch, no delay needed
-        try:
-            detail = await client.fetch_ad_detail(prospect.ikman_slug)
-            if detail:
-                loc_updated = _enrich_location_from_detail(db, prospect, detail)
-                if detail.contactCard and detail.contactCard.phoneNumbers:
-                    prospect.poster_name = detail.contactCard.name
-                    prospect.phone_number = str(detail.contactCard.phoneNumbers[0].get("number", ""))
-                    db.commit()
-                    db.refresh(prospect)
-                elif loc_updated:
-                    db.commit()
-                    db.refresh(prospect)
-                else:
-                    raise HTTPException(status_code=404, detail="Phone number not found on ikman")
-            else:
-                raise HTTPException(status_code=404, detail="Ad detail not found on ikman")
-        finally:
-            await client.close()
-            
-        return prospect
+    if is_lpw and not (prospect.source_url or prospect.ikman_url):
+        raise HTTPException(status_code=400, detail="Prospect has no URL to fetch")
+    elif not is_lpw and not (prospect.ikman_slug or prospect.source_url or prospect.ikman_url):
+        raise HTTPException(status_code=400, detail="Prospect has no ikman slug to fetch")
+
+    success = await fetch_prospect_contact_details(prospect, db, force=True)
+    if not success and not prospect.phone_number:
+        portal_name = "LankaPropertyWeb" if is_lpw else "ikman"
+        raise HTTPException(status_code=404, detail=f"Phone number not found on {portal_name}")
+
+    return prospect
 
 
 @admin_router.post("/{id}/convert-draft", response_model=ExtractedPropertyDraft)

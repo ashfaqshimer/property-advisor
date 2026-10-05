@@ -19,6 +19,7 @@ from app.schemas.field_assignment import (
     FieldAssignmentList,
     FieldAssignmentRead,
 )
+from app.services.prospect_contacts import fetch_prospect_contact_details
 from app.services.telegram_dispatch import (
     PROSPECT_STATUS_MAP,
     send_assignment_message,
@@ -32,6 +33,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 def _assignment_to_read(a: FieldAssignment) -> FieldAssignmentRead:
     p = a.prospect
+    target_url = (p.source_url or p.ikman_url) if p else None
     return FieldAssignmentRead(
         id=a.id,
         prospect_id=a.prospect_id,
@@ -51,13 +53,14 @@ def _assignment_to_read(a: FieldAssignment) -> FieldAssignmentRead:
         prospect_phone_number=p.phone_number if p else None,
         prospect_classification=p.classification if p else None,
         prospect_confidence=p.confidence if p else None,
-        prospect_ikman_url=p.ikman_url if p else None,
+        prospect_source_url=target_url,
+        prospect_ikman_url=target_url,
         prospect_status=p.status if p else None,
     )
 
 
 @router.post("", response_model=list[FieldAssignmentRead])
-def create_assignments(
+async def create_assignments(
     body: FieldAssignmentCreate,
     db: DbSession,
     current_user: CurrentStaffUser,
@@ -94,6 +97,17 @@ def create_assignments(
             )
             continue
 
+        # Auto-fetch contact details if missing before dispatching
+        if not prospect.phone_number:
+            try:
+                await fetch_prospect_contact_details(prospect, db)
+            except Exception as exc:
+                logger.warning(
+                    "field_assignment_contact_fetch_error",
+                    prospect_id=str(prospect.id),
+                    error=str(exc),
+                )
+
         # Reuse any unsent pending assignment or create new
         assignment = db.scalar(
             select(FieldAssignment)
@@ -114,6 +128,7 @@ def create_assignments(
             db.flush()  # get the id before sending
 
         # Send to Telegram (sync — we need the returned message_id)
+        target_url = prospect.source_url or prospect.ikman_url or ""
         message_id = send_assignment_message(
             assignment_id=str(assignment.id),
             poster_name=prospect.poster_name,
@@ -125,7 +140,8 @@ def create_assignments(
             listing_type=prospect.listing_type,
             classification=prospect.classification,
             confidence=prospect.confidence,
-            ikman_url=prospect.ikman_url,
+            listing_url=target_url,
+            ikman_url=target_url,
             assignment_number=i,
             total_assignments=len(prospects),
         )
@@ -185,7 +201,7 @@ def get_assignment(
 
 
 @router.post("/{assignment_id}/resend", response_model=FieldAssignmentRead)
-def resend_assignment(
+async def resend_assignment(
     assignment_id: uuid.UUID,
     db: DbSession,
     current_user: CurrentStaffUser,
@@ -202,6 +218,17 @@ def resend_assignment(
     if not prospect:
         raise HTTPException(status_code=400, detail="Associated prospect not found.")
 
+    if not prospect.phone_number:
+        try:
+            await fetch_prospect_contact_details(prospect, db)
+        except Exception as exc:
+            logger.warning(
+                "field_assignment_resend_contact_fetch_error",
+                prospect_id=str(prospect.id),
+                error=str(exc),
+            )
+
+    target_url = prospect.source_url or prospect.ikman_url or ""
     message_id = send_assignment_message(
         assignment_id=str(assignment.id),
         poster_name=prospect.poster_name,
@@ -213,7 +240,8 @@ def resend_assignment(
         listing_type=prospect.listing_type,
         classification=prospect.classification,
         confidence=prospect.confidence,
-        ikman_url=prospect.ikman_url,
+        listing_url=target_url,
+        ikman_url=target_url,
     )
 
     if message_id:
