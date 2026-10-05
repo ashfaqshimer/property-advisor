@@ -12,6 +12,7 @@ import {
   getFieldAssignments,
   resendFieldAssignment,
 } from "../../../../lib/api";
+import { SourceBadge } from "../../../../components/admin/SourceBadge";
 
 const STATUS_CONFIG: Record<
   string,
@@ -338,15 +339,10 @@ export default function AssignmentsPage() {
                           <span>{resendingId === a.id ? "Sending…" : "Resend"}</span>
                         </button>
                         {a.prospect_ikman_url && (
-                          <a
-                            href={a.prospect_ikman_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1 rounded text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:hover:text-zinc-200 transition"
-                            title="View on ikman"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
+                          <SourceBadge
+                            source={a.prospect_ikman_url.includes("lankapropertyweb") ? "lpw" : "ikman"}
+                            url={a.prospect_ikman_url}
+                          />
                         )}
                       </div>
                     </td>

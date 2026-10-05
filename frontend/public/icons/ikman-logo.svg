@@ -1,0 +1,7 @@
+<svg viewBox="0 0 288 97" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="288" height="97" rx="48.5" fill="#009B79"/>
+  <circle cx="55" cy="36" r="6" fill="#FFFFFF"/>
+  <circle cx="81" cy="36" r="6" fill="#FFFFFF"/>
+  <path d="M47 48.5C45 48.5 43.5 50 43.5 52C43.5 63.5 54.5 71.5 68 71.5C81.5 71.5 92.5 63.5 92.5 52C92.5 50 91 48.5 89 48.5Z" fill="#FFFFFF"/>
+  <text x="108" y="65" fill="#FFFFFF" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="46" letter-spacing="-1.5">ikman</text>
+</svg>

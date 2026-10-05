@@ -17,6 +17,7 @@ import {
   PhoneCall,
 } from "lucide-react";
 import { toast } from "sonner";
+import { IkmanIcon, LpwIcon } from "../icons/PortalLogos";
 import {
   startProspectScan,
   ScanPreset,
@@ -263,13 +264,13 @@ export function ScanLauncherDrawer({
               >
                 <div className="flex items-center gap-2.5">
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden ${
                       selectedSource === "ikman"
-                        ? "bg-[#19352b] dark:bg-emerald-600 text-white"
+                        ? "bg-[#009B79] text-white shadow-xs"
                         : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
                     }`}
                   >
-                    <Globe className="h-4 w-4" />
+                    <IkmanIcon className="h-5 w-5" />
                   </div>
                   <div>
                     <div className="text-xs font-bold text-[#1a2923] dark:text-zinc-100 flex items-center gap-1.5">
@@ -298,13 +299,13 @@ export function ScanLauncherDrawer({
               >
                 <div className="flex items-center gap-2.5">
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden ${
                       selectedSource === "lpw"
-                        ? "bg-[#19352b] dark:bg-emerald-600 text-white"
+                        ? "bg-[#078F46] text-white shadow-xs"
                         : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
                     }`}
                   >
-                    <Building2 className="h-4 w-4" />
+                    <LpwIcon className="h-5 w-5" />
                   </div>
                   <div>
                     <div className="text-xs font-bold text-[#1a2923] dark:text-zinc-100 flex items-center gap-1.5">

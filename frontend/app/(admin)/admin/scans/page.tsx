@@ -51,6 +51,7 @@ import {
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
+import { IkmanIcon, LpwIcon } from "../../../../components/icons/PortalLogos";
 
 interface AutomatedScannerCardProps {
   scanner: AutomatedScanner;
@@ -167,16 +168,16 @@ function AutomatedScannerCard({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-start sm:items-center gap-3">
             <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
-                scanner.enabled
-                  ? "bg-[#eef3f0] dark:bg-emerald-950/60 text-[#19352b] dark:text-emerald-400 border-[#cbd8d1] dark:border-emerald-900/60"
-                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700"
-              }`}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition ${
+                scanner.source === "lpw"
+                  ? "bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200/90 dark:border-emerald-900/50"
+                  : "bg-teal-50/80 dark:bg-teal-950/40 border-teal-200/90 dark:border-teal-900/50"
+              } ${!scanner.enabled ? "opacity-75" : ""}`}
             >
               {scanner.source === "lpw" ? (
-                <Building2 className="h-5 w-5" />
+                <LpwIcon className="h-6 w-6 shrink-0" />
               ) : (
-                <Globe className="h-5 w-5" />
+                <IkmanIcon className="h-6 w-6 shrink-0 rounded-md" />
               )}
             </div>
 
@@ -1584,7 +1585,7 @@ function ScanHistoryContent() {
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
+                          <LpwIcon className="h-5 w-5 shrink-0" />
                           <div>
                             <span className="text-xs font-bold text-[#1a2923] dark:text-zinc-100 block">
                               LankaPropertyWeb
@@ -1609,7 +1610,7 @@ function ScanHistoryContent() {
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
+                          <IkmanIcon className="h-5 w-5 shrink-0 rounded-xs" />
                           <div>
                             <span className="text-xs font-bold text-[#1a2923] dark:text-zinc-100 block">
                               ikman.lk
@@ -1805,11 +1806,11 @@ function ScanHistoryContent() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-4">
+              <div className="rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/50 dark:bg-teal-950/20 p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#19352b] dark:bg-emerald-700 text-white font-bold text-xs">
-                      <Globe className="h-4 w-4" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#009B79] text-white shadow-xs">
+                      <IkmanIcon className="h-5 w-5" />
                     </div>
                     <div>
                       <h4 className="text-xs sm:text-sm font-bold text-[#1a2923] dark:text-zinc-100">ikman.lk</h4>
@@ -1826,19 +1827,19 @@ function ScanHistoryContent() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-dashed border-[#dce4df] dark:border-zinc-800 bg-[#fbfcfb] dark:bg-zinc-900/30 p-4 opacity-80">
+              <div className="rounded-xl border border-blue-200/80 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-300 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs">
-                      <Globe className="h-4 w-4" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#078F46] text-white shadow-xs">
+                      <LpwIcon className="h-5 w-5" />
                     </div>
                     <div>
                       <h4 className="text-xs sm:text-sm font-bold text-[#1a2923] dark:text-zinc-100">LankaPropertyWeb</h4>
                       <p className="text-[11px] text-[#64736b] dark:text-zinc-400">Dedicated Property Portal</p>
                     </div>
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:text-zinc-300">
-                    Upcoming
+                  <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/60 px-2 py-0.5 text-[10px] font-semibold text-blue-800 dark:text-blue-300">
+                    Active
                   </span>
                 </div>
                 <div className="mt-2.5 text-[11px] text-[#64736b] dark:text-zinc-400 space-y-1">
