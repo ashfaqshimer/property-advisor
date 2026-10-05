@@ -1415,6 +1415,7 @@ export default function ProspectsPage() {
                     <option value="apartment">Apartment</option>
                     <option value="land">Land</option>
                     <option value="commercial">Commercial</option>
+                    <option value="mixed_use">Mixed Use</option>
                   </select>
                 </div>
               </div>

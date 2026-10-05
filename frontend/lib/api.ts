@@ -137,10 +137,10 @@ export type CreatePropertyPayload = {
   title: string;
   description: string;
   listing_type: "sale" | "rent";
-  price: number;
+  price?: number | null;
   is_price_per_perch?: boolean;
   location: string;
-  property_type: "house" | "apartment" | "land" | "commercial";
+  property_type: "house" | "apartment" | "land" | "commercial" | "mixed_use";
   bedrooms: number | null;
   property_contact_id?: string | null;
   bathrooms: number | null;
@@ -1335,10 +1335,10 @@ export type ExtractedPropertyDraft = {
   title: string;
   description: string;
   listing_type: 'sale' | 'rent';
-  price: number;
+  price?: number | null;
   is_price_per_perch: boolean;
   location: string;
-  property_type: 'house' | 'apartment' | 'land' | 'commercial';
+  property_type: 'house' | 'apartment' | 'land' | 'commercial' | 'mixed_use';
   bedrooms?: number | null;
   bathrooms?: number | null;
   land_size_perches?: number | null;
@@ -1353,6 +1353,7 @@ export type ExtractedPropertyDraft = {
   is_gated_community?: boolean;
   contact_name?: string | null;
   contact_phone?: string | null;
+  contact_phones?: string[];
   contact_type?: 'owner' | 'broker' | null;
   image_alt?: string;
   source_platform?: string | null;

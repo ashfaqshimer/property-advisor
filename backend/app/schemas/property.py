@@ -31,7 +31,7 @@ class PropertyRead(BaseModel):
     title: str
     description: str
     listing_type: ListingType
-    price: Decimal
+    price: Decimal | None = None
     is_price_per_perch: bool
     is_featured: bool
     # Constant, not a column — the table is single-currency. Stating it on the wire
@@ -77,7 +77,7 @@ class PropertyCreate(BaseModel):
     title: str
     description: str = ""
     listing_type: ListingType
-    price: Decimal
+    price: Decimal | None = None
     is_price_per_perch: bool = False
     is_featured: bool = False
     location: str

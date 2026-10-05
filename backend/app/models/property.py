@@ -26,6 +26,7 @@ class PropertyType(str, enum.Enum):
     APARTMENT = "apartment"
     LAND = "land"
     COMMERCIAL = "commercial"
+    MIXED_USE = "mixed_use"
 
 
 class ListingType(str, enum.Enum):
@@ -63,8 +64,8 @@ class Property(Base):
 
     # LKR. 14,2 tops out just under a trillion rupees — three orders of magnitude
     # above the priciest listing — while keeping cents for the day a rental or a
-    # per-perch land price needs them.
-    price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, index=True)
+    # per-perch land price needs them. Nullable for unpriced listings / price on inquiry.
+    price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True, index=True)
 
     is_price_per_perch: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"

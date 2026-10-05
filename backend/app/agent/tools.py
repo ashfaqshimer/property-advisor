@@ -180,7 +180,15 @@ def _as_property_type(value: Any) -> PropertyType | None:
     if value is None or value == "":
         return None
     text = str(value).strip().lower().rstrip("s")  # "apartments" -> "apartment"
-    aliases = {"flat": "apartment", "condo": "apartment", "shop": "commercial"}
+    aliases = {
+        "flat": "apartment",
+        "condo": "apartment",
+        "shop": "commercial",
+        "factory": "mixed_use",
+        "mixed": "mixed_use",
+        "industrial": "mixed_use",
+        "warehouse": "mixed_use",
+    }
     text = aliases.get(text, text)
     try:
         return PropertyType(text)
@@ -284,7 +292,8 @@ def _serialize(prop: Property) -> dict[str, Any]:
         "title": prop.title,
         "location": prop.location,
         "listing_type": prop.listing_type.value,
-        "price_lkr": int(prop.price),
+        "price_lkr": int(prop.price) if prop.price is not None else None,
+        "is_price_on_request": prop.price is None,
         "is_price_per_perch": prop.is_price_per_perch,
         "property_type": prop.property_type.value,
         "bedrooms": prop.bedrooms,
@@ -650,7 +659,7 @@ _SEARCH_DECLARATION = types.FunctionDeclaration(
             "property_type": types.Schema(
                 type=types.Type.STRING,
                 enum=[member.value for member in PropertyType],
-                description="One of: house, apartment, land, commercial.",
+                description="One of: house, apartment, land, commercial, mixed_use.",
             ),
             "listing_type": types.Schema(
                 type=types.Type.STRING,

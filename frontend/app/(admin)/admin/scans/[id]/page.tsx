@@ -1050,6 +1050,7 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                     <option value="apartment">Apartment</option>
                     <option value="land">Land</option>
                     <option value="commercial">Commercial</option>
+                    <option value="mixed_use">Mixed Use</option>
                   </select>
                 </div>
               </div>

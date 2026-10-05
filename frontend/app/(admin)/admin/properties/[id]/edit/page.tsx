@@ -15,6 +15,7 @@ import {
 } from '@/lib/api';
 import { ContactForm } from '@/components/admin/ContactForm';
 import { Spinner } from '@/components/ui/spinner';
+import { AreaConverterInput } from '@/components/admin/AreaConverterInput';
 
 type FormValues = {
 	title: string;
@@ -40,7 +41,21 @@ type FormValues = {
 
 type ImagePreview = { file: File; url: string };
 
-const PREDEFINED_AMENITIES = ['Pool', 'Garden', 'A/C', 'Gym', 'Generator', 'Maid Room', 'Security'];
+const PREDEFINED_AMENITIES = [
+	'Pool',
+	'Garden',
+	'A/C',
+	'Gym',
+	'Generator',
+	'Maid Room',
+	'Security',
+	'Three-Phase Electricity',
+	'Well Water',
+	'Boundary Wall',
+	'Clear Deeds',
+	'CCTV',
+	'Wi-Fi',
+];
 
 const emptyForm: FormValues = {
 	title: '',
@@ -118,7 +133,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 					title: record.title,
 					propertyType: record.property_type,
 					listingType: record.listing_type,
-					price: String(record.price),
+					price: record.price != null ? String(record.price) : '',
 					pricePerPerch: Boolean(record.is_price_per_perch),
 					location: record.location,
 					bedrooms: record.bedrooms != null ? String(record.bedrooms) : '',
@@ -172,6 +187,12 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 				if (draft.amenities.gym) newAmenities.push('Gym');
 				if (draft.amenities.generator) newAmenities.push('Generator');
 				if (draft.amenities.security) newAmenities.push('Security');
+				if (draft.amenities.three_phase_electricity) newAmenities.push('Three-Phase Electricity');
+				if (draft.amenities.well_water) newAmenities.push('Well Water');
+				if (draft.amenities.boundary_wall) newAmenities.push('Boundary Wall');
+				if (draft.amenities.clear_deeds) newAmenities.push('Clear Deeds');
+				if (draft.amenities.cctv) newAmenities.push('CCTV');
+				if (draft.amenities.wifi) newAmenities.push('Wi-Fi');
 			}
 
 			let matchedContactId = form.propertyContactId;
@@ -316,8 +337,8 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 		const nextErrors: Record<string, string> = {};
 		if (!form.title.trim()) nextErrors.title = 'Title is required';
 		if (!form.location.trim()) nextErrors.location = 'Location is required';
-		if (!form.price || Number(form.price) <= 0)
-			nextErrors.price = 'Enter a valid price';
+		if (form.price && Number(form.price) <= 0)
+			nextErrors.price = 'Price must be greater than 0';
 		if (!form.description.trim())
 			nextErrors.description = 'Description is required';
 		return nextErrors;
@@ -341,14 +362,15 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 				title: form.title.trim(),
 				description: form.description.trim(),
 				listing_type: form.listingType,
-				price: Number(form.price),
+				price: form.price ? Number(form.price) : null,
 				is_price_per_perch: form.pricePerPerch,
 				location: form.location.trim(),
 				property_type: form.propertyType as
 					| 'house'
 					| 'apartment'
 					| 'land'
-					| 'commercial',
+					| 'commercial'
+					| 'mixed_use',
 				bedrooms: form.bedrooms ? Number(form.bedrooms) : null,
 				bathrooms: form.bathrooms ? Number(form.bathrooms) : null,
 				land_size_perches: form.landSizePerches
@@ -614,6 +636,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 								<option value='apartment'>Apartment</option>
 								<option value='land'>Land</option>
 								<option value='commercial'>Commercial</option>
+								<option value='mixed_use'>Mixed Use</option>
 							</select>
 						</label>
 						<label className='text-sm font-medium'>
@@ -716,30 +739,23 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 								</label>
 							</>
 						)}
-						<label className='text-sm font-medium'>
-							Land size (perches)
-							<input
-								className={fieldClass}
-								type='number'
-								min='0'
-								step='0.01'
-								value={form.landSizePerches}
-								onChange={(e) => updateField('landSizePerches', e.target.value)}
-								placeholder='10.5'
-							/>
-						</label>
+						<AreaConverterInput
+							label='Land size'
+							primaryUnit='perches'
+							value={form.landSizePerches}
+							onChange={(val) => updateField('landSizePerches', val)}
+							placeholder='10.5'
+							className={fieldClass}
+						/>
 						{form.propertyType !== 'land' && (
-							<label className='text-sm font-medium'>
-								Sqft
-								<input
-									className={fieldClass}
-									type='number'
-									min='0'
-									value={form.sqft}
-									onChange={(e) => updateField('sqft', e.target.value)}
-									placeholder='1800'
-								/>
-							</label>
+							<AreaConverterInput
+								label='Floor area / House size'
+								primaryUnit='sqft'
+								value={form.sqft}
+								onChange={(val) => updateField('sqft', val)}
+								placeholder='1800'
+								className={fieldClass}
+							/>
 						)}
 						<label className='text-sm font-medium'>
 							Parking spaces

@@ -137,3 +137,53 @@ def test_nullable_dimensions_serialize_as_null(
     assert item["floor_area_sqft"] is None
     # Present-but-null, not absent.
     assert {"bedrooms", "bathrooms", "floor_area_sqft"} <= item.keys()
+
+
+def test_unpriced_and_mixed_use_property_serializes_cleanly(
+    client: TestClient, seeded: Session
+) -> None:
+    from app.agent.tools import _serialize
+
+    prop = Property(
+        title="House with Factory in Ja-Ela",
+        description="A valuable house with factory and 3-phase electricity.",
+        price=None,
+        listing_type=ListingType.SALE,
+        is_price_per_perch=False,
+        is_featured=True,
+        location="Ja-Ela",
+        property_type=PropertyType.MIXED_USE,
+        bedrooms=4,
+        bathrooms=1,
+        floor_area_sqft=3500,
+        land_size_perches=Decimal("27.00"),
+        amenities={
+            "three_phase_electricity": True,
+            "well_water": True,
+            "boundary_wall": True,
+            "clear_deeds": True,
+            "cctv": True,
+            "wifi": True,
+            "secondary_structure": {"type": "factory", "sqft": 2500},
+        },
+        image_urls=["https://images.unsplash.com/photo-0000000000000-000000000000"],
+        image_alt="House with factory compound",
+        status=PropertyStatus.AVAILABLE,
+        created_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    seeded.add(prop)
+    seeded.commit()
+
+    item = _first(client)
+    assert item["title"] == "House with Factory in Ja-Ela"
+    assert item["property_type"] == "mixed_use"
+    assert item["price"] is None
+    assert item["amenities"]["three_phase_electricity"] is True
+
+    # Test Amaya tool serialization does not crash on None price
+    serialized = _serialize(prop)
+    assert serialized["property_type"] == "mixed_use"
+    assert serialized["price_lkr"] is None
+    assert serialized["is_price_on_request"] is True
+    assert serialized["amenities"]["three_phase_electricity"] is True
+
