@@ -74,7 +74,6 @@ function stubBackend(onChat: ChatHandler = () => reply("Of course.")) {
   fetchSpy = vi.fn(async (url: unknown, init: RequestInit = {}) => {
     if (String(url).endsWith("/health")) return streamResponse(200, "");
     if (String(url).endsWith("/properties/featured")) return jsonResponse(200, []);
-    if (String(url).endsWith("/site-configuration")) return jsonResponse(200, {});
     return onChat(init);
   });
   vi.stubGlobal("fetch", fetchSpy);
@@ -356,14 +355,10 @@ describe("suggestion chips", () => {
     expect(screen.queryByRole("button", { name: SUGGESTION_CHIPS[2] })).not.toBeInTheDocument();
   });
 
-  it("renders services chips when site configuration specifies services layout", async () => {
+  it("renders services chips when no featured properties are available", async () => {
     fetchSpy = vi.fn(async (url: unknown) => {
       if (String(url).endsWith("/health")) return streamResponse(200, "");
       if (String(url).endsWith("/properties/featured")) return jsonResponse(200, []);
-      if (String(url).endsWith("/site-configuration"))
-        return jsonResponse(200, {
-          extra_settings: { homepage_layout: "services" },
-        });
       return reply("Of course.");
     });
     vi.stubGlobal("fetch", fetchSpy);

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import PropertyCard from "@/components/properties/PropertyCard";
 import ServicesAndMarketGuide from "@/components/properties/ServicesAndMarketGuide";
-import { getFeaturedProperties, getSiteConfiguration } from "@/lib/api";
+import { getFeaturedProperties } from "@/lib/api";
 import { mapProperty } from "@/lib/properties";
 
 const SLIDE_DURATION_MS = 5500;
@@ -409,17 +409,7 @@ export default function PropertyGrid() {
       }
     }
 
-    // 2. Fetch site configuration to respect root / admin setting
-    getSiteConfiguration()
-      .then((config) => {
-        const layout = config?.extra_settings?.homepage_layout;
-        if (layout === "services" || layout === "featured") {
-          setPreferredLayout((current) => current ?? (layout as "featured" | "services"));
-        }
-      })
-      .catch(() => {});
-
-    // 3. Fetch featured properties
+    // 2. Fetch featured properties
     getFeaturedProperties()
       .then((records) => setProperties(records.map(mapProperty).slice(0, 6)))
       .catch(() => setHasError(true));

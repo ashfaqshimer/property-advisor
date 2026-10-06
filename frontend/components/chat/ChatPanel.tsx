@@ -8,7 +8,6 @@ import {
   ChatError,
   captureFallbackLead,
   getFeaturedProperties,
-  getSiteConfiguration,
   MAX_MESSAGE_LENGTH,
   sendChatMessage,
   wakeBackend,
@@ -222,14 +221,6 @@ export default function ChatPanel({
         setIsServicesLayout(true);
       }
     }
-
-    getSiteConfiguration()
-      .then((config) => {
-        if (config?.extra_settings?.homepage_layout === "services") {
-          setIsServicesLayout(true);
-        }
-      })
-      .catch(() => {});
   }, []);
 
   useEffect(() => {

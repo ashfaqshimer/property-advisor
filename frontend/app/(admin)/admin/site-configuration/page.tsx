@@ -141,15 +141,6 @@ export default function SiteConfigurationPage() {
     });
   }
 
-  function updateExtraSetting(key: string, value: unknown) {
-    setSiteConfig((s) => ({
-      ...s,
-      extra_settings: {
-        ...(s.extra_settings || {}),
-        [key]: value,
-      },
-    }));
-  }
 
   function updateFeaturedSetting<K extends keyof FeaturedSettings>(
     key: K,
@@ -557,64 +548,7 @@ export default function SiteConfigurationPage() {
         </CardContent>
       </Card>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">Homepage Main Section Layout</CardTitle>
-          <CardDescription>
-            Toggle the primary presentation next to the chat panel for all visitors.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="homepage_layout"
-                value="featured"
-                checked={(siteConfig.extra_settings?.homepage_layout ?? "featured") === "featured"}
-                onChange={() => updateExtraSetting("homepage_layout", "featured")}
-                className="mt-1 size-4 accent-primary"
-              />
-              <div>
-                <span className="text-sm font-medium text-foreground">
-                  Featured Properties Carousel (Default)
-                </span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Displays active featured properties in the carousel, automatically falling back to the Services Hub if 0 listings exist.
-                </p>
-              </div>
-            </label>
 
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="homepage_layout"
-                value="services"
-                checked={siteConfig.extra_settings?.homepage_layout === "services"}
-                onChange={() => updateExtraSetting("homepage_layout", "services")}
-                className="mt-1 size-4 accent-primary"
-              />
-              <div>
-                <span className="text-sm font-medium text-foreground">
-                  Curated Sourcing & Services Hub (New Layout)
-                </span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Always displays the Bespoke Sourcing (Market Benchmarks), Legal & Title Due Diligence, and Renovations layout (even when properties exist in the database).
-                </p>
-              </div>
-            </label>
-          </div>
-
-          <Button
-            type="button"
-            onClick={(e) => handleUpdateSiteConfig(e as any)}
-            disabled={updatingSiteConfig}
-            className="mt-6"
-          >
-            {updatingSiteConfig ? "Saving..." : "Save Layout Preference"}
-          </Button>
-        </CardContent>
-      </Card>
 
       <Card className="mt-8">
         <CardHeader>
