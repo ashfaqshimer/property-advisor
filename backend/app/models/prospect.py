@@ -33,6 +33,7 @@ class Prospect(Base):
 
     __table_args__ = (
         sa.UniqueConstraint("source", "source_id", name="uq_prospects_source_source_id"),
+        sa.Index("ix_prospects_status_first_seen_at", "status", "first_seen_at"),
     )
     
     # Listing data
@@ -45,12 +46,12 @@ class Prospect(Base):
     bedrooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     bathrooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     location: Mapped[str] = mapped_column(String(128))
-    suburb: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    suburb: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     suburb_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    property_type: Mapped[str] = mapped_column(String(64))   # land, house, apartment
-    listing_type: Mapped[str] = mapped_column(String(32))     # for_sale, for_rent
+    property_type: Mapped[str] = mapped_column(String(64), index=True)   # land, house, apartment
+    listing_type: Mapped[str] = mapped_column(String(32), index=True)     # for_sale, for_rent
     
     # Contact
     poster_name: Mapped[str | None] = mapped_column(String(128))
@@ -69,11 +70,11 @@ class Prospect(Base):
     # contacted – outreach made, outcome pending
     # converted – converted to a full property listing
     # discarded – rejected/ignored/closed (with discard_reason: misclassified_broker, not_interested, out_of_area, already_sold, unreachable, duplicate)
-    status: Mapped[str] = mapped_column(String(32), default="new")
+    status: Mapped[str] = mapped_column(String(32), default="new", index=True)
     
     # Timestamps
     first_seen_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), index=True
     )
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

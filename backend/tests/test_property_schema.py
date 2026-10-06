@@ -35,6 +35,7 @@ EXPECTED_KEYS = {
     "amenities",
     "image_urls",
     "image_alt",
+    "featured_image_url",
     "status",
     "created_at",
     "property_contact_id",
@@ -46,6 +47,12 @@ EXPECTED_KEYS = {
     "source_platform",
     "has_maids_room",
     "source_id",
+    "price_grade",
+    "price_grade_label",
+    "price_unit_rate",
+    "price_unit_label",
+    "market_median_unit_rate",
+    "price_diff_percent",
 }
 
 

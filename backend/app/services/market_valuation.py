@@ -11,10 +11,12 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import re
 import statistics
+import time
+from threading import Lock
 from typing import Any
 
 import structlog
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
@@ -23,6 +25,35 @@ from app.models.suburb import Suburb
 from app.services.price_parser import parse_lkr_price
 
 logger = structlog.get_logger(__name__)
+
+_GLOBAL_VALUATION_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_GLOBAL_VALUATION_CACHE_LOCK = Lock()
+GLOBAL_VALUATION_CACHE_TTL_SECONDS = 300.0  # 5 minutes TTL
+
+
+def get_cached_suburb_market_value(cache_key: str) -> dict[str, Any] | None:
+    now = time.monotonic()
+    with _GLOBAL_VALUATION_CACHE_LOCK:
+        if cache_key in _GLOBAL_VALUATION_CACHE:
+            expires_at, val = _GLOBAL_VALUATION_CACHE[cache_key]
+            if now < expires_at:
+                return val
+            del _GLOBAL_VALUATION_CACHE[cache_key]
+    return None
+
+
+def set_cached_suburb_market_value(cache_key: str, val: dict[str, Any]) -> None:
+    now = time.monotonic()
+    with _GLOBAL_VALUATION_CACHE_LOCK:
+        if len(_GLOBAL_VALUATION_CACHE) > 500:
+            _GLOBAL_VALUATION_CACHE.clear()
+        _GLOBAL_VALUATION_CACHE[cache_key] = (now + GLOBAL_VALUATION_CACHE_TTL_SECONDS, val)
+
+
+def clear_valuation_cache() -> None:
+    with _GLOBAL_VALUATION_CACHE_LOCK:
+        _GLOBAL_VALUATION_CACHE.clear()
+
 
 # Sri Lankan real estate asking prices carry a standard 5% - 15% negotiation discount.
 # We apply a 10% realization factor to convert asking rates to realistic transaction values.
@@ -233,6 +264,7 @@ def calculate_suburb_market_value(
     if suburb_entity:
         search_tokens.append(suburb_entity.slug.lower())
         search_tokens.extend([a.lower() for a in suburb_entity.aliases])
+    unique_tokens = [t for t in dict.fromkeys(search_tokens) if t and t.strip()]
 
     # 1. Query Internal Property listings
     prop_filter = [
@@ -244,7 +276,14 @@ def calculate_suburb_market_value(
         if pt_clean in ("land", "house", "apartment", "commercial"):
             prop_filter.append(Property.property_type == PropertyType(pt_clean))
 
-    prop_rows = db.execute(select(Property).where(*prop_filter)).scalars().all()
+    if unique_tokens:
+        prop_loc_clauses = []
+        for token in unique_tokens:
+            prop_loc_clauses.append(func.lower(Property.location).ilike(f"%{token}%"))
+            prop_loc_clauses.append(func.lower(Property.title).ilike(f"%{token}%"))
+        prop_filter.append(or_(*prop_loc_clauses))
+
+    prop_rows = db.execute(select(Property).where(*prop_filter).limit(200)).scalars().all()
     matched_properties: list[dict[str, Any]] = []
     for p in prop_rows:
         loc = (p.location or "").lower()
@@ -265,7 +304,7 @@ def calculate_suburb_market_value(
                 "date": p.created_at.strftime("%Y-%m-%d") if p.created_at else None,
             })
 
-    # 2. Query Scraped Prospects (Filtered by timeframe)
+    # 2. Query Scraped Prospects (Filtered by timeframe and location)
     prospect_base_filter = [
         Prospect.status.notin_(["discarded"]),
         Prospect.listing_type.in_([listing_type, f"for_{listing_type}"]),
@@ -273,19 +312,38 @@ def calculate_suburb_market_value(
     if property_type:
         prospect_base_filter.append(Prospect.property_type == property_type.lower())
 
+    if unique_tokens:
+        prospect_loc_clauses = []
+        for token in unique_tokens:
+            prospect_loc_clauses.append(func.lower(Prospect.suburb) == token)
+            prospect_loc_clauses.append(func.lower(Prospect.suburb).ilike(f"%{token}%"))
+            prospect_loc_clauses.append(func.lower(Prospect.location).ilike(f"%{token}%"))
+            prospect_loc_clauses.append(func.lower(Prospect.title).ilike(f"%{token}%"))
+        prospect_base_filter.append(or_(*prospect_loc_clauses))
+
     # Try 90-day window first
     cutoff_time = datetime.now(timezone.utc) - timedelta(days=max_days)
     timeframe_label = f"last_{max_days}_days"
 
-    prospect_stmt_90 = select(Prospect).where(
-        *prospect_base_filter,
-        Prospect.first_seen_at >= cutoff_time,
+    prospect_stmt_90 = (
+        select(Prospect)
+        .where(
+            *prospect_base_filter,
+            Prospect.first_seen_at >= cutoff_time,
+        )
+        .order_by(Prospect.first_seen_at.desc())
+        .limit(200)
     )
     prospect_rows = db.execute(prospect_stmt_90).scalars().all()
 
     # Fallback to all-time if fewer than 3 listings found in the 90-day window
     if len(prospect_rows) < 3:
-        prospect_stmt_all = select(Prospect).where(*prospect_base_filter)
+        prospect_stmt_all = (
+            select(Prospect)
+            .where(*prospect_base_filter)
+            .order_by(Prospect.first_seen_at.desc())
+            .limit(200)
+        )
         all_rows = db.execute(prospect_stmt_all).scalars().all()
         if len(all_rows) > len(prospect_rows):
             prospect_rows = all_rows
@@ -894,13 +952,18 @@ def grade_prospect_pricing(
     if valuation_cache is not None and cache_key in valuation_cache:
         valuation = valuation_cache[cache_key]
     else:
-        valuation = calculate_suburb_market_value(
-            db=db,
-            location_query=target_loc,
-            property_type=pt,
-            listing_type=listing_type_str,
-            unit_type=unit_type,
-        )
+        cached_global = get_cached_suburb_market_value(cache_key)
+        if cached_global is not None:
+            valuation = cached_global
+        else:
+            valuation = calculate_suburb_market_value(
+                db=db,
+                location_query=target_loc,
+                property_type=pt,
+                listing_type=listing_type_str,
+                unit_type=unit_type,
+            )
+            set_cached_suburb_market_value(cache_key, valuation)
         if valuation_cache is not None:
             valuation_cache[cache_key] = valuation
 
