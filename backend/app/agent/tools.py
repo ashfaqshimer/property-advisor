@@ -572,7 +572,32 @@ def get_market_value(context: ToolContext, args: dict[str, Any]) -> dict[str, An
         property_type=str(property_type).strip() if property_type else None,
         listing_type=str(listing_type).strip(),
     )
-    return result
+
+    # Return high-signal, token-efficient payload tailored for agent reasoning
+    return {
+        "suburb": result["suburb"],
+        "sub_area": result["sub_area"],
+        "property_type": result["property_type"],
+        "listing_type": result["listing_type"],
+        "sample_count": result["sample_summary"]["total_sourced"],
+        "unit_pricing": result["unit_pricing"],
+        "grading_thresholds": result["grading_thresholds"],
+        "sub_areas": result.get("sub_areas", [])[:8],
+        "advisory_summary": result["advisory_summary"],
+        "trend": {
+            "direction": result.get("overall_trend_direction"),
+            "percent": result.get("overall_trend_percent"),
+        },
+        "sample_listings": [
+            {
+                "title": item["title"],
+                "price": item["total_price_lkr"],
+                "unit_rate": item["unit_rate_lkr"],
+                "sub_area": item["sub_area"],
+            }
+            for item in result.get("sourced_listings", [])[:3]
+        ],
+    }
 
 
 IMPLEMENTATIONS = {
