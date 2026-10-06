@@ -286,6 +286,9 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
 
       await createProperty({
         ...draftModalData,
+        price: draftModalData.price ? Number(draftModalData.price) : 0,
+        bedrooms: draftModalData.bedrooms ? Number(draftModalData.bedrooms) : null,
+        bathrooms: draftModalData.bathrooms ? Number(draftModalData.bathrooms) : null,
         status: "available",
         image_urls: [],
         image_alt: draftModalData.image_alt || "Property",
@@ -1007,8 +1010,8 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                   <input
                     type="number"
                     className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.price}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, price: Number(e.target.value) })}
+                    value={draftModalData.price ?? ""}
+                    onChange={(e) => setDraftModalData({ ...draftModalData, price: e.target.value })}
                   />
                 </div>
                 <div className="flex-1">
@@ -1026,8 +1029,8 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                   <input
                     type="number"
                     className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.bedrooms || ""}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, bedrooms: Number(e.target.value) })}
+                    value={draftModalData.bedrooms ?? ""}
+                    onChange={(e) => setDraftModalData({ ...draftModalData, bedrooms: e.target.value })}
                   />
                 </div>
                 <div className="flex-1">
@@ -1035,8 +1038,8 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
                   <input
                     type="number"
                     className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.bathrooms || ""}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, bathrooms: Number(e.target.value) })}
+                    value={draftModalData.bathrooms ?? ""}
+                    onChange={(e) => setDraftModalData({ ...draftModalData, bathrooms: e.target.value })}
                   />
                 </div>
                 <div className="flex-1">

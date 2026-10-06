@@ -84,7 +84,7 @@ function AutomatedScannerCard({
 
   // Local draft state for editing
   const [frequency, setFrequency] = useState(scanner.frequency_hours);
-  const [pages, setPages] = useState(scanner.pages_to_scan);
+  const [pages, setPages] = useState<number | string>(scanner.pages_to_scan);
   const [keyword, setKeyword] = useState(scanner.keyword || "");
   const [propertyTypes, setPropertyTypes] = useState<string[]>(
     scanner.property_types || ["house", "apartment"]
@@ -101,7 +101,7 @@ function AutomatedScannerCard({
     e.preventDefault();
     onSave({
       frequency_hours: frequency,
-      pages_to_scan: pages,
+      pages_to_scan: Number(pages) || 1,
       keyword: keyword.trim() || null,
       property_types: propertyTypes.length > 0 ? propertyTypes : ["house", "apartment"],
     });
@@ -360,11 +360,15 @@ function AutomatedScannerCard({
                 max={50}
                 disabled={!isRootOrAdmin || isSaving}
                 value={pages}
-                onChange={(e) => setPages(parseInt(e.target.value) || 1)}
+                onChange={(e) => setPages(e.target.value === "" ? "" : parseInt(e.target.value) || "")}
+                onBlur={() => {
+                  if (pages === "" || Number(pages) < 1) setPages(1);
+                  else if (Number(pages) > 50) setPages(50);
+                }}
                 className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
               />
               <span className="text-[10px] text-[#718078] dark:text-zinc-400">
-                25 listings/page = ~{pages * 25} ads
+                25 listings/page = ~{(Number(pages) || 0) * 25} ads
               </span>
             </div>
 
@@ -484,7 +488,7 @@ function ScanHistoryContent() {
   const [addScannerName, setAddScannerName] = useState("");
   const [addScannerSource, setAddScannerSource] = useState("lpw");
   const [addScannerFrequency, setAddScannerFrequency] = useState(24);
-  const [addScannerPages, setAddScannerPages] = useState(5);
+  const [addScannerPages, setAddScannerPages] = useState<number | string>(5);
   const [addScannerTypes, setAddScannerTypes] = useState<string[]>(["house", "apartment"]);
   const [addScannerKeyword, setAddScannerKeyword] = useState("");
   const [addScannerEnabled, setAddScannerEnabled] = useState(true);
@@ -660,7 +664,7 @@ function ScanHistoryContent() {
       source: addScannerSource,
       enabled: addScannerEnabled,
       frequency_hours: addScannerFrequency,
-      pages_to_scan: addScannerPages,
+      pages_to_scan: Number(addScannerPages) || 1,
       property_types: addScannerTypes.length > 0 ? addScannerTypes : ["house", "apartment"],
       keyword: addScannerKeyword.trim() || null,
       last_run_at: null,
@@ -1653,7 +1657,11 @@ function ScanHistoryContent() {
                         min={1}
                         max={50}
                         value={addScannerPages}
-                        onChange={(e) => setAddScannerPages(parseInt(e.target.value) || 1)}
+                        onChange={(e) => setAddScannerPages(e.target.value === "" ? "" : parseInt(e.target.value) || "")}
+                        onBlur={() => {
+                          if (addScannerPages === "" || Number(addScannerPages) < 1) setAddScannerPages(1);
+                          else if (Number(addScannerPages) > 50) setAddScannerPages(50);
+                        }}
                         className="w-full rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200"
                       />
                     </div>
@@ -1767,11 +1775,18 @@ function ScanHistoryContent() {
                         s
                           ? {
                               ...s,
-                              prospect_retention_days: parseInt(e.target.value) || 30,
+                              prospect_retention_days: e.target.value === "" ? ("" as any) : parseInt(e.target.value) || "",
                             }
                           : s
                       )
                     }
+                    onBlur={() => {
+                      setSiteConfig((s) =>
+                        s && (!s.prospect_retention_days || Number(s.prospect_retention_days) < 7)
+                          ? { ...s, prospect_retention_days: 30 }
+                          : s
+                      );
+                    }}
                     className="w-20 rounded-lg border border-[#cbd8d1] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs sm:text-sm font-semibold outline-none focus:border-[#19352b] dark:focus:border-emerald-500 text-[#1a2923] dark:text-zinc-200 disabled:opacity-60 text-center"
                   />
                   <span className="text-xs text-[#64736b] dark:text-zinc-400 font-medium">days</span>

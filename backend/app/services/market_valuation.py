@@ -506,6 +506,15 @@ def calculate_suburb_market_value(
     advisory_parts.append(f"Grounded in {sample_count} verified & scraped market listings ({timeframe_label}).")
     advisory_summary = " ".join(advisory_parts)
 
+    trends_data = calculate_monthly_trends(
+        db=db,
+        location_query=canonical_name,
+        sub_area_filter=target_sub_area,
+        property_type=primary_property_type,
+        listing_type=listing_type,
+        months_back=6,
+    )
+
     return {
         "suburb": canonical_name,
         "sub_area": target_sub_area,
@@ -553,6 +562,9 @@ def calculate_suburb_market_value(
         "sub_areas": sub_areas_comparison,
         "sourced_listings": sourced_items[:30],
         "advisory_summary": advisory_summary,
+        "monthly_trends": trends_data["monthly_trends"],
+        "overall_trend_direction": trends_data["overall_trend_direction"],
+        "overall_trend_percent": trends_data["overall_trend_percent"],
         # Backward compatibility fields for legacy consumers
         "sample_size": sample_count,
         "stats": {
@@ -568,6 +580,172 @@ def calculate_suburb_market_value(
                 "benchmark_range": [baseline_sqft_min, baseline_sqft_max] if baseline_sqft_min else None,
             },
         },
+    }
+
+
+def calculate_monthly_trends(
+    db: Session,
+    location_query: str,
+    sub_area_filter: str | None = None,
+    property_type: str | None = "land",
+    listing_type: str = "sale",
+    months_back: int = 6,
+) -> dict[str, Any]:
+    """
+    Computes monthly median unit rate trends and month-over-month percentage changes
+    for the specified suburb and micro-area across the last `months_back` months.
+    """
+    suburb_entity, detected_sub_area = get_suburb_by_query(db, location_query)
+    target_sub_area = sub_area_filter or detected_sub_area
+    canonical_name = suburb_entity.name if suburb_entity else location_query.title()
+
+    search_tokens = [canonical_name.lower()]
+    if suburb_entity:
+        search_tokens.append(suburb_entity.slug.lower())
+        search_tokens.extend([a.lower() for a in suburb_entity.aliases])
+
+    # Determine month slots (e.g., last 6 months)
+    now = datetime.now(timezone.utc)
+    slots: list[tuple[str, str, datetime, datetime]] = []
+    for i in range(months_back - 1, -1, -1):
+        y = now.year
+        m = now.month - i
+        while m <= 0:
+            m += 12
+            y -= 1
+        period_str = f"{y:04d}-{m:02d}"
+        month_label = datetime(y, m, 1).strftime("%b %Y")
+        start_dt = datetime(y, m, 1, tzinfo=timezone.utc)
+        if m == 12:
+            end_dt = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end_dt = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+        slots.append((period_str, month_label, start_dt, end_dt))
+
+    earliest_dt = slots[0][2]
+    pt = (property_type or "land").lower()
+    is_apartment_or_commercial = pt in ("apartment", "commercial")
+    unit_label = "LKR / Sq.Ft." if is_apartment_or_commercial else "LKR / Perch"
+
+    # Query prospects in overall window
+    prospect_stmt = select(Prospect).where(
+        Prospect.status.notin_(["discarded"]),
+        Prospect.listing_type.in_([listing_type, f"for_{listing_type}"]),
+        Prospect.first_seen_at >= earliest_dt,
+    )
+    if property_type:
+        prospect_stmt = prospect_stmt.where(Prospect.property_type == pt)
+
+    prospect_rows = db.execute(prospect_stmt).scalars().all()
+
+    # Query internal properties
+    prop_stmt = select(Property).where(
+        Property.status.in_([PropertyStatus.AVAILABLE, PropertyStatus.SOLD, PropertyStatus.UNDER_OFFER]),
+        Property.listing_type == (ListingType.SALE if listing_type == "sale" else ListingType.RENT),
+        Property.created_at >= earliest_dt,
+    )
+    if property_type and pt in ("land", "house", "apartment", "commercial"):
+        prop_stmt = prop_stmt.where(Property.property_type == PropertyType(pt))
+
+    prop_rows = db.execute(prop_stmt).scalars().all()
+
+    rates_by_period: dict[str, list[Decimal]] = {slot[0]: [] for slot in slots}
+
+    def process_item(title: str, loc: str, date_dt: datetime | None, p_type: str, price_val: Decimal | None, is_ppp: bool, perches: Decimal | None, sqft: int | None):
+        if not date_dt:
+            return
+        p_str = date_dt.strftime("%Y-%m")
+        if p_str not in rates_by_period:
+            return
+        combined = f"{title} {loc}".lower()
+        if not any(t in combined for t in search_tokens):
+            return
+        if target_sub_area and target_sub_area.lower() != "all":
+            area = extract_sub_area(title, loc, canonical_name)
+            if target_sub_area.lower() not in area.lower() and area.lower() not in target_sub_area.lower():
+                return
+        if not price_val or price_val <= 0:
+            return
+
+        rate = None
+        if p_type == "land":
+            if is_ppp:
+                rate = price_val
+            elif perches and perches > 0:
+                rate = price_val / perches
+        elif p_type in ("apartment", "commercial") and sqft and sqft > 0:
+            rate = price_val / Decimal(sqft)
+        elif perches and perches > 0:
+            rate = price_val / perches
+        elif sqft and sqft > 0:
+            rate = price_val / Decimal(sqft)
+
+        if rate:
+            rates_by_period[p_str].append(rate)
+
+    for pr in prospect_rows:
+        p_val = pr.price_numeric
+        is_ppp = pr.is_price_per_perch
+        if not p_val and pr.price:
+            p_val, is_ppp = parse_lkr_price(pr.price)
+        process_item(pr.title or "", pr.location or "", pr.first_seen_at, pr.property_type, p_val, is_ppp, pr.land_size_perches, pr.floor_area_sqft)
+
+    for p in prop_rows:
+        process_item(
+            p.title or "",
+            p.location or "",
+            p.created_at,
+            p.property_type.value if hasattr(p.property_type, "value") else str(p.property_type),
+            p.price,
+            p.is_price_per_perch,
+            p.land_size_perches,
+            p.floor_area_sqft,
+        )
+
+    trend_items: list[dict[str, Any]] = []
+    prev_median: float | None = None
+
+    for period_str, month_label, _, _ in slots:
+        rates = rates_by_period.get(period_str, [])
+        sample_count = len(rates)
+        pct = _percentiles(rates)
+        med = pct["median"]
+
+        chg_pct = None
+        if med is not None and prev_median is not None and prev_median > 0:
+            chg_pct = round(((med - prev_median) / prev_median) * 100, 1)
+
+        trend_items.append({
+            "period": period_str,
+            "month_label": month_label,
+            "median_unit_rate": med,
+            "sample_count": sample_count,
+            "unit_label": unit_label,
+            "change_percent": chg_pct,
+        })
+
+        if med is not None:
+            prev_median = med
+
+    active_points = [t for t in trend_items if t["median_unit_rate"] is not None]
+    overall_dir = "stable"
+    overall_pct = None
+
+    if len(active_points) >= 2:
+        first_med = active_points[0]["median_unit_rate"]
+        last_med = active_points[-1]["median_unit_rate"]
+        if first_med and last_med:
+            overall_pct = round(((last_med - first_med) / first_med) * 100, 1)
+            if overall_pct > 2.0:
+                overall_dir = "up"
+            elif overall_pct < -2.0:
+                overall_dir = "down"
+
+    return {
+        "monthly_trends": trend_items,
+        "overall_trend_direction": overall_dir,
+        "overall_trend_percent": overall_pct,
+        "unit_label": unit_label,
     }
 
 

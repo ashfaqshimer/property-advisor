@@ -198,3 +198,20 @@ class TestProspectPriceGrading:
         assert grade_over["price_grade"] == "overpriced"
         assert "Overpriced" in grade_over["price_grade_label"]
         assert grade_over["price_diff_percent"] > 15
+
+
+class TestMonthlyTrends:
+    def test_monthly_trends_calculation(self, db_session: Session):
+        from app.services.market_valuation import calculate_monthly_trends
+        seed_suburbs_data(db_session)
+
+        # Query trends for Dehiwala
+        trends = calculate_monthly_trends(db_session, "Dehiwala", property_type="land", months_back=6)
+        assert "monthly_trends" in trends
+        assert len(trends["monthly_trends"]) == 6
+        assert "overall_trend_direction" in trends
+        assert trends["unit_label"] == "LKR / Perch"
+        # Check period format YYYY-MM
+        for item in trends["monthly_trends"]:
+            assert len(item["period"]) == 7
+            assert "median_unit_rate" in item

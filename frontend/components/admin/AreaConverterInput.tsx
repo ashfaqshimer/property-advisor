@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export const SQFT_PER_PERCH = 272.25;
 
@@ -23,8 +23,10 @@ export function AreaConverterInput({
 }: AreaConverterInputProps) {
 	const [activeUnit, setActiveUnit] = useState<'perches' | 'sqft'>(primaryUnit);
 	const [displayValue, setDisplayValue] = useState<string>(value);
+	const isFocusedRef = useRef(false);
 
 	useEffect(() => {
+		if (isFocusedRef.current) return;
 		if (!value || value.trim() === '') {
 			setDisplayValue('');
 			return;
@@ -42,6 +44,24 @@ export function AreaConverterInput({
 			setDisplayValue((num / SQFT_PER_PERCH).toFixed(2));
 		}
 	}, [value, activeUnit, primaryUnit]);
+
+	const handleUnitSwitch = (newUnit: 'perches' | 'sqft') => {
+		if (newUnit === activeUnit) return;
+		setActiveUnit(newUnit);
+		if (!value || value.trim() === '') {
+			setDisplayValue('');
+			return;
+		}
+		const num = Number(value);
+		if (isNaN(num)) return;
+		if (newUnit === primaryUnit) {
+			setDisplayValue(value);
+		} else if (newUnit === 'sqft' && primaryUnit === 'perches') {
+			setDisplayValue(Math.round(num * SQFT_PER_PERCH).toString());
+		} else if (newUnit === 'perches' && primaryUnit === 'sqft') {
+			setDisplayValue((num / SQFT_PER_PERCH).toFixed(2));
+		}
+	};
 
 	const handleInputChange = (raw: string) => {
 		setDisplayValue(raw);
@@ -84,7 +104,7 @@ export function AreaConverterInput({
 				<div className='inline-flex rounded-md border border-[#dce4df] dark:border-zinc-800 bg-[#f4f8f5] dark:bg-zinc-900 p-0.5 text-[11px] select-none'>
 					<button
 						type='button'
-						onClick={() => setActiveUnit('perches')}
+						onClick={() => handleUnitSwitch('perches')}
 						className={`px-2 py-0.5 rounded font-medium transition-colors cursor-pointer ${
 							activeUnit === 'perches'
 								? 'bg-white dark:bg-zinc-800 text-[#19352b] dark:text-zinc-100 shadow-xs'
@@ -95,7 +115,7 @@ export function AreaConverterInput({
 					</button>
 					<button
 						type='button'
-						onClick={() => setActiveUnit('sqft')}
+						onClick={() => handleUnitSwitch('sqft')}
 						className={`px-2 py-0.5 rounded font-medium transition-colors cursor-pointer ${
 							activeUnit === 'sqft'
 								? 'bg-white dark:bg-zinc-800 text-[#19352b] dark:text-zinc-100 shadow-xs'
@@ -112,6 +132,12 @@ export function AreaConverterInput({
 				step={activeUnit === 'perches' ? '0.01' : '1'}
 				className={className}
 				value={displayValue}
+				onFocus={() => {
+					isFocusedRef.current = true;
+				}}
+				onBlur={() => {
+					isFocusedRef.current = false;
+				}}
 				onChange={(e) => handleInputChange(e.target.value)}
 				placeholder={placeholder}
 			/>

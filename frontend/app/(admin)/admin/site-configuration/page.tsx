@@ -149,7 +149,7 @@ export default function SiteConfigurationPage() {
         tiktok_link: siteConfig.tiktok_link,
         scanner_settings: siteConfig.scanner_settings,
         extra_settings: siteConfig.extra_settings || {},
-        prospect_retention_days: siteConfig.prospect_retention_days,
+        prospect_retention_days: Number(siteConfig.prospect_retention_days) || 30,
       });
       setSiteConfig(updated);
       setPhoneInput(updated.phone_numbers?.values?.join(", ") || "");
@@ -386,13 +386,22 @@ export default function SiteConfigurationPage() {
                 id="retention_days"
                 type="number"
                 min="1"
-                value={siteConfig.prospect_retention_days || 30}
+                value={siteConfig.prospect_retention_days ?? 30}
                 onChange={(e) =>
                   setSiteConfig((s) => ({
                     ...s,
-                    prospect_retention_days: parseInt(e.target.value) || 30,
+                    prospect_retention_days: e.target.value === "" ? ("" as any) : parseInt(e.target.value) || "",
                   }))
                 }
+                onBlur={() => {
+                  setSiteConfig((s) => ({
+                    ...s,
+                    prospect_retention_days:
+                      !s.prospect_retention_days || Number(s.prospect_retention_days) < 1
+                        ? 30
+                        : Number(s.prospect_retention_days),
+                  }));
+                }}
                 className="w-full sm:w-32"
               />
             </div>

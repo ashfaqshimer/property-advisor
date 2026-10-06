@@ -73,6 +73,29 @@ def get_market_value_estimate(
     )
 
 
+@router.get("/trends")
+def get_market_trends(
+    db: DbSession,
+    suburb: str = Query(..., description="Suburb or area name, e.g. 'Dehiwala', 'Rajagiriya'"),
+    sub_area: str | None = Query(None, description="Optional micro-area, e.g. 'Attidiya'"),
+    property_type: str | None = Query("land", description="land, house, apartment, commercial"),
+    listing_type: str = Query("sale", description="sale or rent"),
+    months_back: int = Query(6, ge=1, le=24, description="Months of historical trend data"),
+) -> dict[str, Any]:
+    """
+    Returns monthly median unit rate trends and month-over-month percentage changes.
+    """
+    from app.services.market_valuation import calculate_monthly_trends
+    return calculate_monthly_trends(
+        db=db,
+        location_query=suburb,
+        sub_area_filter=sub_area,
+        property_type=property_type,
+        listing_type=listing_type,
+        months_back=months_back,
+    )
+
+
 @admin_router.post("/seed")
 def seed_suburbs(db: DbSession) -> dict[str, Any]:
     """Seeds or refreshes the baseline suburb and CBSL DS Division benchmark catalog."""

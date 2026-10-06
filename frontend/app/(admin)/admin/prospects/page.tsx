@@ -253,6 +253,12 @@ export default function ProspectsPage() {
 
       await createProperty({
         ...draftModalData,
+        price: draftModalData.price ? Number(draftModalData.price) : 0,
+        bedrooms: draftModalData.bedrooms ? Number(draftModalData.bedrooms) : null,
+        bathrooms: draftModalData.bathrooms ? Number(draftModalData.bathrooms) : null,
+        land_size_perches: draftModalData.land_size_perches ? Number(draftModalData.land_size_perches) : null,
+        parking_spaces: draftModalData.parking_spaces ? Number(draftModalData.parking_spaces) : null,
+        build_year: draftModalData.build_year ? Number(draftModalData.build_year) : null,
         status: "available",
         image_urls: [],
         image_alt: draftModalData.image_alt || "Property",
@@ -1529,7 +1535,7 @@ export default function ProspectsPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-muted-foreground">Price (Numeric)</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.price} onChange={(e) => setDraftModalData({...draftModalData, price: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.price ?? ""} onChange={(e) => setDraftModalData({...draftModalData, price: e.target.value})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-muted-foreground">Location</label>
@@ -1539,11 +1545,11 @@ export default function ProspectsPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-muted-foreground">Bedrooms</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.bedrooms || ""} onChange={(e) => setDraftModalData({...draftModalData, bedrooms: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.bedrooms ?? ""} onChange={(e) => setDraftModalData({...draftModalData, bedrooms: e.target.value})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-muted-foreground">Bathrooms</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.bathrooms || ""} onChange={(e) => setDraftModalData({...draftModalData, bathrooms: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.bathrooms ?? ""} onChange={(e) => setDraftModalData({...draftModalData, bathrooms: e.target.value})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-muted-foreground">Property Type</label>
@@ -1576,15 +1582,15 @@ export default function ProspectsPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-muted-foreground">Land Size (Perches)</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.land_size_perches || ""} onChange={(e) => setDraftModalData({...draftModalData, land_size_perches: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.land_size_perches ?? ""} onChange={(e) => setDraftModalData({...draftModalData, land_size_perches: e.target.value})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-muted-foreground">Parking Spaces</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.parking_spaces || ""} onChange={(e) => setDraftModalData({...draftModalData, parking_spaces: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.parking_spaces ?? ""} onChange={(e) => setDraftModalData({...draftModalData, parking_spaces: e.target.value})} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-muted-foreground">Build Year</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.build_year || ""} onChange={(e) => setDraftModalData({...draftModalData, build_year: Number(e.target.value)})} />
+                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.build_year ?? ""} onChange={(e) => setDraftModalData({...draftModalData, build_year: e.target.value})} />
                 </div>
               </div>
               <div className="flex gap-6 py-2">

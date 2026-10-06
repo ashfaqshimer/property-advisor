@@ -556,7 +556,6 @@ export default function NewPropertyPage() {
 									min='0'
 									value={form.price}
 									onChange={(e) => updateField('price', e.target.value)}
-									placeholder='50000000'
 								/>
 								<div className='flex items-center gap-2 pt-1'>
 									<Switch
@@ -640,7 +639,6 @@ export default function NewPropertyPage() {
 											min='0'
 											value={form.bedrooms}
 											onChange={(e) => updateField('bedrooms', e.target.value)}
-											placeholder='3'
 										/>
 									</div>
 									<div className='space-y-2'>
@@ -651,7 +649,6 @@ export default function NewPropertyPage() {
 											min='0'
 											value={form.bathrooms}
 											onChange={(e) => updateField('bathrooms', e.target.value)}
-											placeholder='2'
 										/>
 									</div>
 								</>
@@ -661,7 +658,6 @@ export default function NewPropertyPage() {
 								primaryUnit='perches'
 								value={form.landSizePerches}
 								onChange={(val) => updateField('landSizePerches', val)}
-								placeholder='10.5'
 								className='flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 							/>
 							{form.propertyType !== 'land' && (
@@ -670,7 +666,6 @@ export default function NewPropertyPage() {
 									primaryUnit='sqft'
 									value={form.sqft}
 									onChange={(val) => updateField('sqft', val)}
-									placeholder='1800'
 									className='flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 								/>
 							)}
@@ -682,7 +677,6 @@ export default function NewPropertyPage() {
 									min='0'
 									value={form.parkingSpaces}
 									onChange={(e) => updateField('parkingSpaces', e.target.value)}
-									placeholder='2'
 								/>
 							</div>
 							{form.propertyType !== 'land' && (
@@ -695,7 +689,6 @@ export default function NewPropertyPage() {
 										max={new Date().getFullYear() + 1}
 										value={form.buildYear}
 										onChange={(e) => updateField('buildYear', e.target.value)}
-										placeholder='2020'
 									/>
 								</div>
 							)}
@@ -707,7 +700,6 @@ export default function NewPropertyPage() {
 									min='0'
 									value={form.roadAccessFt}
 									onChange={(e) => updateField('roadAccessFt', e.target.value)}
-									placeholder='20'
 								/>
 							</div>
 						</div>

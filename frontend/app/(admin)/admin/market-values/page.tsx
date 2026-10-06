@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import {
   TrendingUp,
+  TrendingDown,
+  Minus,
   MapPin,
   Building,
   Home,
@@ -21,6 +23,7 @@ import {
   Info,
   Copy,
   Check,
+  Calendar,
 } from "lucide-react";
 
 import {
@@ -29,6 +32,7 @@ import {
   seedSuburbs,
   SuburbItem,
   MarketValueEstimate,
+  MonthlyTrendPoint,
   SourcedListingItem,
   getCurrentUser,
   AuthUser,
@@ -62,6 +66,205 @@ function formatRange(range: [number | null, number | null] | null | undefined): 
   if (min != null) return `From ${formatLKR(min)}`;
   if (max != null) return `Up to ${formatLKR(max)}`;
   return "—";
+}
+
+function MonthlyTrendChart({
+  trends,
+  unitLabel,
+}: {
+  trends: MonthlyTrendPoint[];
+  unitLabel: string;
+}) {
+  if (!trends || trends.length === 0) return null;
+
+  const validRates = trends
+    .map((t) => t.median_unit_rate)
+    .filter((r): r is number => r !== null && r > 0);
+
+  if (validRates.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-[#718078] dark:text-zinc-400">
+        <TrendingUp className="mb-2 h-7 w-7 stroke-1 text-zinc-300 dark:text-zinc-600" />
+        <p className="font-medium text-[#1a2923] dark:text-zinc-200">Insufficient monthly trend history</p>
+        <p className="mt-0.5 text-[11px]">Trend curves populate as listings are captured across consecutive monthly cycles.</p>
+      </div>
+    );
+  }
+
+  const rawMin = Math.min(...validRates);
+  const rawMax = Math.max(...validRates);
+  // Add 15% margin to chart Y bounds for visual comfort
+  const span = rawMax - rawMin || rawMax * 0.1 || 100000;
+  const padding = span * 0.15;
+  const minY = Math.max(0, rawMin - padding);
+  const maxY = rawMax + padding;
+  const rangeY = maxY - minY || 1;
+
+  const svgWidth = 500;
+  const svgHeight = 160;
+  const padLeft = 45;
+  const padRight = 35;
+  const padTop = 25;
+  const padBottom = 25;
+  const chartW = svgWidth - padLeft - padRight;
+  const chartH = svgHeight - padTop - padBottom;
+
+  const stepX = trends.length > 1 ? chartW / (trends.length - 1) : 0;
+
+  const points = trends.map((t, idx) => {
+    const x = padLeft + idx * stepX;
+    const rate = t.median_unit_rate ?? rawMin;
+    const y = padTop + chartH - ((rate - minY) / rangeY) * chartH;
+    return { ...t, x, y };
+  });
+
+  const linePath = points
+    .map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+    .join(" ");
+
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
+  const areaBottomY = padTop + chartH;
+  const areaPath = `${linePath} L ${lastPoint.x.toFixed(1)} ${areaBottomY} L ${firstPoint.x.toFixed(1)} ${areaBottomY} Z`;
+
+  return (
+    <div className="w-full">
+      {/* SVG Chart */}
+      <div className="relative w-full overflow-hidden">
+        <svg
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          className="w-full h-44 sm:h-48 overflow-visible select-none"
+        >
+          <defs>
+            <linearGradient id="trendAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {/* Horizontal Grid lines */}
+          {[0, 0.5, 1].map((pct) => {
+            const gy = padTop + chartH * (1 - pct);
+            const gridVal = minY + rangeY * pct;
+            return (
+              <g key={pct}>
+                <line
+                  x1={padLeft}
+                  y1={gy}
+                  x2={padLeft + chartW}
+                  y2={gy}
+                  stroke="currentColor"
+                  strokeDasharray="3 3"
+                  className="text-zinc-200 dark:text-zinc-800"
+                  strokeWidth="1"
+                />
+                <text
+                  x={padLeft - 6}
+                  y={gy + 3}
+                  textAnchor="end"
+                  className="text-[9px] fill-zinc-400 dark:fill-zinc-500 font-mono"
+                >
+                  {formatLKR(gridVal)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Area under curve */}
+          <path d={areaPath} fill="url(#trendAreaGrad)" />
+
+          {/* Main Trend Line */}
+          <path
+            d={linePath}
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {/* Data Points */}
+          {points.map((p) => (
+            <g key={p.period}>
+              {/* Highlight circle */}
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r="4"
+                className="fill-white stroke-emerald-600 dark:fill-zinc-900 dark:stroke-emerald-400"
+                strokeWidth="2.5"
+              />
+
+              {/* Value label above point */}
+              {p.median_unit_rate != null && (
+                <text
+                  x={p.x}
+                  y={p.y - 8}
+                  textAnchor="middle"
+                  className="text-[10px] font-bold fill-[#1a2923] dark:fill-zinc-200"
+                >
+                  {formatLKR(p.median_unit_rate)}
+                </text>
+              )}
+
+              {/* X Axis month label */}
+              <text
+                x={p.x}
+                y={svgHeight - 6}
+                textAnchor="middle"
+                className="text-[10px] font-medium fill-[#718078] dark:fill-zinc-400"
+              >
+                {p.month_label.split(" ")[0]}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* Month-over-Month Telemetry Strip */}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {trends.map((t) => {
+          const isUp = t.change_percent != null && t.change_percent > 0;
+          const isDown = t.change_percent != null && t.change_percent < 0;
+
+          return (
+            <div
+              key={t.period}
+              className="rounded-lg border border-[#edf2ee] bg-white p-2.5 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-[#1a2923] dark:text-zinc-200">{t.month_label}</span>
+                {t.change_percent != null ? (
+                  <span
+                    className={`inline-flex items-center text-[10px] font-bold ${
+                      isUp
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : isDown
+                        ? "text-rose-700 dark:text-rose-400"
+                        : "text-zinc-500"
+                    }`}
+                  >
+                    {isUp ? `+${t.change_percent}%` : `${t.change_percent}%`}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-zinc-400">Baseline</span>
+                )}
+              </div>
+
+              <div className="mt-1 flex items-baseline justify-between">
+                <span className="text-xs font-bold text-[#1a2923] dark:text-zinc-100">
+                  {formatLKR(t.median_unit_rate)}
+                </span>
+                <span className="text-[10px] text-[#718078] dark:text-zinc-400">
+                  {t.sample_count} {t.sample_count === 1 ? "listing" : "listings"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default function MarketValuesPage() {
@@ -598,6 +801,54 @@ export default function MarketValuesPage() {
                 </div>
               </div>
             </div>
+
+            {/* THIRD ROW: Historical Monthly Trend Card */}
+            {estimate.monthly_trends && estimate.monthly_trends.length > 0 && (
+              <div className="rounded-xl border border-[#edf2ee] bg-[#fbfcfb] p-4 dark:border-zinc-800 dark:bg-zinc-800/40 sm:p-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-[#19352b] dark:text-emerald-400" />
+                      <h4 className="text-sm font-bold text-[#1a2923] dark:text-zinc-100">
+                        Historical Monthly Trajectory (Past 6 Months)
+                      </h4>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-[#64736b] dark:text-zinc-400">
+                      Tracking median {estimate.unit_pricing.unit_label} movements in{" "}
+                      {selectedSubArea !== "all" ? `${selectedSubArea}, ${selectedSuburb}` : selectedSuburb}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {estimate.overall_trend_direction === "up" && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        {estimate.overall_trend_percent != null ? `+${estimate.overall_trend_percent}%` : "Upward"} Shift
+                      </span>
+                    )}
+                    {estimate.overall_trend_direction === "down" && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                        <TrendingDown className="h-3.5 w-3.5" />
+                        {estimate.overall_trend_percent != null ? `${estimate.overall_trend_percent}%` : "Downward"} Softening
+                      </span>
+                    )}
+                    {estimate.overall_trend_direction === "stable" && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                        <Minus className="h-3.5 w-3.5" />
+                        Stable Trajectory
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <MonthlyTrendChart
+                    trends={estimate.monthly_trends}
+                    unitLabel={estimate.unit_pricing.unit_label}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Amaya AI Advisory Preview Card */}
             <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20 sm:p-5">

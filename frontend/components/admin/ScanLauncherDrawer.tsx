@@ -86,7 +86,7 @@ export function ScanLauncherDrawer({
     "houses-for-sale",
     "apartments-for-sale",
   ]);
-  const [scanPages, setScanPages] = useState(10);
+  const [scanPages, setScanPages] = useState<number | string>(10);
   const [autoFetchPhones, setAutoFetchPhones] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -135,7 +135,7 @@ export function ScanLauncherDrawer({
                 : "all",
           strict_location: scanStrictLocation,
           scan_all: scanAllPages,
-          pages_per_category: scanAllPages ? undefined : scanPages,
+          pages_per_category: scanAllPages ? undefined : (Number(scanPages) || 10),
         });
 
         toast.info(`Scanner started for '${kw}' (${selectedSource})`);
@@ -155,7 +155,7 @@ export function ScanLauncherDrawer({
         const res = await startProspectScan({
           source: selectedSource,
           categories: scanCategories,
-          pages_per_category: scanPages,
+          pages_per_category: Number(scanPages) || 10,
         });
 
         toast.info("Scan started in the background");
@@ -181,7 +181,7 @@ export function ScanLauncherDrawer({
         ? scopedCategories.map((c) => c.charAt(0).toUpperCase() + c.slice(1)).join(", ")
         : "All property types"
       : `${scanCategories.length} categories`;
-  const previewDepth = scanAllPages ? "All matching pages" : `${scanPages} pages`;
+  const previewDepth = scanAllPages ? "All matching pages" : `${Number(scanPages) || 1} pages`;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open && !submitting) onClose(); }}>
@@ -499,7 +499,11 @@ export function ScanLauncherDrawer({
                   min="1"
                   max="50"
                   value={scanPages}
-                  onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
+                  onChange={(e) => setScanPages(e.target.value === "" ? "" : parseInt(e.target.value) || "")}
+                  onBlur={() => {
+                    if (scanPages === "" || Number(scanPages) < 1) setScanPages(1);
+                    else if (Number(scanPages) > 50) setScanPages(50);
+                  }}
                   className="bg-background border-input text-foreground"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">
@@ -589,8 +593,11 @@ export function ScanLauncherDrawer({
                           min="1"
                           max="500"
                           value={scanPages}
-                          onChange={(e) => setScanPages(parseInt(e.target.value) || 1)}
-                          placeholder="e.g. 10"
+                          onChange={(e) => setScanPages(e.target.value === "" ? "" : parseInt(e.target.value) || "")}
+                          onBlur={() => {
+                            if (scanPages === "" || Number(scanPages) < 1) setScanPages(1);
+                            else if (Number(scanPages) > 500) setScanPages(500);
+                          }}
                           className="h-8 text-xs bg-background border-input text-foreground"
                         />
                         <p className="mt-1 text-[11px] text-muted-foreground">

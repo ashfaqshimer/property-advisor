@@ -1596,6 +1596,15 @@ export type SubAreaComparisonItem = {
   p75_unit_rate: number | null;
 };
 
+export type MonthlyTrendPoint = {
+  period: string;
+  month_label: string;
+  median_unit_rate: number | null;
+  sample_count: number;
+  unit_label: string;
+  change_percent: number | null;
+};
+
 export type MarketValueEstimate = {
   suburb: string;
   sub_area: string | null;
@@ -1639,6 +1648,9 @@ export type MarketValueEstimate = {
   sub_areas: SubAreaComparisonItem[];
   sourced_listings: SourcedListingItem[];
   advisory_summary: string;
+  monthly_trends?: MonthlyTrendPoint[];
+  overall_trend_direction?: "up" | "down" | "stable";
+  overall_trend_percent?: number | null;
   // Legacy backward compatibility
   sample_size?: number;
   stats?: {
@@ -1711,5 +1723,44 @@ export async function seedSuburbs(): Promise<{ status: string; seeded_count: num
   }
   return (await response.json()) as { status: string; seeded_count: number };
 }
+
+export type MarketTrendsResponse = {
+  suburb: string;
+  sub_area: string | null;
+  property_type: string | null;
+  monthly_trends: MonthlyTrendPoint[];
+  overall_trend_direction: "up" | "down" | "stable";
+  overall_trend_percent: number | null;
+  unit_label: string;
+};
+
+export async function getMarketTrends(
+  suburb: string,
+  subArea?: string | null,
+  propertyType?: string,
+  listingType: string = "sale",
+  monthsBack: number = 6
+): Promise<MarketTrendsResponse> {
+  const params = new URLSearchParams({
+    suburb,
+    listing_type: listingType,
+    months_back: monthsBack.toString(),
+  });
+  if (subArea && subArea !== "all") params.set("sub_area", subArea);
+  if (propertyType && propertyType !== "all") params.set("property_type", propertyType);
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/market-values/trends?${params}`,
+    {
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Market trends fetch failed (${response.status}).`, response.status);
+  }
+  return (await response.json()) as MarketTrendsResponse;
+}
+
 
 
