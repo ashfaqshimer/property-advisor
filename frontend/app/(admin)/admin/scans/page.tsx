@@ -52,6 +52,7 @@ import {
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
 import { IkmanIcon, LpwIcon } from "../../../../components/icons/PortalLogos";
+import { Button } from "@/components/ui/button";
 
 interface AutomatedScannerCardProps {
   scanner: AutomatedScanner;
@@ -280,47 +281,49 @@ function AutomatedScannerCard({
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
             {isRootOrAdmin && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={onRunNow}
                 disabled={isRunning}
-                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-[#19352b]/20 dark:border-emerald-800 bg-[#eef3f0]/60 dark:bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-[#19352b] dark:text-emerald-300 hover:bg-[#19352b] hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white transition disabled:opacity-50"
+                className="h-8 gap-1.5 px-3 text-xs font-semibold cursor-pointer"
               >
                 {isRunning ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Play className="h-3 w-3 fill-current" />
+                  <Play className="h-3.5 w-3.5 fill-current" />
                 )}
                 <span>{isRunning ? "Running..." : "Run Now"}</span>
-              </button>
+              </Button>
             )}
 
             {isRootOrAdmin && (
-              <button
+              <Button
                 type="button"
+                variant={isExpanded ? "default" : "outline"}
+                size="sm"
                 onClick={onToggleExpand}
-                className={`cursor-pointer inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                  isExpanded
-                    ? "border-[#19352b] bg-[#19352b] text-white dark:border-emerald-600 dark:bg-emerald-600"
-                    : "border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#1a2923] dark:text-zinc-300 hover:bg-[#f4f6f4]"
-                }`}
+                className="h-8 gap-1.5 px-3 text-xs font-medium cursor-pointer"
               >
-                <SlidersHorizontal className="h-3 w-3" />
+                <SlidersHorizontal className="h-3.5 w-3.5" />
                 <span>{isExpanded ? "Close Config" : "Configure"}</span>
-                {isExpanded ? <ChevronUp className="h-3 w-3 ml-0.5" /> : <ChevronDown className="h-3 w-3 ml-0.5" />}
-              </button>
+                {isExpanded ? <ChevronUp className="h-3.5 w-3.5 ml-0.5" /> : <ChevronDown className="h-3.5 w-3.5 ml-0.5" />}
+              </Button>
             )}
 
             {!isDefault && isRootOrAdmin && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onDelete}
-                className="cursor-pointer p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
                 title="Delete this scanner"
                 aria-label="Delete this scanner"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             )}
           </div>
         </div>

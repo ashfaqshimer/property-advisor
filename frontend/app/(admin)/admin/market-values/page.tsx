@@ -45,6 +45,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 
 function formatLKR(amount: number | null | undefined): string {
   if (amount == null) return "—";
@@ -408,14 +409,16 @@ export default function MarketValuesPage() {
 
         <div className="flex items-center gap-2">
           {["root", "admin"].includes(user?.role || "") && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleReseed}
               disabled={seeding}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#dce4df] bg-white px-3.5 py-2 text-xs font-medium text-[#1a2923] shadow-xs transition hover:bg-[#f4f6f4] disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="gap-2 cursor-pointer"
             >
-              {seeding ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5 text-[#19352b] dark:text-emerald-400" />}
+              {seeding ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
               Refresh Benchmarks
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -544,14 +547,16 @@ export default function MarketValuesPage() {
               </div>
             </div>
 
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => setIsDrawerOpen(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-[#19352b]/20 bg-[#19352b]/5 px-2.5 py-1 text-xs font-semibold text-[#19352b] transition hover:bg-[#19352b]/10 dark:border-emerald-400/20 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-950/60"
+              className="gap-1.5 text-xs font-semibold cursor-pointer"
             >
               Inspect Sourced Listings ({estimate.sourced_listings.length})
               <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         )}
 
@@ -865,14 +870,16 @@ export default function MarketValuesPage() {
                     Amaya Live Market Advisory
                   </h4>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={copyAdvisoryText}
-                  className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-900 shadow-2xs transition hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-200 dark:hover:bg-zinc-800"
+                  className="h-7 gap-1 px-2.5 text-xs font-semibold cursor-pointer"
                 >
-                  {copiedAdvice ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {copiedAdvice ? <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> : <Copy className="h-3 w-3" />}
                   {copiedAdvice ? "Copied" : "Copy Advice"}
-                </button>
+                </Button>
               </div>
 
               <p className="mt-3 text-xs leading-relaxed text-emerald-900/90 dark:text-emerald-200/90 sm:text-sm">
@@ -1051,18 +1058,20 @@ export default function MarketValuesPage() {
                         {formatRange(sub.baseline_apartment_sqft_range)}
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             setSelectedSuburb(sub.name);
                             setSelectedSubArea("all");
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
-                          className="inline-flex items-center gap-1 rounded border border-[#dce4df] bg-white px-2.5 py-1 text-[11px] font-medium text-[#19352b] shadow-2xs transition hover:bg-[#edf2ee] dark:border-zinc-700 dark:bg-zinc-800 dark:text-emerald-400 dark:hover:bg-zinc-700"
+                          className="h-7 gap-1 px-2 text-xs font-medium text-primary hover:bg-primary/10 hover:text-primary cursor-pointer"
                         >
                           Simulate
                           <ArrowUpRight className="h-3 w-3" />
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))

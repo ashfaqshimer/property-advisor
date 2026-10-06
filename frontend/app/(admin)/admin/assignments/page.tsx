@@ -15,6 +15,7 @@ import {
   processDueFieldAssignmentReminders,
 } from "../../../../lib/api";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
+import { Button } from "@/components/ui/button";
 
 const STATUS_CONFIG: Record<
   string,
@@ -202,23 +203,27 @@ export default function AssignmentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleProcessReminders}
             disabled={processingReminders || loading}
             title="Check and dispatch all due 10:00 AM reminders now"
-            className="inline-flex items-center gap-2 rounded-lg border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer"
+            className="gap-2 cursor-pointer"
           >
             <Clock className={`h-3.5 w-3.5 text-amber-600 dark:text-amber-400 ${processingReminders ? "animate-spin" : ""}`} />
             Check Due Reminders
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={fetchAssignments}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer"
+            className="gap-2 cursor-pointer"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -228,10 +233,10 @@ export default function AssignmentsPage() {
           <button
             key={f.value}
             onClick={() => handleFilterChange(f.value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition cursor-pointer ${
               filterStatus === f.value
-                ? "bg-[#19352b] text-white dark:bg-emerald-700"
-                : "bg-white dark:bg-zinc-800 border border-[#dce4df] dark:border-zinc-700 text-[#718078] dark:text-zinc-400 hover:border-[#1a2923] dark:hover:border-zinc-500 hover:text-[#1a2923] dark:hover:text-zinc-200"
+                ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                : "bg-card border border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
             }`}
           >
             {f.label}
@@ -256,14 +261,14 @@ export default function AssignmentsPage() {
               <button
                 key={status}
                 onClick={() => handleFilterChange(status === filterStatus ? "" : status)}
-                className={`rounded-xl border p-3 text-left transition hover:shadow-sm ${
+                className={`rounded-xl border p-3 text-left transition hover:shadow-xs cursor-pointer ${
                   filterStatus === status
-                    ? "border-[#19352b] dark:border-emerald-600 bg-[#f0f5f2] dark:bg-emerald-900/20"
-                    : "border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-900"
+                    ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/30"
+                    : "border-border bg-card hover:bg-muted/40"
                 }`}
               >
-                <p className="text-lg font-semibold text-[#1a2923] dark:text-zinc-100">{count}</p>
-                <p className="text-xs text-[#718078] dark:text-zinc-400">{label}</p>
+                <p className="text-lg font-semibold text-foreground">{count}</p>
+                <p className="text-xs text-muted-foreground">{label}</p>
               </button>
             );
           })}
@@ -271,7 +276,7 @@ export default function AssignmentsPage() {
       )}
 
       {/* Table */}
-      <div className="rounded-xl border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <RefreshCw className="h-5 w-5 animate-spin text-[#718078] dark:text-zinc-500 mr-2" />
@@ -410,24 +415,28 @@ export default function AssignmentsPage() {
                     {/* Actions */}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1.5 justify-end">
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleResend(a.id)}
                           disabled={resendingId === a.id || deletingId === a.id}
                           title="Resend to Telegram agent"
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#dce4df] dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1 text-xs font-medium text-[#1a2923] dark:text-zinc-200 hover:bg-[#f4f6f4] dark:hover:bg-zinc-700 transition disabled:opacity-50"
+                          className="h-7 gap-1.5 px-2.5 text-xs font-semibold cursor-pointer"
                         >
                           <Send className={`h-3 w-3 ${resendingId === a.id ? "animate-pulse" : ""}`} />
                           <span>{resendingId === a.id ? "Sending…" : "Resend"}</span>
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
                           onClick={() => setDeleteConfirmAssignment(a)}
                           disabled={deletingId === a.id || resendingId === a.id}
                           title="Remove assignment and delete from Telegram"
-                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/20 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition disabled:opacity-50 cursor-pointer"
+                          className="h-7 gap-1 px-2 text-xs font-semibold cursor-pointer"
                         >
                           <Trash2 className="h-3 w-3" />
                           <span>Remove</span>
-                        </button>
+                        </Button>
                         {a.prospect_ikman_url && (
                           <SourceBadge
                             source={a.prospect_ikman_url.includes("lankapropertyweb") ? "lpw" : "ikman"}
@@ -472,34 +481,38 @@ export default function AssignmentsPage() {
       {/* Delete Confirmation Modal */}
       {deleteConfirmAssignment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-[#dce4df] dark:border-zinc-800 shadow-xl w-full max-w-md p-6 transform transition-all">
-            <h3 className="text-lg font-semibold text-[#1a2923] dark:text-zinc-100">
+          <div className="bg-card text-card-foreground rounded-xl border border-border shadow-xl w-full max-w-md p-6 transform transition-all">
+            <h3 className="text-lg font-semibold text-foreground">
               Remove Assignment?
             </h3>
-            <p className="mt-2 text-sm text-[#718078] dark:text-zinc-400">
+            <p className="mt-2 text-sm text-muted-foreground">
               Are you sure you want to remove the sent assignment for{" "}
-              <strong className="text-[#1a2923] dark:text-zinc-200">
+              <strong className="text-foreground">
                 {deleteConfirmAssignment.prospect_poster_name || deleteConfirmAssignment.prospect_title || "this prospect"}
               </strong>
               ?
             </p>
-            <p className="mt-2 text-xs text-[#8c9e94] dark:text-zinc-500">
+            <p className="mt-2 text-xs text-muted-foreground/80">
               This will delete the assignment record and attempt to remove the card from the Telegram agent chat. The prospect will return to unassigned status.
             </p>
             <div className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={deletingId === deleteConfirmAssignment.id}
                 onClick={() => setDeleteConfirmAssignment(null)}
-                className="w-full sm:w-auto px-4 py-2 text-xs font-medium text-[#1a2923] dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-[#dce4df] dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
+                size="sm"
                 disabled={deletingId === deleteConfirmAssignment.id}
                 onClick={() => handleDelete(deleteConfirmAssignment)}
-                className="w-full sm:w-auto px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-lg transition cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                className="w-full sm:w-auto gap-1.5"
               >
                 {deletingId === deleteConfirmAssignment.id ? (
                   <>
@@ -512,7 +525,7 @@ export default function AssignmentsPage() {
                     <span>Remove Assignment</span>
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 import { AuthUser, getCurrentUser, logout } from "../../../lib/api";
 import { Spinner } from "../../../components/ui/spinner";
+import { Button } from "../../../components/ui/button";
+import { Menu, X } from "lucide-react";
 import AdminUserMenu from "../../../components/admin/AdminUserMenu";
 import { ThemeToggle } from "../../../components/ThemeToggle";
 
@@ -55,7 +57,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="admin-workspace min-h-screen bg-background text-foreground">
       {/* Mobile Sidebar Overlay */}
       {mobileMenuOpen && (
         <div 
@@ -71,11 +73,15 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
             <Link href="/admin" className="text-xl font-semibold tracking-tight text-sidebar-foreground">Property Advisor</Link>
             <p className="mt-1 text-xs uppercase tracking-[0.18em] text-sidebar-foreground/70">Admin workspace</p>
           </div>
-          <button onClick={() => setMobileMenuOpen(false)} className="lg:hidden p-1 text-sidebar-foreground/70 hover:text-sidebar-foreground" aria-label="Close sidebar">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileMenuOpen(false)}
+            className="lg:hidden h-8 w-8 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground cursor-pointer"
+            aria-label="Close sidebar"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
         <nav aria-label="Admin navigation" className="space-y-1 px-4 py-7">
           {navigation.map((item) => item.disabled ? (
@@ -117,16 +123,16 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
       <div className="lg:pl-64">
         <header className="flex h-20 items-center justify-between border-b border-border bg-card px-5 sm:px-8">
           <div className="flex items-center gap-3 sm:gap-4">
-            <button
+            <Button
               type="button"
-              className="lg:hidden -ml-2 rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none"
+              variant="ghost"
+              size="icon"
+              className="lg:hidden -ml-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Open sidebar"
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
+              <Menu className="h-6 w-6" />
+            </Button>
             <div>
               <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Property Advisor</p>
               <h1 className="mt-0.5 sm:mt-1 text-base sm:text-lg font-semibold text-foreground">Admin workspace</h1>

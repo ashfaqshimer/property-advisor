@@ -70,34 +70,34 @@
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #f4f4f5;
-  --card: #18181b;
-  --card-foreground: #f4f4f5;
-  --popover: #18181b;
-  --popover-foreground: #f4f4f5;
-  --primary: #10b981;
-  --primary-foreground: #064e3b;
-  --secondary: #27272a;
-  --secondary-foreground: #f4f4f5;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #f4f4f5;
-  --destructive: #ef4444;
+  --background: #0d1411;
+  --foreground: #ecf2ee;
+  --card: #131d18;
+  --card-foreground: #ecf2ee;
+  --popover: #17241e;
+  --popover-foreground: #ecf2ee;
+  --primary: #34d399;
+  --primary-foreground: #042f1f;
+  --secondary: #1a2720;
+  --secondary-foreground: #ecf2ee;
+  --muted: #1a2720;
+  --muted-foreground: #8ea396;
+  --accent: #1e2e26;
+  --accent-foreground: #ecf2ee;
+  --destructive: #f87171;
   --destructive-foreground: #ffffff;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #10b981;
+  --border: #23362c;
+  --input: #23362c;
+  --ring: #34d399;
 
-  --sidebar: #121215;
-  --sidebar-foreground: #f4f4f5;
-  --sidebar-primary: #10b981;
-  --sidebar-primary-foreground: #064e3b;
-  --sidebar-accent: #27272a;
-  --sidebar-accent-foreground: #f4f4f5;
-  --sidebar-border: #27272a;
-  --sidebar-ring: #10b981;
+  --sidebar: #090e0c;
+  --sidebar-foreground: #ecf2ee;
+  --sidebar-primary: #34d399;
+  --sidebar-primary-foreground: #042f1f;
+  --sidebar-accent: #141f19;
+  --sidebar-accent-foreground: #ecf2ee;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #34d399;
 }
 
 /*
@@ -140,14 +140,17 @@
   --font-display: Georgia, "Times New Roman", ui-serif, serif;
 }
 
-/* The page is off-white, not white, so the white property cards read as raised
+/* The public page is off-white, not white, so the white property cards read as raised
    rather than dissolving into the background. The hero and footer sit on their
-   own bands and are unaffected. */
+   own bands and are unaffected. The public-facing site always stays on this canvas. */
 body {
   background-color: var(--color-page);
 }
 
-.dark body {
+/* Scoped dark body ONLY when within admin workspace */
+.dark body:has(.admin-workspace),
+.dark:has(.admin-workspace) body,
+.dark .admin-workspace {
   background-color: var(--background);
   color: var(--foreground);
 }

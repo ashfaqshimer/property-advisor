@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus, Save, X } from "lucide-react";
 
 const intentVariants: Record<"buy" | "rent" | "sell", "success" | "info" | "warning"> = {
   buy: "success",
@@ -189,7 +189,8 @@ export default function AdminLeadsPage() {
           Remarks
           <Input value={remarks} onChange={(event) => setRemarks(event.target.value)} className="mt-1.5" />
         </label>
-        <Button type="submit" disabled={creating} className="w-full sm:w-auto">
+        <Button type="submit" disabled={creating} className="w-full sm:w-auto gap-2">
+          <Plus className="h-4 w-4" />
           {creating ? "Adding..." : "Add new lead"}
         </Button>
         {formError && <p className="basis-full text-sm text-destructive">{formError}</p>}
@@ -199,7 +200,10 @@ export default function AdminLeadsPage() {
         <form onSubmit={handleUpdate} className="mb-6 flex flex-col items-stretch gap-4 rounded-xl border border-border bg-muted/30 p-5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
           <div className="basis-full flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Edit lead</p>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingLead(null)}>Cancel</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingLead(null)} className="gap-1.5">
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
           </div>
           <label className="min-w-48 flex-1 text-sm font-medium text-foreground">
             Name
@@ -241,7 +245,8 @@ export default function AdminLeadsPage() {
             Remarks
             <Input value={editRemarks} onChange={(event) => setEditRemarks(event.target.value)} className="mt-1.5 bg-background" />
           </label>
-          <Button type="submit" disabled={updating} className="w-full sm:w-auto">
+          <Button type="submit" disabled={updating} className="w-full sm:w-auto gap-2">
+            <Save className="h-4 w-4" />
             {updating ? "Saving..." : "Save changes"}
           </Button>
         </form>

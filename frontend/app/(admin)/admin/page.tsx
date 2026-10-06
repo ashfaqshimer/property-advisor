@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Plus } from 'lucide-react';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
@@ -160,8 +160,8 @@ export default function AdminPropertiesPage() {
 				</div>
 				<div className='flex flex-wrap items-center gap-3'>
 					<Button asChild>
-						<Link href='/admin/properties/new'>
-							<span className='mr-1 text-lg leading-none'>+</span> Add Property
+						<Link href='/admin/properties/new' className="gap-2">
+							<Plus className='h-4 w-4' /> Add Property
 						</Link>
 					</Button>
 				</div>

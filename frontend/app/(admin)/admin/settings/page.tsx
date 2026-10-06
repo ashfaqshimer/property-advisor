@@ -1,10 +1,14 @@
 "use client";
 
 import { FormEvent, useState, useEffect } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Save, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { changePassword, getCurrentUser, updateProfile } from "../../../../lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -75,105 +79,107 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-      <p className="mt-2 text-sm text-[#64736b]">Manage your account settings and preferences.</p>
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Manage your account settings and preferences.</p>
 
-      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-        <h2 className="text-lg font-medium">Profile Details</h2>
+      <div className="mt-8 rounded-xl border border-border bg-card p-6 shadow-xs">
+        <h2 className="text-lg font-medium text-card-foreground">Profile Details</h2>
         <form onSubmit={handleUpdateName} className="mt-6 max-w-md">
-          <label className="block text-sm font-medium" htmlFor="name">Full Name</label>
-          <input
+          <Label className="block text-sm font-medium text-foreground" htmlFor="name">Full Name</Label>
+          <Input
             id="name"
             type="text"
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 outline-none focus:border-[#28513f]"
+            className="mt-2"
           />
-          {nameError && <p role="alert" className="mt-4 text-sm text-red-700">{nameError}</p>}
+          {nameError && <p role="alert" className="mt-4 text-sm text-destructive">{nameError}</p>}
           
-          <button
+          <Button
             type="submit"
             disabled={updatingName}
-            className="mt-6 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#132820] dark:hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+            className="mt-6 gap-2"
           >
+            {updatingName ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />}
             {updatingName ? "Saving..." : "Save changes"}
-          </button>
+          </Button>
         </form>
       </div>
 
-      <div className="mt-8 rounded-xl border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-        <h2 className="text-lg font-medium">Change Password</h2>
+      <div className="mt-8 rounded-xl border border-border bg-card p-6 shadow-xs">
+        <h2 className="text-lg font-medium text-card-foreground">Change Password</h2>
         <form onSubmit={handleSubmit} className="mt-6 max-w-md">
-          <label className="block text-sm font-medium" htmlFor="currentPassword">Current Password</label>
+          <Label className="block text-sm font-medium text-foreground" htmlFor="currentPassword">Current Password</Label>
           <div className="relative mt-2">
-            <input
+            <Input
               id="currentPassword"
               type={showCurrentPassword ? "text" : "password"}
               required
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
-              className="w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 pr-10 outline-none focus:border-[#28513f]"
+              className="pr-10"
             />
             <button
               type="button"
               onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:text-zinc-200 focus:outline-none"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer"
               aria-label={showCurrentPassword ? "Hide password" : "Show password"}
             >
               {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
 
-          <label className="mt-5 block text-sm font-medium" htmlFor="newPassword">New Password</label>
+          <Label className="mt-5 block text-sm font-medium text-foreground" htmlFor="newPassword">New Password</Label>
           <div className="relative mt-2">
-            <input
+            <Input
               id="newPassword"
               type={showNewPassword ? "text" : "password"}
               required
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
-              className="w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 pr-10 outline-none focus:border-[#28513f]"
+              className="pr-10"
             />
             <button
               type="button"
               onClick={() => setShowNewPassword(!showNewPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:text-zinc-200 focus:outline-none"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer"
               aria-label={showNewPassword ? "Hide password" : "Show password"}
             >
               {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
 
-          <label className="mt-5 block text-sm font-medium" htmlFor="confirmPassword">Confirm New Password</label>
+          <Label className="mt-5 block text-sm font-medium text-foreground" htmlFor="confirmPassword">Confirm New Password</Label>
           <div className="relative mt-2">
-            <input
+            <Input
               id="confirmPassword"
               type={showConfirmPassword ? "text" : "password"}
               required
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              className="w-full rounded-lg border border-[#cbd8d1] px-3 py-2.5 pr-10 outline-none focus:border-[#28513f]"
+              className="pr-10"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#718078] dark:text-zinc-400 hover:text-[#1a2923] dark:text-zinc-200 focus:outline-none"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer"
               aria-label={showConfirmPassword ? "Hide password" : "Show password"}
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
 
-          {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
+          {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
           
-          <button
+          <Button
             type="submit"
             disabled={submitting}
-            className="mt-6 rounded-lg bg-[#19352b] dark:bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-200 transition-colors hover:bg-[#132820] dark:hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+            className="mt-6 gap-2"
           >
+            {submitting ? <Spinner className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
             {submitting ? "Updating..." : "Update password"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>
