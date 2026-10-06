@@ -96,29 +96,39 @@ export default async function Footer() {
 
           {/* Quick Nav Links (Center) */}
           <div className="lg:col-span-4">
-            <ul className="flex flex-wrap gap-x-8 gap-y-3 text-sm font-medium text-neutral-600">
+            <ul className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-neutral-600">
               <li>
                 <Link href="/" className={linkClass}>
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="#how-it-works" className={linkClass}>
+                <Link href="/properties" className={linkClass}>
+                  Properties
+                </Link>
+              </li>
+              <li>
+                <Link href="/#how-it-works" className={linkClass}>
                   How it works
                 </Link>
               </li>
               <li>
-                <Link href="#services" className={linkClass}>
+                <Link href="/#services" className={linkClass}>
                   Services
                 </Link>
               </li>
               <li>
-                <Link href="#journey" className={linkClass}>
-                  About
+                <Link href="/faq" className={linkClass}>
+                  FAQ
                 </Link>
               </li>
               <li>
-                <Link href="#contact" className={linkClass}>
+                <Link href="/tools/area-converter" className={linkClass}>
+                  Area Converter
+                </Link>
+              </li>
+              <li>
+                <Link href="/#contact" className={linkClass}>
                   Contact
                 </Link>
               </li>
