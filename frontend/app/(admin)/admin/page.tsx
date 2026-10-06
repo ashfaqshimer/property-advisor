@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Trash2, Plus, Image as ImageIcon } from 'lucide-react';
+import { Pencil, Trash2, Plus, Image as ImageIcon, Search } from 'lucide-react';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
@@ -13,6 +13,7 @@ import {
 	type PropertyContact,
 } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
+import { Input } from '@/components/ui/input';
 import {
 	Table,
 	TableBody,
@@ -38,6 +39,12 @@ type Property = {
 	contactName: string | null;
 	imageUrls: string[];
 	featuredImageUrl: string | null;
+	priceGrade?: string | null;
+	priceGradeLabel?: string | null;
+	priceUnitRate?: number | null;
+	priceUnitLabel?: string | null;
+	marketMedianUnitRate?: number | null;
+	priceDiffPercent?: number | null;
 };
 
 const statusVariant: Record<PropertyStatus, 'success' | 'warning' | 'secondary'> = {
@@ -57,6 +64,11 @@ export default function AdminPropertiesPage() {
 	const [selectingPhotoProperty, setSelectingPhotoProperty] = useState<Property | null>(null);
 	const [savingPhotoId, setSavingPhotoId] = useState<string | null>(null);
 
+	// Filters
+	const [searchQuery, setSearchQuery] = useState('');
+	const [filterStatus, setFilterStatus] = useState<string>('all');
+	const [filterPriceGrade, setFilterPriceGrade] = useState<string>('all');
+
 	useEffect(() => {
 		getCurrentUser().then((user) => setCanDelete(user?.role === 'root' || user?.role === 'admin')).catch(() => {});
 		getPropertyContacts().then(setContacts).catch(() => {});
@@ -75,6 +87,12 @@ export default function AdminPropertiesPage() {
 						contactName: record.property_contact?.full_name ?? null,
 						imageUrls: record.image_urls ?? [],
 						featuredImageUrl: record.featured_image_url ?? null,
+						priceGrade: record.price_grade ?? null,
+						priceGradeLabel: record.price_grade_label ?? null,
+						priceUnitRate: record.price_unit_rate ?? null,
+						priceUnitLabel: record.price_unit_label ?? null,
+						marketMedianUnitRate: record.market_median_unit_rate ?? null,
+						priceDiffPercent: record.price_diff_percent ?? null,
 					})),
 				),
 			)
@@ -168,6 +186,22 @@ export default function AdminPropertiesPage() {
 		}
 	}
 
+	const filteredProperties = properties.filter((property) => {
+		if (filterStatus !== 'all' && property.status !== filterStatus) return false;
+		if (filterPriceGrade !== 'all') {
+			if (filterPriceGrade === 'underpriced' && property.priceGrade !== 'underpriced') return false;
+			if (filterPriceGrade === 'fair_market' && property.priceGrade !== 'fair_market') return false;
+			if (filterPriceGrade === 'overpriced' && property.priceGrade !== 'overpriced') return false;
+		}
+		if (searchQuery.trim()) {
+			const q = searchQuery.toLowerCase();
+			const matchTitle = property.title.toLowerCase().includes(q);
+			const matchLoc = property.location.toLowerCase().includes(q);
+			if (!matchTitle && !matchLoc) return false;
+		}
+		return true;
+	});
+
 	return (
 		<section className='mx-auto max-w-[1380px]'>
 			<div className='mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end'>
@@ -195,10 +229,55 @@ export default function AdminPropertiesPage() {
 					<p className='text-sm font-semibold text-foreground'>
 						All properties{' '}
 						<span className='ml-1 font-normal text-muted-foreground'>
-							({properties.length})
+							({filteredProperties.length}{filteredProperties.length !== properties.length ? ` of ${properties.length}` : ''})
 						</span>
 					</p>
 					<span className='text-xs text-muted-foreground'>Live data</span>
+				</div>
+				<div className='flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-5 py-3'>
+					<div className='relative min-w-[200px] flex-1 max-w-sm'>
+						<Search className='absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground' />
+						<Input
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder='Search title or location...'
+							className='h-8 pl-8 text-xs'
+						/>
+					</div>
+					<Select
+						value={filterStatus}
+						onChange={(e) => setFilterStatus(e.target.value)}
+						className='h-8 w-auto text-xs'
+					>
+						<option value='all'>All Statuses</option>
+						<option value='available'>Available</option>
+						<option value='under_offer'>Under Offer</option>
+						<option value='sold'>Sold</option>
+					</Select>
+					<Select
+						value={filterPriceGrade}
+						onChange={(e) => setFilterPriceGrade(e.target.value)}
+						className='h-8 w-auto text-xs'
+					>
+						<option value='all'>All Deal Grades</option>
+						<option value='underpriced'>🔥 Hot Deals (Below Market)</option>
+						<option value='fair_market'>Fair Market Value</option>
+						<option value='overpriced'>Overpriced</option>
+					</Select>
+					{(searchQuery || filterStatus !== 'all' || filterPriceGrade !== 'all') && (
+						<Button
+							variant='ghost'
+							size='sm'
+							onClick={() => {
+								setSearchQuery('');
+								setFilterStatus('all');
+								setFilterPriceGrade('all');
+							}}
+							className='h-8 px-2 text-xs text-muted-foreground hover:text-foreground'
+						>
+							Reset
+						</Button>
+					)}
 				</div>
 				<div className='hidden sm:block'>
 					<Table className='min-w-[900px]'>
@@ -207,7 +286,7 @@ export default function AdminPropertiesPage() {
 								<TableHead className='px-5 py-4 font-semibold'>Property</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Type</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Location</TableHead>
-								<TableHead className='px-4 py-4 font-semibold'>Price (LKR)</TableHead>
+								<TableHead className='px-4 py-4 font-semibold'>Price & Valuation</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Status</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Contact</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Featured</TableHead>
@@ -222,17 +301,51 @@ export default function AdminPropertiesPage() {
 										<span className='sr-only'>Loading properties</span>
 									</TableCell>
 								</TableRow>
-							) : properties.map((property) => (
+							) : filteredProperties.length === 0 ? (
+								<TableRow>
+									<TableCell className='px-5 py-12 text-center text-sm text-muted-foreground' colSpan={8}>
+										No properties match the selected filters.
+									</TableCell>
+								</TableRow>
+							) : filteredProperties.map((property) => (
 								<TableRow key={property.id} className='transition hover:bg-muted/50'>
 									<TableCell className='px-5 py-4 font-semibold text-foreground'>
 										{property.title}
 									</TableCell>
-									<TableCell className='px-4 py-4 text-muted-foreground'>{property.type}</TableCell>
+									<TableCell className='px-4 py-4 text-muted-foreground capitalize'>{property.type}</TableCell>
 									<TableCell className='px-4 py-4 text-muted-foreground'>
 										{property.location}
 									</TableCell>
-									<TableCell className='px-4 py-4 font-medium text-foreground'>
-										{property.price.replace('LKR ', '')}
+									<TableCell className='px-4 py-4'>
+										<div className='flex flex-col gap-1'>
+											<span className='font-semibold text-foreground'>
+												{property.price.replace('LKR ', '')}
+											</span>
+											{property.priceGrade && property.priceGrade !== 'unrated' && (
+												<span
+													title={
+														property.priceUnitRate && property.marketMedianUnitRate
+															? `Listing: LKR ${Math.round(property.priceUnitRate).toLocaleString()} | Market Median: LKR ${Math.round(property.marketMedianUnitRate).toLocaleString()}`
+															: undefined
+													}
+													className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold border w-fit ${
+														property.priceGrade === 'underpriced'
+															? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800'
+															: property.priceGrade === 'overpriced'
+															? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
+															: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'
+													}`}
+												>
+													{property.priceGrade === 'underpriced' && '🔥 '}
+													{property.priceGradeLabel || property.priceGrade}
+												</span>
+											)}
+											{property.priceUnitRate && (
+												<span className='text-[11px] text-muted-foreground'>
+													≈ LKR {Math.round(property.priceUnitRate).toLocaleString()} {property.priceUnitLabel || ''}
+												</span>
+											)}
+										</div>
 									</TableCell>
 									<TableCell className='px-4 py-4'>
 										<Badge variant={statusVariant[property.status]} className='capitalize'>
@@ -319,7 +432,11 @@ export default function AdminPropertiesPage() {
 						<div className='flex justify-center py-12'>
 							<Spinner className='h-5 w-5 text-primary' />
 						</div>
-					) : properties.map((property) => (
+					) : filteredProperties.length === 0 ? (
+						<div className='py-12 text-center text-sm text-muted-foreground'>
+							No properties match the selected filters.
+						</div>
+					) : filteredProperties.map((property) => (
 						<div key={property.id} className='flex flex-col gap-3 p-5'>
 							<div className='flex items-start justify-between gap-4'>
 								<span className='font-semibold text-foreground leading-tight'>
@@ -329,9 +446,35 @@ export default function AdminPropertiesPage() {
 									{property.status.replace('_', ' ')}
 								</Badge>
 							</div>
-							<div className='flex items-center justify-between text-sm text-muted-foreground'>
-								<span>{property.type}</span>
-								<span className='font-semibold text-foreground'>{property.price}</span>
+							<div className='flex items-start justify-between text-sm text-muted-foreground'>
+								<span className='capitalize font-medium'>{property.type}</span>
+								<div className='flex flex-col items-end gap-1'>
+									<span className='font-semibold text-foreground'>{property.price}</span>
+									{property.priceGrade && property.priceGrade !== 'unrated' && (
+										<span
+											title={
+												property.priceUnitRate && property.marketMedianUnitRate
+													? `Listing: LKR ${Math.round(property.priceUnitRate).toLocaleString()} | Market Median: LKR ${Math.round(property.marketMedianUnitRate).toLocaleString()}`
+													: undefined
+											}
+											className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold border ${
+												property.priceGrade === 'underpriced'
+													? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800'
+													: property.priceGrade === 'overpriced'
+													? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
+													: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'
+											}`}
+										>
+											{property.priceGrade === 'underpriced' && '🔥 '}
+											{property.priceGradeLabel || property.priceGrade}
+										</span>
+									)}
+									{property.priceUnitRate && (
+										<span className='text-[11px] text-muted-foreground'>
+											≈ LKR {Math.round(property.priceUnitRate).toLocaleString()} {property.priceUnitLabel || ''}
+										</span>
+									)}
+								</div>
 							</div>
 							<div className='text-sm text-muted-foreground'>
 								📍 {property.location}

@@ -171,3 +171,24 @@ def test_admin_patch_featured_image_url(authenticated_client: TestClient) -> Non
 
     assert response.status_code == 200
     assert response.json()["featured_image_url"] == "https://example.com/custom-featured.jpg"
+
+
+def test_admin_properties_include_market_valuation(authenticated_client: TestClient) -> None:
+    response = authenticated_client.get("/admin/properties")
+    assert response.status_code == 200
+    items = response.json()
+    assert len(items) > 0
+    for item in items:
+        assert "price_grade" in item
+        assert "price_unit_rate" in item
+        assert "market_median_unit_rate" in item
+        assert "price_diff_percent" in item
+
+    # Single property fetch also includes market valuation
+    property_id = seed_id("garden-villa-ward-place")
+    single_res = authenticated_client.get(f"/admin/properties/{property_id}")
+    assert single_res.status_code == 200
+    data = single_res.json()
+    assert "price_grade" in data
+    assert "price_unit_rate" in data
+    assert "market_median_unit_rate" in data

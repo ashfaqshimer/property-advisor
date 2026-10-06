@@ -65,6 +65,14 @@ class PropertyRead(BaseModel):
     has_maids_toilet: bool
     is_gated_community: bool
 
+    # Market valuation & price grading fields
+    price_grade: str | None = None
+    price_grade_label: str | None = None
+    price_unit_rate: float | None = None
+    price_unit_label: str | None = None
+    market_median_unit_rate: float | None = None
+    price_diff_percent: float | None = None
+
     @field_serializer("price", "land_size_perches")
     def _decimal_as_number(self, value: Decimal | None) -> float | None:
         """Pydantic v2 serializes Decimal to a JSON *string* ("185000000.00") by

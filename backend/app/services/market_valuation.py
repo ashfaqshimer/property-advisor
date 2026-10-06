@@ -787,20 +787,26 @@ def calculate_monthly_trends(
 
 def grade_prospect_pricing(
     db: Session,
-    prospect: Prospect,
+    prospect: Prospect | Property | Any,
     valuation_cache: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Grades an individual prospect's pricing against market valuation benchmarks:
+    Grades an individual prospect's or saved property's pricing against market valuation benchmarks:
     - underpriced (>15% below market)
     - fair_market (within +/-15%)
     - overpriced (>15% above market)
     - unrated (insufficient specifications or missing price)
     """
-    p_val = prospect.price_numeric
-    is_ppp = prospect.is_price_per_perch
-    if not p_val and prospect.price:
-        p_val, is_ppp = parse_lkr_price(prospect.price)
+    p_val = getattr(prospect, "price_numeric", None)
+    is_ppp = getattr(prospect, "is_price_per_perch", False)
+    if not p_val and getattr(prospect, "price", None) is not None:
+        raw_price = prospect.price
+        if isinstance(raw_price, (int, float, Decimal)):
+            p_val = Decimal(str(raw_price))
+        else:
+            p_val, parsed_ppp = parse_lkr_price(raw_price)
+            if parsed_ppp:
+                is_ppp = True
 
     if not p_val or p_val <= 0:
         return {
@@ -812,27 +818,33 @@ def grade_prospect_pricing(
             "price_diff_percent": None,
         }
 
-    pt = (prospect.property_type or "land").lower()
+    raw_pt = getattr(prospect, "property_type", None)
+    if hasattr(raw_pt, "value"):
+        raw_pt = raw_pt.value
+    pt = (str(raw_pt) if raw_pt else "land").lower()
+
     unit_rate: float | None = None
     unit_label: str | None = None
+    land_size = getattr(prospect, "land_size_perches", None)
+    floor_sqft = getattr(prospect, "floor_area_sqft", None)
 
     if pt == "land":
         unit_label = "LKR / Perch"
         if is_ppp:
             unit_rate = float(p_val)
-        elif prospect.land_size_perches and prospect.land_size_perches > 0:
-            unit_rate = float(p_val / prospect.land_size_perches)
+        elif land_size and land_size > 0:
+            unit_rate = float(p_val / Decimal(str(land_size)))
     elif pt in ("apartment", "commercial"):
         unit_label = "LKR / Sq.Ft."
-        if prospect.floor_area_sqft and prospect.floor_area_sqft > 0:
-            unit_rate = float(p_val / Decimal(prospect.floor_area_sqft))
-    else:  # house
-        if prospect.land_size_perches and prospect.land_size_perches > 0:
+        if floor_sqft and floor_sqft > 0:
+            unit_rate = float(p_val / Decimal(str(floor_sqft)))
+    else:  # house, mixed_use
+        if land_size and land_size > 0:
             unit_label = "LKR / Perch"
-            unit_rate = float(p_val / prospect.land_size_perches)
-        elif prospect.floor_area_sqft and prospect.floor_area_sqft > 0:
+            unit_rate = float(p_val / Decimal(str(land_size)))
+        elif floor_sqft and floor_sqft > 0:
             unit_label = "LKR / Sq.Ft."
-            unit_rate = float(p_val / Decimal(prospect.floor_area_sqft))
+            unit_rate = float(p_val / Decimal(str(floor_sqft)))
 
     if not unit_rate:
         return {
@@ -845,8 +857,14 @@ def grade_prospect_pricing(
         }
 
     # Location lookup
-    target_loc = prospect.suburb or prospect.location or "Colombo"
+    target_loc = getattr(prospect, "suburb", None) or getattr(prospect, "location", None) or "Colombo"
     cache_key = f"{target_loc.lower()}:{pt}"
+
+    raw_lt = getattr(prospect, "listing_type", None)
+    if hasattr(raw_lt, "value"):
+        raw_lt = raw_lt.value
+    raw_lt_str = str(raw_lt).lower() if raw_lt else "sale"
+    listing_type_str = "sale" if "sale" in raw_lt_str else "rent"
 
     if valuation_cache is not None and cache_key in valuation_cache:
         valuation = valuation_cache[cache_key]
@@ -855,13 +873,15 @@ def grade_prospect_pricing(
             db=db,
             location_query=target_loc,
             property_type=pt,
-            listing_type="sale" if "sale" in (prospect.listing_type or "sale") else "rent",
+            listing_type=listing_type_str,
         )
         if valuation_cache is not None:
             valuation_cache[cache_key] = valuation
 
     # Check for micro-area specific median
-    extracted_area = extract_sub_area(prospect.title or "", prospect.location or "", valuation.get("suburb", ""))
+    prospect_title = getattr(prospect, "title", "") or ""
+    prospect_loc = getattr(prospect, "location", "") or ""
+    extracted_area = extract_sub_area(prospect_title, prospect_loc, valuation.get("suburb", ""))
     target_median: float | None = None
 
     for sa in valuation.get("sub_areas", []):
@@ -889,12 +909,11 @@ def grade_prospect_pricing(
         from sqlalchemy import func as sa_func
 
         norm_loc = normalize_location_name(target_loc)
-        l_type = "sale" if "sale" in (prospect.listing_type or "sale") else "rent"
         bm_row = db.execute(
             select(MarketBenchmark).where(
                 sa_func.lower(MarketBenchmark.location) == norm_loc.lower(),
                 MarketBenchmark.property_type == pt,
-                MarketBenchmark.listing_type == l_type,
+                MarketBenchmark.listing_type == listing_type_str,
                 MarketBenchmark.status == "active",
             ).limit(1)
         ).scalar_one_or_none()
@@ -941,6 +960,17 @@ def grade_prospect_pricing(
     }
 
 
+def grade_property_pricing(
+    db: Session,
+    property_item: Property,
+    valuation_cache: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Grades an individual saved catalog property against market valuation benchmarks.
+    """
+    return grade_prospect_pricing(db, property_item, valuation_cache)
+
+
 def bulk_grade_prospects(
     db: Session,
     prospects: list[Prospect],
@@ -952,5 +982,20 @@ def bulk_grade_prospects(
     cache: dict[str, Any] = {}
     result: dict[Any, dict[str, Any]] = {}
     for p in prospects:
+        result[p.id] = grade_prospect_pricing(db, p, cache)
+    return result
+
+
+def bulk_grade_properties(
+    db: Session,
+    properties: Sequence[Property] | list[Property],
+) -> dict[Any, dict[str, Any]]:
+    """
+    Grades multiple saved catalog properties with caching across suburbs.
+    Returns mapping of property.id -> grade info.
+    """
+    cache: dict[str, Any] = {}
+    result: dict[Any, dict[str, Any]] = {}
+    for p in properties:
         result[p.id] = grade_prospect_pricing(db, p, cache)
     return result

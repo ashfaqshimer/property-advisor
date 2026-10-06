@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   extractPropertyFromText,
   getAdminLeads,
+  getAdminProperties,
   getAdminProperty,
   getFeaturedProperties,
   updateAdminProperty,
@@ -206,6 +207,28 @@ describe("getAdminProperty and updateAdminProperty API", () => {
         method: "PATCH",
         body: JSON.stringify({ title: "Updated Villa", price: 190000000 }),
       }),
+    );
+  });
+
+  it("fetches admin properties with market valuation and filters", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const propertyWithValuation = {
+      ...record,
+      price_grade: "underpriced",
+      price_grade_label: "Deal: 20% below market",
+      price_unit_rate: 2500000,
+      price_unit_label: "LKR / Perch",
+      market_median_unit_rate: 3000000,
+      price_diff_percent: -16.7,
+    };
+    const fetchSpy = vi.fn(async () => jsonResponse(200, [propertyWithValuation]));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await getAdminProperties({ price_grade: "underpriced" });
+    expect(result).toEqual([propertyWithValuation]);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/admin/properties?price_grade=underpriced",
+      expect.objectContaining({ method: "GET" }),
     );
   });
 });

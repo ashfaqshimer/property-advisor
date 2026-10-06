@@ -116,6 +116,16 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 		type?: 'owner' | 'broker' | null;
 	} | null>(null);
 
+	// Market valuation state
+	const [marketValuation, setMarketValuation] = useState<{
+		priceGrade: string | null;
+		priceGradeLabel: string | null;
+		priceUnitRate: number | null;
+		priceUnitLabel: string | null;
+		marketMedianUnitRate: number | null;
+		priceDiffPercent: number | null;
+	} | null>(null);
+
 	useEffect(() => {
 		getPropertyContacts().then(setContacts).catch(() => {});
 
@@ -161,6 +171,14 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 					featuredImageUrl: record.featured_image_url ?? (record.image_urls?.[0] ?? ''),
 				});
 				setExistingImages(record.image_urls ?? []);
+				setMarketValuation({
+					priceGrade: record.price_grade ?? null,
+					priceGradeLabel: record.price_grade_label ?? null,
+					priceUnitRate: record.price_unit_rate ?? null,
+					priceUnitLabel: record.price_unit_label ?? null,
+					marketMedianUnitRate: record.market_median_unit_rate ?? null,
+					priceDiffPercent: record.price_diff_percent ?? null,
+				});
 			})
 			.catch((err) => {
 				setNotFound(true);
@@ -374,7 +392,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 			const allImageUrls = [...existingImages, ...uploadedUrls];
 			const amenityNames = form.amenities.filter(Boolean);
 
-			await updateAdminProperty(propertyId, {
+			const updatedRecord = await updateAdminProperty(propertyId, {
 				title: form.title.trim(),
 				description: form.description.trim(),
 				listing_type: form.listingType,
@@ -416,6 +434,14 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 			setExistingImages(allImageUrls);
 			setNewImages([]);
 			newImagesRef.current = [];
+			setMarketValuation({
+				priceGrade: updatedRecord.price_grade ?? null,
+				priceGradeLabel: updatedRecord.price_grade_label ?? null,
+				priceUnitRate: updatedRecord.price_unit_rate ?? null,
+				priceUnitLabel: updatedRecord.price_unit_label ?? null,
+				marketMedianUnitRate: updatedRecord.market_median_unit_rate ?? null,
+				priceDiffPercent: updatedRecord.price_diff_percent ?? null,
+			});
 			setSuccess(true);
 			toast.success('Property updated successfully.');
 		} catch (error) {
@@ -688,6 +714,35 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 									</Label>
 								</div>
 								{errorText('price')}
+								{marketValuation && marketValuation.priceGrade && marketValuation.priceGrade !== 'unrated' && (
+									<div className={`mt-2 flex flex-col gap-1 rounded-lg border p-2.5 text-xs ${
+										marketValuation.priceGrade === 'underpriced'
+											? 'bg-emerald-50 text-emerald-950 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800'
+											: marketValuation.priceGrade === 'overpriced'
+											? 'bg-amber-50 text-amber-950 border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800'
+											: 'bg-blue-50 text-blue-950 border-blue-300 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800'
+									}`}>
+										<div className='flex items-center justify-between'>
+											<span className='font-semibold flex items-center gap-1'>
+												{marketValuation.priceGrade === 'underpriced' && '🔥 '}
+												{marketValuation.priceGradeLabel || marketValuation.priceGrade}
+											</span>
+											{marketValuation.priceDiffPercent !== null && marketValuation.priceDiffPercent !== undefined && (
+												<span className='font-medium text-[11px]'>
+													{marketValuation.priceDiffPercent > 0 ? `+${marketValuation.priceDiffPercent}%` : `${marketValuation.priceDiffPercent}%`} vs market
+												</span>
+											)}
+										</div>
+										<div className='flex flex-wrap items-center justify-between text-[11px] opacity-90 mt-0.5'>
+											{marketValuation.priceUnitRate && (
+												<span>Rate: LKR {Math.round(marketValuation.priceUnitRate).toLocaleString()} {marketValuation.priceUnitLabel || ''}</span>
+											)}
+											{marketValuation.marketMedianUnitRate && (
+												<span>Market Median: LKR {Math.round(marketValuation.marketMedianUnitRate).toLocaleString()} {marketValuation.priceUnitLabel || ''}</span>
+											)}
+										</div>
+									</div>
+								)}
 							</div>
 
 							<div className='space-y-2 sm:col-span-2'>

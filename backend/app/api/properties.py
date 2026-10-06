@@ -23,6 +23,7 @@ from app.schemas.extractor import (
     GeminiPropertyExtraction,
 )
 from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
+from app.services.market_valuation import bulk_grade_properties, grade_property_pricing
 
 logger = structlog.get_logger()
 
@@ -89,8 +90,20 @@ def upload_property_images(
     return urls
 
 
+def _attach_market_valuation(property_record: Property, grade_info: dict | None) -> PropertyRead:
+    read_obj = PropertyRead.model_validate(property_record)
+    if grade_info:
+        read_obj.price_grade = grade_info.get("price_grade")
+        read_obj.price_grade_label = grade_info.get("price_grade_label")
+        read_obj.price_unit_rate = grade_info.get("price_unit_rate")
+        read_obj.price_unit_label = grade_info.get("price_unit_label")
+        read_obj.market_median_unit_rate = grade_info.get("market_median_unit_rate")
+        read_obj.price_diff_percent = grade_info.get("price_diff_percent")
+    return read_obj
+
+
 @admin_router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
-def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffUser) -> Property:
+def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffUser) -> PropertyRead:
     property_data = payload.model_dump()
     coordinates = _geocode_location(property_data["location"])
     property_record = Property(
@@ -101,7 +114,8 @@ def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffU
     db.add(property_record)
     db.commit()
     db.refresh(property_record)
-    return property_record
+    grade_info = grade_property_pricing(db, property_record)
+    return _attach_market_valuation(property_record, grade_info)
 
 
 @admin_router.post("/extract-from-text", response_model=ExtractedPropertyDraft)
@@ -233,10 +247,11 @@ def get_admin_properties(
     property_type: PropertyType | None = None,
     listing_type: ListingType | None = None,
     is_featured: bool | None = None,
+    price_grade: str | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
-) -> Sequence[Property]:
-    return queries.admin_properties(
+) -> list[PropertyRead]:
+    records = queries.admin_properties(
         db,
         search=search,
         status=property_status,
@@ -246,20 +261,26 @@ def get_admin_properties(
         offset=offset,
         limit=limit,
     )
+    grades_map = bulk_grade_properties(db, records)
+    reads = [_attach_market_valuation(p, grades_map.get(p.id)) for p in records]
+    if price_grade and price_grade != "all":
+        reads = [r for r in reads if r.price_grade == price_grade]
+    return reads
 
 
 @admin_router.get("/{property_id}", response_model=PropertyRead)
-def get_admin_property(property_id: UUID, db: DbSession, _user: CurrentStaffUser) -> Property:
+def get_admin_property(property_id: UUID, db: DbSession, _user: CurrentStaffUser) -> PropertyRead:
     property_record = db.get(Property, property_id)
     if property_record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
-    return property_record
+    grade_info = grade_property_pricing(db, property_record)
+    return _attach_market_valuation(property_record, grade_info)
 
 
 @admin_router.patch("/{property_id}", response_model=PropertyRead)
 def update_admin_property(
     property_id: UUID, payload: PropertyUpdate, db: DbSession, _user: CurrentStaffUser
-) -> Property:
+) -> PropertyRead:
     property_record = db.get(Property, property_id)
     if property_record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
@@ -278,7 +299,8 @@ def update_admin_property(
         setattr(property_record, field, value)
     db.commit()
     db.refresh(property_record)
-    return property_record
+    grade_info = grade_property_pricing(db, property_record)
+    return _attach_market_valuation(property_record, grade_info)
 
 
 @admin_router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)

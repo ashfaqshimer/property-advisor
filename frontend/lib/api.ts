@@ -132,6 +132,12 @@ export type PropertyApiRecord = {
   has_maids_room?: boolean | null;
   has_maids_toilet?: boolean | null;
   is_gated_community?: boolean | null;
+  price_grade?: string | null;
+  price_grade_label?: string | null;
+  price_unit_rate?: number | null;
+  price_unit_label?: string | null;
+  market_median_unit_rate?: number | null;
+  price_diff_percent?: number | null;
 };
 
 export type CreatePropertyPayload = {
@@ -885,8 +891,17 @@ export async function createProperty(payload: CreatePropertyPayload): Promise<Pr
   return result;
 }
 
-export async function getAdminProperties(): Promise<PropertyApiRecord[]> {
-  const response = await fetch(`${baseUrl()}/admin/properties`, {
+export async function getAdminProperties(filters?: {
+  search?: string;
+  status?: string;
+  price_grade?: string;
+}): Promise<PropertyApiRecord[]> {
+  const params = new URLSearchParams();
+  if (filters?.search) params.set("search", filters.search);
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.price_grade) params.set("price_grade", filters.price_grade);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`${baseUrl()}/admin/properties${qs}`, {
     method: "GET",
     credentials: "include",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
