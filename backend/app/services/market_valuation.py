@@ -440,6 +440,27 @@ def calculate_suburb_market_value(
     unit_stats = _percentiles(unit_rates)
     total_stats = _percentiles(raw_prices)
 
+    # MarketBenchmark fallback if active listing samples are sparse or empty
+    if not unit_stats["median"]:
+        from app.models.market_benchmark import MarketBenchmark
+        from sqlalchemy import func as sa_func
+        pt_target = property_type.lower() if property_type else ("land" if primary_property_type == "land" else "house")
+        bm_stmt = select(MarketBenchmark).where(
+            sa_func.lower(MarketBenchmark.location) == canonical_name.lower(),
+            MarketBenchmark.property_type == pt_target,
+            MarketBenchmark.listing_type == listing_type.lower(),
+            MarketBenchmark.status == "active",
+        ).limit(1)
+        bm_row = db.execute(bm_stmt).scalar_one_or_none()
+        if bm_row:
+            bm_rate = float(bm_row.rate_per_perch) if (pt_target == "land" and bm_row.rate_per_perch) else (float(bm_row.rate_per_sqft) if bm_row.rate_per_sqft else None)
+            if bm_rate:
+                unit_stats["median"] = bm_rate
+                unit_stats["min"] = round(bm_rate * 0.85, 2)
+                unit_stats["max"] = round(bm_rate * 1.15, 2)
+                unit_stats["p25"] = round(bm_rate * 0.92, 2)
+                unit_stats["p75"] = round(bm_rate * 1.08, 2)
+
     # CBSL Divisional / Baseline fallbacks
     baseline_land_min = float(suburb_entity.baseline_land_perch_min) if suburb_entity and suburb_entity.baseline_land_perch_min else None
     baseline_land_max = float(suburb_entity.baseline_land_perch_max) if suburb_entity and suburb_entity.baseline_land_perch_max else None

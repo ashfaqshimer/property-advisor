@@ -128,6 +128,88 @@ def remove_property_scanner():
         scheduler.remove_job('property_scanner_job')
         logger.info("property_scanner.unscheduled")
 
+
+def get_benchmark_sync_next_run_time() -> datetime | None:
+    """Returns the next scheduled run time of the benchmark sync job, if any."""
+    try:
+        job = scheduler.get_job('benchmark_sync_job')
+        if job and job.next_run_time:
+            return job.next_run_time
+    except Exception:
+        pass
+    return None
+
+
+def schedule_benchmark_sync_job(freq_days: int, last_run_at_str: str | None = None) -> datetime | None:
+    """Schedules the periodic market benchmark sync job."""
+    now = datetime.now(timezone.utc)
+    next_run_time = None
+
+    if last_run_at_str:
+        try:
+            last_run = datetime.fromisoformat(last_run_at_str.replace("Z", "+00:00"))
+            if last_run.tzinfo is None:
+                last_run = last_run.replace(tzinfo=timezone.utc)
+            target = last_run + timedelta(days=freq_days)
+            if target <= now:
+                next_run_time = now
+            else:
+                next_run_time = target
+        except Exception:
+            next_run_time = now
+    else:
+        next_run_time = now
+
+    job = scheduler.add_job(
+        run_benchmark_sync_background,
+        'interval',
+        days=freq_days,
+        id='benchmark_sync_job',
+        replace_existing=True,
+        next_run_time=next_run_time,
+        coalesce=True,
+        misfire_grace_time=86400,
+    )
+    logger.info(
+        "benchmark_sync.scheduled",
+        days=freq_days,
+        next_run=job.next_run_time.isoformat() if job.next_run_time else None
+    )
+    return job.next_run_time
+
+
+def remove_benchmark_sync_job():
+    """Removes the benchmark sync job from the scheduler if present."""
+    if scheduler.get_job('benchmark_sync_job'):
+        scheduler.remove_job('benchmark_sync_job')
+        logger.info("benchmark_sync.unscheduled")
+
+
+def run_benchmark_sync_background():
+    """Executes the benchmark synchronization in background."""
+    logger.info("benchmark_sync.background_started")
+    from app.services.benchmark_sync import run_benchmark_sync
+    with SessionLocal() as session:
+        try:
+            asyncio.run(run_benchmark_sync(session))
+        except Exception as exc:
+            logger.exception("benchmark_sync.background_failed", error=str(exc))
+
+
+def sync_benchmark_schedule(benchmark_settings: dict) -> dict:
+    """Synchronizes market benchmark schedule with APScheduler."""
+    settings = dict(benchmark_settings or {})
+    if settings.get("enabled", True):
+        freq_days = settings.get("frequency_days", 7)
+        last_run = settings.get("last_run_at")
+        next_run = schedule_benchmark_sync_job(freq_days, last_run)
+        settings["next_run_at"] = next_run.isoformat() if next_run else None
+    else:
+        remove_benchmark_sync_job()
+        settings["next_run_at"] = None
+    return settings
+
+
 def sync_all_scanner_schedules(scanner_settings: dict) -> dict:
     """Synchronizes all automated scanners with APScheduler."""
     settings = dict(scanner_settings or {})
@@ -426,21 +508,35 @@ def init_scheduler():
         logger.error("init_scheduler.db_failed", error=str(e))
         config = None
 
-    if config and config.scanner_settings:
-        settings = dict(config.scanner_settings)
-        from app.schemas.site_configuration import ensure_default_scanners
-        scanners = ensure_default_scanners(settings)
-        settings["scanners"] = scanners
-        synced_settings = sync_all_scanner_schedules(settings)
-        try:
-            with SessionLocal() as session:
-                cfg = session.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
-                if cfg:
-                    cfg.scanner_settings = synced_settings
-                    flag_modified(cfg, "scanner_settings")
-                    session.commit()
-        except Exception as e:
-            logger.warning("init_scheduler.save_next_run_failed", error=str(e))
+    if config:
+        if config.scanner_settings:
+            settings = dict(config.scanner_settings)
+            from app.schemas.site_configuration import ensure_default_scanners
+            scanners = ensure_default_scanners(settings)
+            settings["scanners"] = scanners
+            synced_settings = sync_all_scanner_schedules(settings)
+            try:
+                with SessionLocal() as session:
+                    cfg = session.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
+                    if cfg:
+                        cfg.scanner_settings = synced_settings
+                        flag_modified(cfg, "scanner_settings")
+                        session.commit()
+            except Exception as e:
+                logger.warning("init_scheduler.save_next_run_failed", error=str(e))
+
+        if getattr(config, "benchmark_sync_settings", None):
+            b_settings = dict(config.benchmark_sync_settings)
+            synced_b = sync_benchmark_schedule(b_settings)
+            try:
+                with SessionLocal() as session:
+                    cfg = session.execute(select(SiteConfiguration).limit(1)).scalar_one_or_none()
+                    if cfg:
+                        cfg.benchmark_sync_settings = synced_b
+                        flag_modified(cfg, "benchmark_sync_settings")
+                        session.commit()
+            except Exception as e:
+                logger.warning("init_scheduler.save_benchmark_next_run_failed", error=str(e))
 
     # Schedule recurring field assignment reminder checker (runs every 5 minutes)
     if not scheduler.get_job("field_assignment_reminders_job"):

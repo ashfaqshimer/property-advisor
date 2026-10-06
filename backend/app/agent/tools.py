@@ -562,8 +562,12 @@ def get_market_value(context: ToolContext, args: dict[str, Any]) -> dict[str, An
     sub_area = args.get("sub_area")
     property_type = args.get("property_type")
     listing_type = args.get("listing_type") or "sale"
+    raw_price = args.get("price")
+    raw_floor_area = args.get("floor_area_sqft")
+    raw_land_size = args.get("land_size_perches")
 
     from app.services.market_valuation import calculate_suburb_market_value
+    from app.services.benchmark_sync import calculate_market_comparison
 
     result = calculate_suburb_market_value(
         db=context.db,
@@ -574,7 +578,7 @@ def get_market_value(context: ToolContext, args: dict[str, Any]) -> dict[str, An
     )
 
     # Return high-signal, token-efficient payload tailored for agent reasoning
-    return {
+    payload: dict[str, Any] = {
         "suburb": result["suburb"],
         "sub_area": result["sub_area"],
         "property_type": result["property_type"],
@@ -598,6 +602,28 @@ def get_market_value(context: ToolContext, args: dict[str, Any]) -> dict[str, An
             for item in result.get("sourced_listings", [])[:3]
         ],
     }
+
+    if raw_price is not None:
+        try:
+            coerced_price = _as_decimal(raw_price, "price")
+            if coerced_price:
+                coerced_floor_area = float(raw_floor_area) if raw_floor_area else None
+                coerced_land_size = float(raw_land_size) if raw_land_size else None
+                p_type = str(property_type).strip().lower() if property_type else "house"
+                price_eval = calculate_market_comparison(
+                    session=context.db,
+                    location=str(location).strip(),
+                    property_type=p_type,
+                    listing_type=str(listing_type).strip().lower(),
+                    price=coerced_price,
+                    floor_area_sqft=coerced_floor_area,
+                    land_size_perches=coerced_land_size,
+                )
+                payload["price_evaluation"] = price_eval
+        except Exception as exc:
+            logger.warning("get_market_value.price_eval_failed", error=str(exc))
+
+    return payload
 
 
 IMPLEMENTATIONS = {
@@ -819,6 +845,18 @@ _MARKET_VALUE_DECLARATION = types.FunctionDeclaration(
                 type=types.Type.STRING,
                 enum=["sale", "rent"],
                 description="Optional: 'sale' (default) or 'rent'.",
+            ),
+            "price": types.Schema(
+                type=types.Type.STRING,
+                description="Optional asking price (number or string like '85M' or '25 lakhs') to evaluate against market rate.",
+            ),
+            "floor_area_sqft": types.Schema(
+                type=types.Type.NUMBER,
+                description="Optional floor area in square feet for house/apartment price evaluation.",
+            ),
+            "land_size_perches": types.Schema(
+                type=types.Type.NUMBER,
+                description="Optional land size in perches for land/house price evaluation.",
             ),
         },
         required=["location"],

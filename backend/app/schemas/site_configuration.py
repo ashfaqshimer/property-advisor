@@ -180,6 +180,15 @@ class ScannerSettingsConfigField(BaseModel):
 
 
 
+class BenchmarkSyncSettingsConfigField(BaseModel):
+    enabled: bool = True
+    frequency_days: int = Field(default=7, ge=1, le=90, description="Sync frequency in days (1-90)")
+    last_run_at: datetime | None = None
+    last_run_status: str | None = None
+    next_run_at: datetime | None = None
+    custom_locations: list[str] = Field(default_factory=list)
+
+
 class SiteConfigurationBase(BaseModel):
     phone_numbers: ListConfigField = Field(default_factory=ListConfigField)
     contact_email: StringConfigField = Field(default_factory=StringConfigField)
@@ -190,6 +199,7 @@ class SiteConfigurationBase(BaseModel):
     tiktok_link: StringConfigField = Field(default_factory=StringConfigField)
     city: StringConfigField = Field(default_factory=StringConfigField)
     scanner_settings: ScannerSettingsConfigField = Field(default_factory=ScannerSettingsConfigField)
+    benchmark_sync_settings: BenchmarkSyncSettingsConfigField = Field(default_factory=BenchmarkSyncSettingsConfigField)
     extra_settings: dict[str, Any] | None = Field(default_factory=dict)
     prospect_retention_days: int = Field(default=30)
 
@@ -208,6 +218,7 @@ class SiteConfigurationUpdate(BaseModel):
     tiktok_link: StringConfigField | None = None
     city: StringConfigField | None = None
     scanner_settings: ScannerSettingsConfigField | None = None
+    benchmark_sync_settings: BenchmarkSyncSettingsConfigField | None = None
     extra_settings: dict[str, Any] | None = None
     prospect_retention_days: int | None = None
 

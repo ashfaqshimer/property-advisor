@@ -18,6 +18,8 @@ from app.services.scanner_scheduler import (
     schedule_property_scanner,
     sync_all_scanner_schedules,
     run_automated_scanner,
+    get_benchmark_sync_next_run_time,
+    sync_benchmark_schedule,
 )
 
 router = APIRouter(prefix="/site-configuration", tags=["site-configuration"])
@@ -84,6 +86,18 @@ def get_site_configuration(db: DbSession) -> SiteConfiguration:
             "presets": DEFAULT_SCAN_PRESETS,
             "scanners": ensure_default_scanners(),
         }
+
+    # Populate live next_run_at for benchmark_sync_settings
+    if config.benchmark_sync_settings:
+        b_settings = dict(config.benchmark_sync_settings)
+        if b_settings.get("enabled", True):
+            next_b = get_benchmark_sync_next_run_time()
+            if next_b:
+                b_settings["next_run_at"] = next_b.isoformat()
+        else:
+            b_settings["next_run_at"] = None
+        config.benchmark_sync_settings = b_settings
+
     return config
 
 
@@ -126,6 +140,14 @@ def update_site_configuration(
             config.scanner_settings = settings
 
         flag_modified(config, "scanner_settings")
+        db.commit()
+        db.refresh(config)
+
+    if payload.benchmark_sync_settings is not None:
+        b_settings = dict(config.benchmark_sync_settings or {})
+        synced_b = sync_benchmark_schedule(b_settings)
+        config.benchmark_sync_settings = synced_b
+        flag_modified(config, "benchmark_sync_settings")
         db.commit()
         db.refresh(config)
 

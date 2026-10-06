@@ -25,6 +25,7 @@ from app.models.scan_job import ScanJob
 from app.models.location_cache import LocationCache
 from app.models.field_assignment import FieldAssignment
 from app.models.suburb import Suburb
+from app.models.market_benchmark import MarketBenchmark
 
 __all__ = [
     "StaffSession",
@@ -48,4 +49,5 @@ __all__ = [
     "LocationCache",
     "FieldAssignment",
     "Suburb",
+    "MarketBenchmark",
 ]
