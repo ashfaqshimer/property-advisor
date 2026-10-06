@@ -858,6 +858,34 @@ export async function getFeaturedProperties(limit?: number): Promise<PropertyApi
   return payload;
 }
 
+export async function getProperty(propertyId: string): Promise<PropertyApiRecord | null> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl()}/properties/${propertyId}`, {
+      method: "GET",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw classifyTransportFailure(error);
+  }
+
+  if (response.status === 404) return null;
+  if (!response.ok) throw classifyStatus(response.status);
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new ChatError("unexpected", "The backend returned a malformed body.");
+  }
+
+  if (!isPropertyApiRecord(payload)) {
+    throw new ChatError("unexpected", "The backend returned an unrecognised property response.");
+  }
+
+  return payload;
+}
+
 export async function uploadPropertyImages(files: File[]): Promise<string[]> {
   const body = new FormData();
   files.forEach((file) => body.append("files", file));

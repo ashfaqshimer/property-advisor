@@ -238,6 +238,16 @@ def get_featured_properties(
     return queries.featured_properties(db, limit=limit)
 
 
+@router.get("/{property_id}", response_model=PropertyRead)
+def get_public_property(property_id: UUID, db: DbSession) -> PropertyRead:
+    """Public read endpoint for a single property by ID."""
+    property_record = db.get(Property, property_id)
+    if property_record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
+    grade_info = grade_property_pricing(db, property_record)
+    return _attach_market_valuation(property_record, grade_info)
+
+
 @admin_router.get("", response_model=list[PropertyRead])
 def get_admin_properties(
     db: DbSession,

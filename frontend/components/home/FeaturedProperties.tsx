@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import Container from "@/components/layout/Container";
 import { Badge } from "@/components/ui/badge";
 import { openChat } from "@/lib/chat-dialog";
@@ -339,23 +340,28 @@ export default function FeaturedProperties() {
               return (
                 <article
                   key={item.id}
-                  onClick={() => handleCardClick(item)}
-                  className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-neutral-300 hover:shadow-lg"
+                  className="group relative flex flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-neutral-300 hover:shadow-lg"
                 >
                   {/* Photo & Overlays */}
                   <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100">
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.imageAlt}
-                      fill
-                      unoptimized
-                      loading="eager"
-                      sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
+                    <Link
+                      href={`/properties/${item.id}`}
+                      className="block size-full"
+                      aria-label={`View details for ${item.title}`}
+                    >
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.imageAlt}
+                        fill
+                        unoptimized
+                        loading="eager"
+                        sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    </Link>
 
                     {/* Badge: For Sale / For Rent */}
-                    <div className="absolute bottom-3 left-3">
+                    <div className="absolute bottom-3 left-3 pointer-events-none">
                       <Badge variant={item.badgeVariant}>{item.badge}</Badge>
                     </div>
 
@@ -364,7 +370,7 @@ export default function FeaturedProperties() {
                       type="button"
                       onClick={(e) => toggleFavorite(e, item.id)}
                       aria-label={`Save ${item.title}`}
-                      className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-2xs transition-colors hover:bg-white"
+                      className="absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-2xs transition-colors hover:bg-white"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -384,7 +390,9 @@ export default function FeaturedProperties() {
                   {/* Details */}
                   <div className="flex flex-1 flex-col p-5">
                     <h3 className="font-semibold text-base text-ink line-clamp-1 group-hover:text-brand transition-colors">
-                      {item.title}
+                      <Link href={`/properties/${item.id}`} className="hover:underline">
+                        {item.title}
+                      </Link>
                     </h3>
 
                     {/* Specs */}

@@ -1,5 +1,6 @@
 """GET /properties/featured — behaviour."""
 
+import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -76,3 +77,18 @@ def test_reseeding_does_not_duplicate_rows(seeded: Session) -> None:
     seeded.commit()
 
     assert seeded.query(Property).count() == 8
+
+
+def test_get_public_property_by_id(client: TestClient) -> None:
+    target_id = str(seed_id("garden-villa-ward-place"))
+    response = client.get(f"/properties/{target_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == target_id
+    assert "Ward Place" in data["title"]
+
+
+def test_get_public_property_not_found(client: TestClient) -> None:
+    non_existent = str(uuid.uuid4())
+    response = client.get(f"/properties/{non_existent}")
+    assert response.status_code == 404
