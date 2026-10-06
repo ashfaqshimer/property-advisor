@@ -1069,7 +1069,7 @@ export default function MarketValuesPage() {
                           }}
                           className="h-7 gap-1 px-2 text-xs font-medium text-primary hover:bg-primary/10 hover:text-primary cursor-pointer"
                         >
-                          Simulate
+                          Analyze
                           <ArrowUpRight className="h-3 w-3" />
                         </Button>
                       </td>
