@@ -284,9 +284,8 @@ export default function FeaturedProperties() {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => openChat("Show me all available properties in Colombo and Sri Lanka")}
+            <Link
+              href="/properties"
               className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-brand transition-colors hover:text-[#233c32]"
             >
               <span>View all properties</span>
@@ -302,7 +301,7 @@ export default function FeaturedProperties() {
               >
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
-            </button>
+            </Link>
           </div>
         </div>
 
