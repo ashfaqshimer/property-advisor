@@ -255,6 +255,15 @@ export type ScannerSettingsConfigField = {
   next_run_at?: string | null;
 };
 
+export type BenchmarkSyncSettings = {
+  enabled: boolean;
+  frequency_days: number;
+  last_run_at?: string | null;
+  last_run_status?: string | null;
+  next_run_at?: string | null;
+  custom_locations?: string[];
+};
+
 export type SiteConfiguration = {
   id: string;
   phone_numbers: ListConfigField;
@@ -266,6 +275,7 @@ export type SiteConfiguration = {
   tiktok_link: StringConfigField;
   city: StringConfigField;
   scanner_settings: ScannerSettingsConfigField;
+  benchmark_sync_settings?: BenchmarkSyncSettings;
   extra_settings: Record<string, unknown> | null;
   prospect_retention_days: number;
 };
@@ -1760,6 +1770,53 @@ export async function getMarketTrends(
     throw new ChatError("unexpected", `Market trends fetch failed (${response.status}).`, response.status);
   }
   return (await response.json()) as MarketTrendsResponse;
+}
+
+export type MarketBenchmark = {
+  id: string;
+  location: string;
+  property_type: string;
+  listing_type: string;
+  rate_per_sqft: number | null;
+  rate_per_perch: number | null;
+  status: string;
+  updated_at: string;
+};
+
+export async function getMarketBenchmarks(params?: {
+  location?: string;
+  property_type?: string;
+  listing_type?: string;
+}): Promise<MarketBenchmark[]> {
+  const q = new URLSearchParams();
+  if (params?.location) q.set("location", params.location);
+  if (params?.property_type) q.set("property_type", params.property_type);
+  if (params?.listing_type) q.set("listing_type", params.listing_type);
+
+  const response = await fetch(`${baseUrl()}/market-benchmarks?${q.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to fetch benchmarks (${response.status}).`, response.status);
+  }
+  return (await response.json()) as MarketBenchmark[];
+}
+
+export async function triggerBenchmarkSync(locations?: string[]): Promise<{ message: string; job_started: boolean }> {
+  const response = await fetch(`${baseUrl()}/market-benchmarks/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ locations, background: true }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ChatError("unexpected", errorData.detail || `Failed to trigger sync (${response.status}).`, response.status);
+  }
+  return await response.json();
 }
 
 

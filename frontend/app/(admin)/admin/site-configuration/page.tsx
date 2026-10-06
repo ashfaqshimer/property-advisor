@@ -4,13 +4,23 @@ import { FormEvent, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Compass } from "lucide-react";
+import {
+  Compass,
+  TrendingUp,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+} from "lucide-react";
 
 import {
   getCurrentUser,
   getSiteConfiguration,
   updateSiteConfiguration,
+  getMarketBenchmarks,
+  triggerBenchmarkSync,
   type SiteConfiguration,
+  type MarketBenchmark,
 } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -82,6 +92,40 @@ export default function SiteConfigurationPage() {
   const [phoneInput, setPhoneInput] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const [syncingBenchmarks, setSyncingBenchmarks] = useState(false);
+  const [benchmarks, setBenchmarks] = useState<MarketBenchmark[]>([]);
+  const [showBenchmarksList, setShowBenchmarksList] = useState(false);
+  const [loadingBenchmarks, setLoadingBenchmarks] = useState(false);
+
+  async function loadBenchmarks() {
+    setLoadingBenchmarks(true);
+    try {
+      const data = await getMarketBenchmarks();
+      setBenchmarks(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingBenchmarks(false);
+    }
+  }
+
+  async function handleSyncBenchmarksNow() {
+    setSyncingBenchmarks(true);
+    try {
+      const res = await triggerBenchmarkSync();
+      toast.success(res.message || "Benchmark sync started.");
+      setTimeout(async () => {
+        const updatedCfg = await getSiteConfiguration();
+        if (updatedCfg) setSiteConfig(updatedCfg);
+        loadBenchmarks();
+      }, 3000);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sync failed.");
+    } finally {
+      setSyncingBenchmarks(false);
+    }
+  }
+
   function updateStringValue(key: keyof SiteConfiguration, value: string) {
     setSiteConfig((s) => {
       const field = (s[key] as any) || { value: null, show: true };
@@ -148,6 +192,7 @@ export default function SiteConfigurationPage() {
         x_link: siteConfig.x_link,
         tiktok_link: siteConfig.tiktok_link,
         scanner_settings: siteConfig.scanner_settings,
+        benchmark_sync_settings: siteConfig.benchmark_sync_settings,
         extra_settings: siteConfig.extra_settings || {},
         prospect_retention_days: Number(siteConfig.prospect_retention_days) || 30,
       });
@@ -309,6 +354,190 @@ export default function SiteConfigurationPage() {
               <span>Open Scanner Hub →</span>
             </Link>
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg font-medium">Market Benchmarks & Price Valuation</CardTitle>
+          </div>
+          <CardDescription>
+            Localized per-square-foot and per-perch pricing benchmarks used by Amaya and the lead evaluation engine.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg bg-muted/40 border">
+            <div>
+              <div className="text-sm font-medium">Automated Periodic Sync</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Periodically refreshes pricing baselines from market indicators.
+              </div>
+            </div>
+            <Switch
+              checked={siteConfig.benchmark_sync_settings?.enabled ?? true}
+              onCheckedChange={(checked) =>
+                setSiteConfig((s) => ({
+                  ...s,
+                  benchmark_sync_settings: {
+                    ...(s.benchmark_sync_settings || { frequency_days: 7 }),
+                    enabled: checked,
+                  },
+                }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="benchmark_frequency">Sync Frequency (Days)</Label>
+            <div className="flex items-center gap-3">
+              <Input
+                id="benchmark_frequency"
+                type="number"
+                min="1"
+                max="90"
+                value={siteConfig.benchmark_sync_settings?.frequency_days ?? 7}
+                onChange={(e) =>
+                  setSiteConfig((s) => ({
+                    ...s,
+                    benchmark_sync_settings: {
+                      ...(s.benchmark_sync_settings || { enabled: true }),
+                      frequency_days: parseInt(e.target.value) || 7,
+                    },
+                  }))
+                }
+                className="w-28"
+              />
+              <span className="text-xs text-muted-foreground">days between scheduled updates</span>
+            </div>
+          </div>
+
+          <div className="rounded-lg border p-4 bg-muted/20 text-xs space-y-1.5">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Last Sync Run:</span>
+              <span className="font-medium text-foreground">
+                {siteConfig.benchmark_sync_settings?.last_run_at
+                  ? new Date(siteConfig.benchmark_sync_settings.last_run_at).toLocaleString()
+                  : "Never"}
+              </span>
+            </div>
+            {siteConfig.benchmark_sync_settings?.last_run_status && (
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Last Result:</span>
+                <span className="font-medium text-foreground">
+                  {siteConfig.benchmark_sync_settings.last_run_status}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Next Scheduled Run:</span>
+              <span className="font-medium text-foreground">
+                {siteConfig.benchmark_sync_settings?.next_run_at
+                  ? new Date(siteConfig.benchmark_sync_settings.next_run_at).toLocaleString()
+                  : "Not scheduled"}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Button
+              type="button"
+              onClick={handleSyncBenchmarksNow}
+              disabled={syncingBenchmarks}
+              size="sm"
+            >
+              {syncingBenchmarks ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync Benchmarks Now
+                </>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!showBenchmarksList && benchmarks.length === 0) {
+                  loadBenchmarks();
+                }
+                setShowBenchmarksList(!showBenchmarksList);
+              }}
+            >
+              {showBenchmarksList ? (
+                <>
+                  <ChevronUp className="mr-2 h-4 w-4" />
+                  Hide Stored Rates
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="mr-2 h-4 w-4" />
+                  View Stored Rates ({benchmarks.length > 0 ? benchmarks.length : "Show"})
+                </>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={(e) => handleUpdateSiteConfig(e as any)}
+              disabled={updatingSiteConfig}
+            >
+              {updatingSiteConfig ? "Saving..." : "Save Benchmark Settings"}
+            </Button>
+          </div>
+
+          {showBenchmarksList && (
+            <div className="mt-4 border rounded-lg overflow-hidden">
+              <div className="bg-muted/50 p-2 text-xs font-semibold border-b flex justify-between items-center">
+                <span>Stored Market Benchmarks</span>
+                <span className="text-muted-foreground font-normal">
+                  {benchmarks.length} entries
+                </span>
+              </div>
+              {loadingBenchmarks ? (
+                <div className="p-4 text-xs text-center text-muted-foreground">Loading benchmarks...</div>
+              ) : benchmarks.length === 0 ? (
+                <div className="p-4 text-xs text-center text-muted-foreground">
+                  No benchmarks stored yet. Click "Sync Benchmarks Now" to populate.
+                </div>
+              ) : (
+                <div className="max-h-64 overflow-y-auto divide-y text-xs">
+                  {benchmarks.map((b) => (
+                    <div key={b.id} className="p-2.5 flex items-center justify-between hover:bg-muted/20">
+                      <div>
+                        <span className="font-medium text-foreground">{b.location}</span>
+                        <span className="ml-2 text-muted-foreground uppercase text-[10px] tracking-wider">
+                          {b.property_type} • {b.listing_type}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        {b.rate_per_sqft ? (
+                          <div className="font-semibold text-foreground">
+                            Rs. {Number(b.rate_per_sqft).toLocaleString()} <span className="text-muted-foreground text-[10px]">/sqft</span>
+                          </div>
+                        ) : b.rate_per_perch ? (
+                          <div className="font-semibold text-foreground">
+                            Rs. {Number(b.rate_per_perch).toLocaleString()} <span className="text-muted-foreground text-[10px]">/perch</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic text-[11px]">{b.status}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
