@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  deleteAdminLead,
   extractPropertyFromText,
   getAdminLeads,
   getAdminProperties,
@@ -125,6 +126,26 @@ describe("admin lead API", () => {
     );
 
     await expect(getAdminLeads()).rejects.toThrow("unrecognised lead list");
+  });
+
+  it("deletes a lead successfully", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const fetchSpy = vi.fn(async () => jsonResponse(204, null));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(deleteAdminLead("lead-1")).resolves.toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/admin/leads/lead-1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("handles lead deletion failure", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const fetchSpy = vi.fn(async () => jsonResponse(404, { detail: "Lead not found." }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(deleteAdminLead("lead-999")).rejects.toThrow("Lead deletion failed (404).");
   });
 });
 

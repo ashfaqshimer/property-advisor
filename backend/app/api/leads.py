@@ -157,3 +157,18 @@ def update_lead(
     db.commit()
     db.refresh(lead)
     return lead
+
+
+@router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_lead(
+    lead_id: UUID,
+    db: DbSession,
+    user: CurrentStaffUser,
+) -> None:
+    lead = db.get(Lead, lead_id)
+    if lead is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found.")
+    db.delete(lead)
+    db.commit()
+    logger.info("lead_deleted", lead_id=str(lead_id), user_id=str(user.id))
+

@@ -168,3 +168,26 @@ def test_admin_leads_can_filter_by_source(
 
     assert response.status_code == 200
     assert [item["name"] for item in response.json()] == ["Ravi"]
+
+
+def test_delete_lead_requires_authentication(client: TestClient) -> None:
+    assert client.delete("/admin/leads/00000000-0000-0000-0000-000000000000").status_code == 401
+
+
+def test_delete_lead_success(
+    authenticated_client: TestClient, seeded: Session
+) -> None:
+    lead = _add_lead(seeded, name="Maya", intent=LeadIntent.BUY)
+
+    response = authenticated_client.delete(f"/admin/leads/{lead.id}")
+
+    assert response.status_code == 204
+    assert seeded.scalar(select(Lead).where(Lead.id == lead.id)) is None
+
+
+def test_delete_lead_not_found(authenticated_client: TestClient) -> None:
+    response = authenticated_client.delete(
+        "/admin/leads/00000000-0000-0000-0000-000000000000"
+    )
+    assert response.status_code == 404
+

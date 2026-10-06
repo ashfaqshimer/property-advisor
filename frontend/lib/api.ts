@@ -1034,6 +1034,18 @@ export async function createAdminLead(payload: ManualLeadPayload): Promise<Admin
   return result;
 }
 
+export async function deleteAdminLead(leadId: string): Promise<void> {
+  const response = await fetch(`${baseUrl()}/admin/leads/${leadId}`, {
+    method: "DELETE",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Lead deletion failed (${response.status}).`, response.status);
+  }
+}
+
+
 /**
  * Nudge the Render service awake, and don't wait around for it.
  *

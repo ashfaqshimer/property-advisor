@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   createAdminLead,
+  deleteAdminLead,
   getAdminLeads,
   updateAdminLead,
   type AdminLead,
@@ -21,7 +22,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Pencil, Plus, Save, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 const intentVariants: Record<"buy" | "rent" | "sell", "success" | "info" | "warning"> = {
   buy: "success",
@@ -74,6 +84,9 @@ export default function AdminLeadsPage() {
   const [editRequirements, setEditRequirements] = useState("");
   const [editInterest, setEditInterest] = useState<LeadInterest | "">("");
   const [updating, setUpdating] = useState(false);
+  const [deletingLead, setDeletingLead] = useState<AdminLead | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     getAdminLeads()
@@ -146,6 +159,24 @@ export default function AdminLeadsPage() {
       setFormError(reason instanceof Error ? reason.message : "Could not update lead.");
     } finally {
       setUpdating(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deletingLead) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteAdminLead(deletingLead.id);
+      setLeads((current) => current.filter((lead) => lead.id !== deletingLead.id));
+      if (editingLead?.id === deletingLead.id) {
+        setEditingLead(null);
+      }
+      setDeletingLead(null);
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : "Could not delete lead.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -319,16 +350,31 @@ export default function AdminLeadsPage() {
                       <TableCell className="px-4 py-4 text-muted-foreground">{lead.edited_by ? lead.edited_by.name : "Not edited"}</TableCell>
                       <TableCell className="px-5 py-4 text-right text-muted-foreground">{new Date(lead.created_at).toLocaleDateString()}</TableCell>
                       <TableCell className="px-5 py-4 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEditing(lead)}
-                          className="h-8 gap-1.5 px-2.5 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => startEditing(lead)}
+                            className="h-8 gap-1.5 px-2.5 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDeleteError("");
+                              setDeletingLead(lead);
+                            }}
+                            className="h-8 gap-1.5 px-2.5 text-xs font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -363,16 +409,31 @@ export default function AdminLeadsPage() {
                   )}
                   <div className="mt-2 flex items-center justify-between border-t border-border pt-4">
                     <span className="text-xs text-muted-foreground">{new Date(lead.created_at).toLocaleDateString()} &middot; {lead.source ? sourceLabels[lead.source] : "Unknown"}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => startEditing(lead)}
-                      className="h-8 gap-1.5 px-2.5 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startEditing(lead)}
+                        className="h-8 gap-1.5 px-2.5 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setDeleteError("");
+                          setDeletingLead(lead);
+                        }}
+                        className="h-8 gap-1.5 px-2.5 text-xs font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -380,6 +441,44 @@ export default function AdminLeadsPage() {
           </>
         )}
       </div>
+
+      <AlertDialog
+        open={deletingLead !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) {
+            setDeletingLead(null);
+            setDeleteError("");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the lead for{" "}
+              <span className="font-semibold text-foreground">
+                {deletingLead?.name || deletingLead?.phone || "this contact"}
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting}
+              onClick={handleDelete}
+              className="min-h-[44px]"
+            >
+              {deleting ? "Deleting..." : "Delete lead"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
