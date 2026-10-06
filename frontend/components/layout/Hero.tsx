@@ -61,12 +61,13 @@ export default function Hero() {
               id="hero-heading"
               className="mt-4 font-display text-4xl leading-[1.12] text-balance text-ink sm:text-5xl lg:text-6xl"
             >
-              Tell Amaya what you&apos;re looking for.
+              Find Prime Real Estate in Colombo & Sri Lanka
             </h1>
 
             <p className="mt-5 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-              She&apos;ll help you find the right property, with real options,
-              local insights and expert guidance.
+              Tell Amaya what you&apos;re looking for. She&apos;ll help you find
+              the right property with real options, local insights, and expert
+              guidance.
             </p>
 
             {/* Natural Language Prompt Search Bar */}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import Container from "@/components/layout/Container";
 import { openChat } from "@/lib/chat-dialog";
 
@@ -312,11 +313,11 @@ export default function IslandWideReach() {
                 <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-1">
                   {LOCATIONS.map((loc) => {
                     const isMatched = activeCity === loc;
+                    const slug = loc.toLowerCase().replace(/\s+/g, "-");
                     return (
                       <li key={loc}>
-                        <button
-                          type="button"
-                          onClick={() => handleLocationClick(loc)}
+                        <Link
+                          href={`/locations/${slug}`}
                           onMouseEnter={() => setActiveCity(loc)}
                           onMouseLeave={() => setActiveCity(null)}
                           className={`inline-flex cursor-pointer items-center gap-2 text-xs font-medium transition-colors ${
@@ -331,7 +332,7 @@ export default function IslandWideReach() {
                             }`}
                           />
                           <span>{loc}</span>
-                        </button>
+                        </Link>
                       </li>
                     );
                   })}

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getFeaturedProperties } from "@/lib/api";
+import { CITIES } from "@/lib/locations";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = (
@@ -14,6 +15,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1.0,
     },
   ];
+
+  // Programmatic location landing pages
+  for (const city of CITIES) {
+    routes.push({
+      url: `${siteUrl}/locations/${city.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    });
+  }
 
   try {
     const properties = await getFeaturedProperties(50);
