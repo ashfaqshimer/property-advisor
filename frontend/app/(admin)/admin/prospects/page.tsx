@@ -4,15 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, CheckSquare, Send, Bookmark, Bot, Trash2 } from "lucide-react";
+import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, CheckSquare, Send, Bookmark, Bot, Trash2, Pencil } from "lucide-react";
 
 import {
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
+  TableHead,
+  TableBody,
   TableRow,
+  TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import {
   createFieldAssignments,
   deleteFieldAssignment,
   deleteFieldAssignmentByProspect,
+  updateFieldAssignment,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
@@ -207,6 +208,55 @@ export default function ProspectsPage() {
       toast.error(err.message || "Failed to remove assignment.");
     } finally {
       setRemovingAssignmentProspectId(null);
+    }
+  };
+
+  const [editingAssignmentProspect, setEditingAssignmentProspect] = useState<Prospect | null>(null);
+  const [editAssignmentStatus, setEditAssignmentStatus] = useState<string>("contacted");
+  const [editAssignmentNotes, setEditAssignmentNotes] = useState<string>("");
+  const [savingAssignmentEdit, setSavingAssignmentEdit] = useState(false);
+
+  const handleOpenEditAssignment = (prospect: Prospect) => {
+    setEditingAssignmentProspect(prospect);
+    setEditAssignmentStatus(
+      prospect.assignment_status === "interested" ? "contacted" : prospect.assignment_status || "contacted"
+    );
+    setEditAssignmentNotes("");
+  };
+
+  const handleSaveEditAssignment = async () => {
+    if (!editingAssignmentProspect || !editingAssignmentProspect.assignment_id) return;
+    setSavingAssignmentEdit(true);
+    try {
+      const updated = await updateFieldAssignment(editingAssignmentProspect.assignment_id, {
+        status: editAssignmentStatus,
+        notes: editAssignmentNotes.trim() || undefined,
+      });
+      toast.success("Assignment outcome updated.");
+      setProspects((prev) =>
+        prev.map((p) => {
+          if (p.id !== editingAssignmentProspect.id) return p;
+          let newProspectStatus = p.status;
+          if (editAssignmentStatus === "not_interested") {
+            newProspectStatus = "discarded";
+          } else if (editAssignmentStatus === "contacted" || editAssignmentStatus === "callback_later") {
+            newProspectStatus = "contacted";
+          } else if ((editAssignmentStatus === "pending" || editAssignmentStatus === "no_answer") && p.status === "discarded") {
+            newProspectStatus = "new";
+          }
+          return {
+            ...p,
+            assignment_status: updated.status,
+            status: newProspectStatus,
+            discard_reason: updated.status === "not_interested" ? "not_interested" : (p.discard_reason === "not_interested" ? null : p.discard_reason),
+          };
+        })
+      );
+      setEditingAssignmentProspect(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update assignment.");
+    } finally {
+      setSavingAssignmentEdit(false);
     }
   };
 
@@ -956,47 +1006,95 @@ export default function ProspectsPage() {
                           </Button>
                         </div>
                       ) : prospect.assignment_status === "contacted" || prospect.assignment_status === "interested" ? (
-                        <div className="flex-1 flex justify-center">
-                          <Badge variant="success" className="w-full justify-center gap-1.5 py-1 text-xs font-medium">
+                        <div className="flex-1 flex items-center justify-between gap-2">
+                          <Badge variant="success" className="gap-1.5 py-1 text-xs font-medium">
                             <CheckCircle2 className="h-3.5 w-3.5" />
-                            <span>Agent Outcome: Contacted</span>
+                            <span>Contacted</span>
                           </Badge>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditAssignment(prospect)}
+                            className="h-7 gap-1 px-2.5 text-xs font-medium"
+                            title="Edit assignment outcome"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            <span>Change</span>
+                          </Button>
                         </div>
                       ) : prospect.assignment_status === "not_interested" ? (
-                        <div className="flex-1 flex justify-center">
-                          <Badge variant="destructive" className="w-full justify-center py-1 text-xs font-medium">
-                            <span>Agent Outcome: Not Interested</span>
+                        <div className="flex-1 flex items-center justify-between gap-2">
+                          <Badge variant="destructive" className="py-1 text-xs font-medium">
+                            <span>Not Interested</span>
                           </Badge>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditAssignment(prospect)}
+                            className="h-7 gap-1 px-2.5 text-xs font-medium"
+                            title="Edit or correct assignment outcome"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            <span>Fix</span>
+                          </Button>
                         </div>
                       ) : prospect.assignment_status === "no_answer" ? (
                         <div className="flex-1 flex items-center justify-between gap-2">
                           <Badge variant="secondary" className="text-xs font-medium">Outcome: No Answer</Badge>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSingleAssign(prospect.id)}
-                            disabled={isAssigning}
-                            className="h-7 gap-1 px-3 text-xs"
-                          >
-                            <Send className="h-3 w-3" />
-                            <span>Re-assign</span>
-                          </Button>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEditAssignment(prospect)}
+                              className="h-7 gap-1 px-2 text-xs"
+                              title="Edit assignment outcome"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              <span>Edit</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSingleAssign(prospect.id)}
+                              disabled={isAssigning}
+                              className="h-7 gap-1 px-2.5 text-xs"
+                            >
+                              <Send className="h-3 w-3" />
+                              <span>Re-assign</span>
+                            </Button>
+                          </div>
                         </div>
                       ) : prospect.assignment_status === "callback_later" ? (
                         <div className="flex-1 flex items-center justify-between gap-2">
                           <Badge variant="info" className="text-xs font-medium">Outcome: Call Back Later</Badge>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSingleAssign(prospect.id)}
-                            disabled={isAssigning}
-                            className="h-7 gap-1 px-3 text-xs"
-                          >
-                            <Send className="h-3 w-3" />
-                            <span>Re-assign</span>
-                          </Button>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEditAssignment(prospect)}
+                              className="h-7 gap-1 px-2 text-xs"
+                              title="Edit assignment outcome"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              <span>Edit</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSingleAssign(prospect.id)}
+                              disabled={isAssigning}
+                              className="h-7 gap-1 px-2.5 text-xs"
+                            >
+                              <Send className="h-3 w-3" />
+                              <span>Re-assign</span>
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <Button
@@ -1294,17 +1392,31 @@ export default function ProspectsPage() {
                       <TableCell className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {isDiscarded ? (
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => handleUpdateStatus(prospect.id, "new")}
-                              disabled={updatingStatusId === prospect.id}
-                              className="h-8 gap-1.5 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
-                              title="Restore this prospect to active pipeline"
-                            >
-                              <Undo2 className="h-3.5 w-3.5" />
-                              <span>Keep</span>
-                            </Button>
+                            <div className="flex items-center gap-1.5">
+                              {prospect.assignment_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenEditAssignment(prospect)}
+                                  className="h-8 gap-1.5 px-2.5 text-xs font-semibold cursor-pointer"
+                                  title="Fix or edit assignment outcome"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  <span>Fix Outcome</span>
+                                </Button>
+                              )}
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleUpdateStatus(prospect.id, "new")}
+                                disabled={updatingStatusId === prospect.id}
+                                className="h-8 gap-1.5 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                title="Restore this prospect to active pipeline"
+                              >
+                                <Undo2 className="h-3.5 w-3.5" />
+                                <span>Keep</span>
+                              </Button>
+                            </div>
                           ) : !isTerminal ? (
                             <div className="flex items-center gap-1.5">
                               {isAdminOrRoot && telegramAgentConfigured && (
@@ -1332,22 +1444,46 @@ export default function ProspectsPage() {
                                     </Button>
                                   </div>
                                 ) : prospect.assignment_status === "contacted" || prospect.assignment_status === "interested" ? (
-                                  <Badge
-                                    variant="success"
-                                    className="gap-1 py-1 text-xs font-medium"
-                                    title="Agent outcome: Contacted"
-                                  >
-                                    <CheckCircle2 className="h-3 w-3" />
-                                    <span>Contacted</span>
-                                  </Badge>
+                                  <div className="flex items-center gap-1">
+                                    <Badge
+                                      variant="success"
+                                      className="gap-1 py-1 text-xs font-medium"
+                                      title="Agent outcome: Contacted"
+                                    >
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      <span>Contacted</span>
+                                    </Badge>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenEditAssignment(prospect)}
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                                      title="Edit assignment outcome"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 ) : prospect.assignment_status === "not_interested" ? (
-                                  <Badge
-                                    variant="destructive"
-                                    className="py-1 text-xs font-medium"
-                                    title="Agent outcome: Not Interested"
-                                  >
-                                    <span>Not Interested</span>
-                                  </Badge>
+                                  <div className="flex items-center gap-1">
+                                    <Badge
+                                      variant="destructive"
+                                      className="py-1 text-xs font-medium"
+                                      title="Agent outcome: Not Interested"
+                                    >
+                                      <span>Not Interested</span>
+                                    </Badge>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenEditAssignment(prospect)}
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                                      title="Fix or edit assignment outcome"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 ) : prospect.assignment_status === "no_answer" ? (
                                   <div className="flex items-center gap-1">
                                     <Badge
@@ -1357,6 +1493,16 @@ export default function ProspectsPage() {
                                     >
                                       <span>No Answer</span>
                                     </Badge>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenEditAssignment(prospect)}
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                                      title="Edit assignment outcome"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
                                     <Button
                                       type="button"
                                       variant="outline"
@@ -1379,6 +1525,16 @@ export default function ProspectsPage() {
                                     >
                                       <span>Call Later</span>
                                     </Badge>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenEditAssignment(prospect)}
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                                      title="Edit assignment outcome"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
                                     <Button
                                       type="button"
                                       variant="outline"
@@ -1630,6 +1786,109 @@ export default function ProspectsPage() {
         onConfirm={handleConfirmDiscard}
         loading={isDiscarding}
       />
+
+      {/* Edit Assignment Outcome Modal */}
+      {editingAssignmentProspect && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="bg-card text-card-foreground rounded-xl border border-border shadow-xl w-full max-w-md p-6 transform transition-all">
+            <h3 className="text-lg font-semibold text-foreground">
+              Update Assignment Outcome
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground truncate">
+              {editingAssignmentProspect.poster_name || editingAssignmentProspect.title}
+            </p>
+            {editingAssignmentProspect.phone_number && (
+              <p className="mt-0.5 text-xs font-mono text-muted-foreground">
+                📞 {editingAssignmentProspect.phone_number}
+              </p>
+            )}
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Assignment Status
+                </label>
+                <select
+                  value={editAssignmentStatus}
+                  onChange={(e) => setEditAssignmentStatus(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="pending">Pending (Awaiting agent)</option>
+                  <option value="contacted">✅ Contacted</option>
+                  <option value="callback_later">🔄 Call Back Later</option>
+                  <option value="no_answer">📵 No Answer (Next-day reminder)</option>
+                  <option value="not_interested">❌ Not Interested (Discard prospect)</option>
+                </select>
+
+                <div className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-2.5">
+                  {editAssignmentStatus === "not_interested" && (
+                    <span className="text-destructive font-medium">
+                      ⚠️ Marking as Not Interested will automatically move the prospect to Discarded in the pipeline.
+                    </span>
+                  )}
+                  {editAssignmentStatus === "no_answer" && (
+                    <span className="text-amber-700 dark:text-amber-400 font-medium">
+                      ⏰ Schedules an automated 10:00 AM follow-up reminder for tomorrow.
+                    </span>
+                  )}
+                  {(editAssignmentStatus === "contacted" || editAssignmentStatus === "callback_later") && (
+                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                      ✅ Marks the prospect as Contacted in the pipeline.
+                    </span>
+                  )}
+                  {editAssignmentStatus === "pending" && (
+                    <span>
+                      🔄 Resets status to Pending awaiting field agent response on Telegram.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Notes / Feedback (Optional)
+                </label>
+                <textarea
+                  value={editAssignmentNotes}
+                  onChange={(e) => setEditAssignmentNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Add any notes from the call or agent interaction..."
+                  className="w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={savingAssignmentEdit}
+                onClick={() => setEditingAssignmentProspect(null)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={savingAssignmentEdit}
+                onClick={handleSaveEditAssignment}
+                className="w-full sm:w-auto gap-1.5"
+              >
+                {savingAssignmentEdit ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <span>Save Changes</span>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

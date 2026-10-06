@@ -8,6 +8,12 @@ class FieldAssignmentCreate(BaseModel):
     prospect_ids: list[UUID]
 
 
+class FieldAssignmentUpdate(BaseModel):
+    status: str | None = None
+    notes: str | None = None
+    remind_at: datetime | None = None
+
+
 class FieldAssignmentRead(BaseModel):
     id: UUID
     prospect_id: UUID | None

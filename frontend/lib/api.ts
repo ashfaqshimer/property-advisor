@@ -1535,6 +1535,31 @@ export async function resendFieldAssignment(assignmentId: string): Promise<Field
   return (await response.json()) as FieldAssignment;
 }
 
+export async function updateFieldAssignment(
+  assignmentId: string,
+  data: { status?: string; notes?: string; remind_at?: string | null }
+): Promise<FieldAssignment> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/admin/field-assignments/${assignmentId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    let detail = `Update failed (${response.status}).`;
+    try {
+      const p = await response.json();
+      if (p.detail) detail = p.detail;
+    } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return (await response.json()) as FieldAssignment;
+}
+
 export async function deleteFieldAssignment(assignmentId: string): Promise<{ ok: boolean; id: string }> {
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/admin/field-assignments/${assignmentId}`,

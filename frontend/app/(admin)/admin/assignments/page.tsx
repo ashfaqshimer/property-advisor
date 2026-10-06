@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, MessageSquare, Phone, Send, Trash2, Clock } from "lucide-react";
+import { ExternalLink, RefreshCw, MessageSquare, Phone, Send, Trash2, Clock, Pencil } from "lucide-react";
 import {
   FieldAssignment,
   PaginatedFieldAssignments,
   getCurrentUser,
   getFieldAssignments,
   resendFieldAssignment,
+  updateFieldAssignment,
   deleteFieldAssignment,
   processDueFieldAssignmentReminders,
 } from "../../../../lib/api";
@@ -141,6 +142,44 @@ export default function AssignmentsPage() {
       toast.error(err.message || "Failed to remove assignment.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const [editingAssignment, setEditingAssignment] = useState<FieldAssignment | null>(null);
+  const [editStatus, setEditStatus] = useState<string>("pending");
+  const [editNotes, setEditNotes] = useState<string>("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleOpenEdit = (assignment: FieldAssignment) => {
+    setEditingAssignment(assignment);
+    setEditStatus(assignment.status === "interested" ? "contacted" : assignment.status);
+    setEditNotes(assignment.notes || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingAssignment) return;
+    setSavingEdit(true);
+    try {
+      const updated = await updateFieldAssignment(editingAssignment.id, {
+        status: editStatus,
+        notes: editNotes,
+      });
+      toast.success("Assignment updated successfully.");
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((item) =>
+                item.id === editingAssignment.id ? { ...item, ...updated } : item
+              ),
+            }
+          : null
+      );
+      setEditingAssignment(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update assignment.");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -371,7 +410,15 @@ export default function AssignmentsPage() {
                     {/* Status */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex flex-col gap-1 items-start">
-                        <StatusBadge status={a.status} />
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(a)}
+                          className="group inline-flex items-center gap-1.5 cursor-pointer rounded-full transition hover:opacity-85 text-left"
+                          title="Click to change assignment outcome or notes"
+                        >
+                          <StatusBadge status={a.status} />
+                          <Pencil className="h-3 w-3 text-muted-foreground opacity-40 group-hover:opacity-100 transition" />
+                        </button>
                         {a.status === "no_answer" && (
                           <div className="flex items-center gap-1 text-[11px]">
                             {a.remind_at ? (
@@ -396,13 +443,20 @@ export default function AssignmentsPage() {
 
                     {/* Notes */}
                     <td className="hidden lg:table-cell px-4 py-3 max-w-[200px]">
-                      {a.notes ? (
-                        <p className="text-xs text-[#1a2923] dark:text-zinc-300 line-clamp-2">
-                          {a.notes}
-                        </p>
-                      ) : (
-                        <span className="text-xs text-[#c5d4cc] dark:text-zinc-600">—</span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(a)}
+                        className="text-left w-full hover:bg-muted/50 p-1 -m-1 rounded transition cursor-pointer group"
+                        title="Click to edit notes"
+                      >
+                        {a.notes ? (
+                          <p className="text-xs text-[#1a2923] dark:text-zinc-300 line-clamp-2">
+                            {a.notes}
+                          </p>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/60 italic group-hover:text-muted-foreground transition">+ Add notes</span>
+                        )}
+                      </button>
                     </td>
 
                     {/* Assigned at */}
@@ -415,6 +469,16 @@ export default function AssignmentsPage() {
                     {/* Actions */}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1.5 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenEdit(a)}
+                          title="Update outcome or notes"
+                          className="h-7 gap-1 px-2 text-xs font-semibold cursor-pointer"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          <span>Edit</span>
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -524,6 +588,109 @@ export default function AssignmentsPage() {
                     <Trash2 className="h-3.5 w-3.5" />
                     <span>Remove Assignment</span>
                   </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Assignment Modal */}
+      {editingAssignment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="bg-card text-card-foreground rounded-xl border border-border shadow-xl w-full max-w-md p-6 transform transition-all">
+            <h3 className="text-lg font-semibold text-foreground">
+              Update Assignment Outcome
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground truncate">
+              {editingAssignment.prospect_poster_name || editingAssignment.prospect_title || "Assignment details"}
+            </p>
+            {editingAssignment.prospect_phone_number && (
+              <p className="mt-0.5 text-xs font-mono text-muted-foreground">
+                📞 {editingAssignment.prospect_phone_number}
+              </p>
+            )}
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Assignment Status
+                </label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="pending">Pending (Awaiting agent)</option>
+                  <option value="contacted">✅ Contacted</option>
+                  <option value="callback_later">🔄 Call Back Later</option>
+                  <option value="no_answer">📵 No Answer (Next-day reminder)</option>
+                  <option value="not_interested">❌ Not Interested (Discard prospect)</option>
+                </select>
+
+                <div className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-2.5">
+                  {editStatus === "not_interested" && (
+                    <span className="text-destructive font-medium">
+                      ⚠️ Marking as Not Interested will automatically move the prospect to Discarded in the pipeline.
+                    </span>
+                  )}
+                  {editStatus === "no_answer" && (
+                    <span className="text-amber-700 dark:text-amber-400 font-medium">
+                      ⏰ Schedules an automated 10:00 AM follow-up reminder for tomorrow.
+                    </span>
+                  )}
+                  {(editStatus === "contacted" || editStatus === "callback_later") && (
+                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                      ✅ Marks the associated prospect as Contacted in the pipeline.
+                    </span>
+                  )}
+                  {editStatus === "pending" && (
+                    <span>
+                      🔄 Resets status to Pending awaiting field agent response on Telegram.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Notes / Feedback (Optional)
+                </label>
+                <textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Add or update notes from the call or agent interaction..."
+                  className="w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={savingEdit}
+                onClick={() => setEditingAssignment(null)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={savingEdit}
+                onClick={handleSaveEdit}
+                className="w-full sm:w-auto gap-1.5"
+              >
+                {savingEdit ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <span>Save Changes</span>
                 )}
               </Button>
             </div>

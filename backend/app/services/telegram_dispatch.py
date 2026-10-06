@@ -404,6 +404,42 @@ def edit_assignment_card(
     return edit_telegram_message(token, chat_id, message_id, text, reply_markup=markup)
 
 
+def sync_telegram_assignment_card(
+    assignment: Any,
+    status: str,
+    actor_name: str | None = None,
+) -> bool:
+    """Sync the Telegram message card in-place if telegram_message_id is tracked and Telegram is configured."""
+    message_id = getattr(assignment, "telegram_message_id", None)
+    if not message_id:
+        return False
+
+    settings = get_settings()
+    token = settings.telegram_bot_token.strip()
+    chat_id = (
+        settings.telegram_assignments_chat_id.strip()
+        or settings.telegram_agent_chat_id.strip()
+        or settings.telegram_chat_id.strip()
+    )
+    if not token or not chat_id:
+        return False
+
+    reply_markup = (
+        _build_assignment_keyboard(str(assignment.id))
+        if status == "pending"
+        else {"inline_keyboard": []}
+    )
+    return edit_assignment_card(
+        token=token,
+        chat_id=chat_id,
+        message_id=message_id,
+        assignment=assignment,
+        status=status,
+        actor_name=actor_name,
+        reply_markup=reply_markup,
+    )
+
+
 def send_confirmation(
     chat_id: str,
     token: str,

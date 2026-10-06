@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   deleteFieldAssignment,
   deleteFieldAssignmentByProspect,
+  updateFieldAssignment,
   ChatError,
 } from "@/lib/api";
 
@@ -14,7 +15,28 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("field assignments API deletion", () => {
+describe("field assignments API update and deletion", () => {
+  it("updates field assignment status and notes", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const updatedRecord = { id: "asgn-123", status: "contacted", notes: "Called owner directly" };
+    const fetchSpy = vi.fn(async () => jsonResponse(200, updatedRecord));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await updateFieldAssignment("asgn-123", {
+      status: "contacted",
+      notes: "Called owner directly",
+    });
+    expect(result).toEqual(updatedRecord);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/admin/field-assignments/asgn-123",
+      expect.objectContaining({
+        method: "PATCH",
+        credentials: "include",
+        body: JSON.stringify({ status: "contacted", notes: "Called owner directly" }),
+      })
+    );
+  });
+
   it("deletes field assignment by ID", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
     const fetchSpy = vi.fn(async () => jsonResponse(200, { ok: true, id: "asgn-123" }));

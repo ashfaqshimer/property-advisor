@@ -361,3 +361,82 @@ def test_format_reminder_message_status_and_verified():
     assert "⏰ <b>Follow-up Reminder • 📵 No Answer</b>" in msg
     assert "✍️ <b>Updated by:</b> Agent Sarah" in msg
 
+
+def test_update_assignment_status_and_notes(authenticated_client: TestClient, seeded: Session):
+    from app.models.scan_job import ScanJob
+
+    job = ScanJob(
+        id=uuid.uuid4(),
+        source="ikman",
+        job_type="manual",
+        status="completed",
+        progress="done",
+        new_count=5,
+        filtered_count=2,
+    )
+    seeded.add(job)
+
+    prospect = Prospect(
+        id=uuid.uuid4(),
+        source="ikman",
+        source_id="p-123",
+        title="House in Maharagama",
+        price="Rs 25,000,000",
+        location="Maharagama",
+        property_type="house",
+        listing_type="for_sale",
+        classification="owner",
+        confidence=90,
+        classification_reasons=["owner"],
+        classification_method="heuristic",
+        status="contacted",
+        first_scan_job_id=job.id,
+    )
+    seeded.add(prospect)
+
+    assignment = FieldAssignment(
+        id=uuid.uuid4(),
+        prospect_id=prospect.id,
+        status="contacted",
+        telegram_message_id=777,
+    )
+    seeded.add(assignment)
+    seeded.commit()
+
+    with patch("app.api.field_assignments.sync_telegram_assignment_card") as mock_sync_card:
+        # 1. Update status to not_interested -> cascades prospect to discarded and updates scan job
+        res = authenticated_client.patch(
+            f"/admin/field-assignments/{assignment.id}",
+            json={"status": "not_interested", "notes": "Owner already sold last week"},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "not_interested"
+        assert data["notes"] == "Owner already sold last week"
+
+        seeded.refresh(prospect)
+        seeded.refresh(job)
+        seeded.refresh(assignment)
+        assert prospect.status == "discarded"
+        assert prospect.discard_reason == "not_interested"
+        assert job.new_count == 4
+        assert job.filtered_count == 3
+        mock_sync_card.assert_called_once()
+
+    with patch("app.api.field_assignments.sync_telegram_assignment_card"):
+        # 2. Correct mistake: Admin updates status to no_answer -> clears discard, sets remind_at
+        res2 = authenticated_client.patch(
+            f"/admin/field-assignments/{assignment.id}",
+            json={"status": "no_answer"},
+        )
+        assert res2.status_code == 200
+        seeded.refresh(prospect)
+        seeded.refresh(job)
+        seeded.refresh(assignment)
+        assert assignment.status == "no_answer"
+        assert assignment.remind_at is not None
+        assert prospect.status == "new"
+        assert prospect.discard_reason is None
+        assert job.new_count == 5
+        assert job.filtered_count == 2
+

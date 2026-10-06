@@ -10,21 +10,26 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentStaffUser, RootStaffUser
+from app.config import get_settings
 from app.db.session import get_db
 from app.models.field_assignment import FieldAssignment
 from app.models.prospect import Prospect
+from app.models.scan_job import ScanJob
 from app.schemas.auth import StaffRole
 from app.schemas.field_assignment import (
     FieldAssignmentCreate,
     FieldAssignmentList,
     FieldAssignmentRead,
+    FieldAssignmentUpdate,
 )
 from app.services.prospect_contacts import fetch_prospect_contact_details
 from app.services.telegram_dispatch import (
     PROSPECT_STATUS_MAP,
+    calculate_next_reminder_time,
     delete_assignment_message,
     process_due_reminders,
     send_assignment_message,
+    sync_telegram_assignment_card,
 )
 
 logger = structlog.get_logger(__name__)
@@ -203,6 +208,106 @@ def get_assignment(
     if not a:
         raise HTTPException(status_code=404, detail="Assignment not found.")
     return _assignment_to_read(a)
+
+
+@router.patch("/{assignment_id}", response_model=FieldAssignmentRead)
+def update_assignment(
+    assignment_id: uuid.UUID,
+    body: FieldAssignmentUpdate,
+    db: DbSession,
+    current_user: CurrentStaffUser,
+) -> FieldAssignmentRead:
+    """Update a field assignment status, notes, or reminder time from the admin panel."""
+    if current_user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Only root and admin users can update field assignments.")
+
+    assignment = db.get(FieldAssignment, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found.")
+
+    old_status = assignment.status
+
+    if body.notes is not None:
+        assignment.notes = body.notes
+
+    if body.status is not None:
+        new_status = body.status.strip().lower()
+        if new_status == "interested":
+            new_status = "contacted"
+        if new_status not in {"pending", "contacted", "not_interested", "no_answer", "callback_later"}:
+            raise HTTPException(status_code=422, detail=f"Invalid status: {body.status}")
+
+        assignment.status = new_status
+
+        # Reminder scheduling
+        if new_status == "no_answer":
+            if body.remind_at is not None:
+                assignment.remind_at = body.remind_at
+            elif not assignment.remind_at or old_status != "no_answer":
+                assignment.remind_at = calculate_next_reminder_time()
+            assignment.reminder_sent_at = None
+        else:
+            if body.remind_at is not None:
+                assignment.remind_at = body.remind_at
+            else:
+                assignment.remind_at = None
+
+        # Sync associated prospect status & scan job statistics
+        if assignment.prospect_id:
+            prospect = db.get(Prospect, assignment.prospect_id)
+            if prospect:
+                old_prospect_status = prospect.status
+                if new_status == "not_interested":
+                    prospect.status = "discarded"
+                    prospect.discard_reason = "not_interested"
+                    if old_prospect_status != "discarded" and prospect.first_scan_job_id:
+                        scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                        if scan_job:
+                            scan_job.new_count = max(0, (scan_job.new_count or 0) - 1)
+                            scan_job.filtered_count = (scan_job.filtered_count or 0) + 1
+                elif new_status in ("contacted", "callback_later"):
+                    if old_prospect_status == "discarded":
+                        prospect.discard_reason = None
+                        if prospect.first_scan_job_id:
+                            scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                            if scan_job:
+                                scan_job.new_count = (scan_job.new_count or 0) + 1
+                                scan_job.filtered_count = max(0, (scan_job.filtered_count or 0) - 1)
+                    prospect.status = "contacted"
+                elif new_status in ("pending", "no_answer"):
+                    if old_prospect_status == "discarded" and prospect.discard_reason == "not_interested":
+                        prospect.status = "new"
+                        prospect.discard_reason = None
+                        if prospect.first_scan_job_id:
+                            scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                            if scan_job:
+                                scan_job.new_count = (scan_job.new_count or 0) + 1
+                                scan_job.filtered_count = max(0, (scan_job.filtered_count or 0) - 1)
+    elif body.remind_at is not None:
+        assignment.remind_at = body.remind_at
+
+    assignment.updated_at = func.now()
+    db.commit()
+    db.refresh(assignment)
+
+    # Sync telegram message card if present
+    if assignment.telegram_message_id:
+        try:
+            actor = getattr(current_user, "full_name", None) or getattr(current_user, "email", "Staff")
+            sync_telegram_assignment_card(
+                assignment=assignment,
+                status=assignment.status,
+                actor_name=f"Admin ({actor})",
+            )
+        except Exception as exc:
+            logger.warning(
+                "field_assignment_telegram_edit_error",
+                assignment_id=str(assignment_id),
+                error=str(exc),
+            )
+
+    logger.info("field_assignment_updated", assignment_id=str(assignment_id), status=assignment.status, by=str(current_user.id))
+    return _assignment_to_read(assignment)
 
 
 @router.post("/{assignment_id}/resend", response_model=FieldAssignmentRead)
