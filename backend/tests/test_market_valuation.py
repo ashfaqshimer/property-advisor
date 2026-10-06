@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.agent import tools
 from app.agent.tools import ToolArgumentError, ToolContext
-from app.models import Conversation, Property, PropertyStatus, PropertyType, Suburb, Prospect
+from app.models import Conversation, ListingType, Property, PropertyStatus, PropertyType, Suburb, Prospect
 from app.services.price_parser import parse_lkr_price
 from app.services.market_valuation import calculate_suburb_market_value, extract_sub_area
 from app.services.suburb_seeds import seed_suburbs_data
@@ -198,6 +198,66 @@ class TestProspectPriceGrading:
         assert grade_over["price_grade"] == "overpriced"
         assert "Overpriced" in grade_over["price_grade_label"]
         assert grade_over["price_diff_percent"] > 15
+
+    def test_house_grading_does_not_mix_perch_and_sqft_units(self, db_session: Session):
+        from app.services.market_valuation import grade_property_pricing
+        seed_suburbs_data(db_session)
+
+        # Scraped house prospects with floor area only (standard for Colombo houses)
+        h1 = Prospect(
+            title="House in Woodland Avenue Dehiwala",
+            price="Rs. 65M",
+            price_numeric=Decimal("65000000"),
+            floor_area_sqft=2300,
+            location="woodland avenue, Dehiwala",
+            suburb="Dehiwala",
+            property_type="house",
+            listing_type="sale",
+            classification="owner",
+            confidence=90,
+            classification_reasons=["test"],
+            classification_method="heuristic",
+            status="new",
+        )
+        h2 = Prospect(
+            title="House in Bellantara Road Dehiwala",
+            price="Rs. 90M",
+            price_numeric=Decimal("90000000"),
+            floor_area_sqft=3300,
+            location="Bellanthara Road, Dehiwala",
+            suburb="Dehiwala",
+            property_type="house",
+            listing_type="sale",
+            classification="owner",
+            confidence=90,
+            classification_reasons=["test"],
+            classification_method="heuristic",
+            status="new",
+        )
+        db_session.add_all([h1, h2])
+        db_session.commit()
+
+        # Property with both land size (6 perches) and floor area (1600 sqft)
+        prop = Property(
+            title="Well-Maintained 3-Bedroom House for Sale in Dehiwala",
+            price=Decimal("69000000"),
+            property_type=PropertyType.HOUSE,
+            listing_type=ListingType.SALE,
+            land_size_perches=Decimal("6.0"),
+            floor_area_sqft=1600,
+            location="Dehiwala",
+            status=PropertyStatus.AVAILABLE,
+        )
+        db_session.add(prop)
+        db_session.commit()
+
+        grade = grade_property_pricing(db_session, prop)
+        # Unit must be LKR / Sq.Ft. and diff percent must be realistic (~50%, NOT +40000%)
+        assert grade["price_unit_label"] == "LKR / Sq.Ft."
+        assert grade["price_unit_rate"] == 43125.0  # 69M / 1600
+        assert grade["price_diff_percent"] is not None
+        assert 30.0 < grade["price_diff_percent"] < 100.0
+
 
 
 class TestMonthlyTrends:

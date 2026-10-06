@@ -215,10 +215,11 @@ def calculate_suburb_market_value(
     property_type: str | None = None,
     listing_type: str = "sale",
     max_days: int = 90,
+    unit_type: str | None = None,
 ) -> dict[str, Any]:
     """
     Calculates detailed, micro-area aware market valuation statistics.
-    Focuses on per-unit pricing (per perch for land/houses, per sqft for apartments),
+    Focuses on per-unit pricing (per perch for land, per sqft for apartments/houses/commercial),
     source provenance transparency, and grading thresholds.
     """
     suburb_entity, detected_sub_area = get_suburb_by_query(db, location_query)
@@ -333,9 +334,12 @@ def calculate_suburb_market_value(
 
     # Process prices and per-unit metrics
     primary_property_type = (property_type or "land").lower()
-    is_apartment_or_commercial = primary_property_type in ("apartment", "commercial")
-    primary_unit = "per_sqft" if is_apartment_or_commercial else "per_perch"
-    unit_label = "LKR / Sq.Ft." if is_apartment_or_commercial else "LKR / Perch"
+    if unit_type in ("per_perch", "per_sqft"):
+        primary_unit = unit_type
+    else:
+        is_perch = primary_property_type == "land"
+        primary_unit = "per_perch" if is_perch else "per_sqft"
+    unit_label = "LKR / Perch" if primary_unit == "per_perch" else "LKR / Sq.Ft."
 
     raw_prices: list[Decimal] = []
     unit_rates: list[Decimal] = []
@@ -353,27 +357,31 @@ def calculate_suburb_market_value(
         item_total_price: Decimal | None = None
 
         pt = item["property_type"].lower()
+        perches = item["land_size_perches"]
+        sqft = item["floor_area_sqft"]
+
         if pt == "land":
             if item["is_price_per_perch"]:
-                item_unit_rate = p_val
-                if item["land_size_perches"] and item["land_size_perches"] > 0:
-                    item_total_price = p_val * item["land_size_perches"]
+                if perches and perches > 0:
+                    item_total_price = p_val * perches
                 else:
                     item_total_price = p_val
+                if primary_unit == "per_perch":
+                    item_unit_rate = p_val
             else:
                 item_total_price = p_val
-                if item["land_size_perches"] and item["land_size_perches"] > 0:
-                    item_unit_rate = p_val / item["land_size_perches"]
+                if primary_unit == "per_perch" and perches and perches > 0:
+                    item_unit_rate = p_val / perches
         elif pt in ("apartment", "commercial"):
             item_total_price = p_val
-            if item["floor_area_sqft"] and item["floor_area_sqft"] > 0:
-                item_unit_rate = p_val / Decimal(item["floor_area_sqft"])
+            if primary_unit == "per_sqft" and sqft and sqft > 0:
+                item_unit_rate = p_val / Decimal(sqft)
         else:  # house
             item_total_price = p_val
-            if item["land_size_perches"] and item["land_size_perches"] > 0:
-                item_unit_rate = p_val / item["land_size_perches"]
-            elif item["floor_area_sqft"] and item["floor_area_sqft"] > 0:
-                item_unit_rate = p_val / Decimal(item["floor_area_sqft"])
+            if primary_unit == "per_perch" and perches and perches > 0:
+                item_unit_rate = p_val / perches
+            elif primary_unit == "per_sqft" and sqft and sqft > 0:
+                item_unit_rate = p_val / Decimal(sqft)
 
         if item_total_price:
             raw_prices.append(item_total_price)
@@ -404,16 +412,23 @@ def calculate_suburb_market_value(
         if not p_val or p_val <= 0:
             continue
         pt = item["property_type"].lower()
+        perches = item["land_size_perches"]
+        sqft = item["floor_area_sqft"]
         rate = None
         if pt == "land":
-            if item["is_price_per_perch"]:
-                rate = p_val
-            elif item["land_size_perches"] and item["land_size_perches"] > 0:
-                rate = p_val / item["land_size_perches"]
-        elif pt in ("apartment", "commercial") and item["floor_area_sqft"] and item["floor_area_sqft"] > 0:
-            rate = p_val / Decimal(item["floor_area_sqft"])
-        elif item["land_size_perches"] and item["land_size_perches"] > 0:
-            rate = p_val / item["land_size_perches"]
+            if primary_unit == "per_perch":
+                if item["is_price_per_perch"]:
+                    rate = p_val
+                elif perches and perches > 0:
+                    rate = p_val / perches
+        elif pt in ("apartment", "commercial"):
+            if primary_unit == "per_sqft" and sqft and sqft > 0:
+                rate = p_val / Decimal(sqft)
+        else:  # house
+            if primary_unit == "per_perch" and perches and perches > 0:
+                rate = p_val / perches
+            elif primary_unit == "per_sqft" and sqft and sqft > 0:
+                rate = p_val / Decimal(sqft)
 
         if rate:
             all_sub_area_rates_map.setdefault(item["sub_area"], []).append(rate)
@@ -441,7 +456,7 @@ def calculate_suburb_market_value(
     total_stats = _percentiles(raw_prices)
 
     # MarketBenchmark fallback if active listing samples are sparse or empty
-    if not unit_stats["median"] or len(filtered_listings) < 3:
+    if not unit_stats["median"] or len(unit_rates) < 3:
         from app.models.market_benchmark import MarketBenchmark
         from app.services.benchmark_sync import normalize_location_name
         from sqlalchemy import func as sa_func
@@ -460,12 +475,8 @@ def calculate_suburb_market_value(
                 bm_rate = float(bm_row.rate_per_perch)
             elif primary_unit == "per_sqft" and bm_row.rate_per_sqft:
                 bm_rate = float(bm_row.rate_per_sqft)
-            elif pt_target == "land" and bm_row.rate_per_perch:
-                bm_rate = float(bm_row.rate_per_perch)
-            elif bm_row.rate_per_sqft:
-                bm_rate = float(bm_row.rate_per_sqft)
 
-            if bm_rate and (not unit_stats["median"] or len(filtered_listings) < 3):
+            if bm_rate and (not unit_stats["median"] or len(unit_rates) < 3):
                 unit_stats["median"] = bm_rate
                 unit_stats["min"] = round(bm_rate * 0.85, 2)
                 unit_stats["max"] = round(bm_rate * 1.15, 2)
@@ -549,6 +560,7 @@ def calculate_suburb_market_value(
         property_type=primary_property_type,
         listing_type=listing_type,
         months_back=6,
+        unit_type=primary_unit,
     )
 
     return {
@@ -575,9 +587,9 @@ def calculate_suburb_market_value(
             "max": unit_stats["max"],
             "realized_deal_target": realized_unit_target,
             "benchmark_range": (
-                [baseline_sqft_min, baseline_sqft_max]
-                if is_apartment_or_commercial
-                else [baseline_land_min, baseline_land_max]
+                [baseline_land_min, baseline_land_max]
+                if primary_unit == "per_perch"
+                else [baseline_sqft_min, baseline_sqft_max]
             ),
         },
         "total_pricing": {
@@ -626,6 +638,7 @@ def calculate_monthly_trends(
     property_type: str | None = "land",
     listing_type: str = "sale",
     months_back: int = 6,
+    unit_type: str | None = None,
 ) -> dict[str, Any]:
     """
     Computes monthly median unit rate trends and month-over-month percentage changes
@@ -660,8 +673,11 @@ def calculate_monthly_trends(
 
     earliest_dt = slots[0][2]
     pt = (property_type or "land").lower()
-    is_apartment_or_commercial = pt in ("apartment", "commercial")
-    unit_label = "LKR / Sq.Ft." if is_apartment_or_commercial else "LKR / Perch"
+    if unit_type in ("per_perch", "per_sqft"):
+        primary_unit = unit_type
+    else:
+        primary_unit = "per_perch" if pt == "land" else "per_sqft"
+    unit_label = "LKR / Perch" if primary_unit == "per_perch" else "LKR / Sq.Ft."
 
     # Query prospects in overall window
     prospect_stmt = select(Prospect).where(
@@ -705,16 +721,19 @@ def calculate_monthly_trends(
 
         rate = None
         if p_type == "land":
-            if is_ppp:
-                rate = price_val
-            elif perches and perches > 0:
+            if primary_unit == "per_perch":
+                if is_ppp:
+                    rate = price_val
+                elif perches and perches > 0:
+                    rate = price_val / perches
+        elif p_type in ("apartment", "commercial"):
+            if primary_unit == "per_sqft" and sqft and sqft > 0:
+                rate = price_val / Decimal(sqft)
+        else:  # house
+            if primary_unit == "per_perch" and perches and perches > 0:
                 rate = price_val / perches
-        elif p_type in ("apartment", "commercial") and sqft and sqft > 0:
-            rate = price_val / Decimal(sqft)
-        elif perches and perches > 0:
-            rate = price_val / perches
-        elif sqft and sqft > 0:
-            rate = price_val / Decimal(sqft)
+            elif primary_unit == "per_sqft" and sqft and sqft > 0:
+                rate = price_val / Decimal(sqft)
 
         if rate:
             rates_by_period[p_str].append(rate)
@@ -825,28 +844,33 @@ def grade_prospect_pricing(
 
     unit_rate: float | None = None
     unit_label: str | None = None
+    unit_type: str | None = None
     land_size = getattr(prospect, "land_size_perches", None)
     floor_sqft = getattr(prospect, "floor_area_sqft", None)
 
     if pt == "land":
+        unit_type = "per_perch"
         unit_label = "LKR / Perch"
         if is_ppp:
             unit_rate = float(p_val)
         elif land_size and land_size > 0:
             unit_rate = float(p_val / Decimal(str(land_size)))
     elif pt in ("apartment", "commercial"):
+        unit_type = "per_sqft"
         unit_label = "LKR / Sq.Ft."
         if floor_sqft and floor_sqft > 0:
             unit_rate = float(p_val / Decimal(str(floor_sqft)))
     else:  # house, mixed_use
-        if land_size and land_size > 0:
-            unit_label = "LKR / Perch"
-            unit_rate = float(p_val / Decimal(str(land_size)))
-        elif floor_sqft and floor_sqft > 0:
+        if floor_sqft and floor_sqft > 0:
+            unit_type = "per_sqft"
             unit_label = "LKR / Sq.Ft."
             unit_rate = float(p_val / Decimal(str(floor_sqft)))
+        elif land_size and land_size > 0:
+            unit_type = "per_perch"
+            unit_label = "LKR / Perch"
+            unit_rate = float(p_val / Decimal(str(land_size)))
 
-    if not unit_rate:
+    if not unit_rate or not unit_type:
         return {
             "price_grade": "unrated",
             "price_grade_label": None,
@@ -858,13 +882,14 @@ def grade_prospect_pricing(
 
     # Location lookup
     target_loc = getattr(prospect, "suburb", None) or getattr(prospect, "location", None) or "Colombo"
-    cache_key = f"{target_loc.lower()}:{pt}"
 
     raw_lt = getattr(prospect, "listing_type", None)
     if hasattr(raw_lt, "value"):
         raw_lt = raw_lt.value
     raw_lt_str = str(raw_lt).lower() if raw_lt else "sale"
     listing_type_str = "sale" if "sale" in raw_lt_str else "rent"
+
+    cache_key = f"{target_loc.lower()}:{pt}:{unit_type}:{listing_type_str}"
 
     if valuation_cache is not None and cache_key in valuation_cache:
         valuation = valuation_cache[cache_key]
@@ -874,6 +899,7 @@ def grade_prospect_pricing(
             location_query=target_loc,
             property_type=pt,
             listing_type=listing_type_str,
+            unit_type=unit_type,
         )
         if valuation_cache is not None:
             valuation_cache[cache_key] = valuation
@@ -918,15 +944,15 @@ def grade_prospect_pricing(
             ).limit(1)
         ).scalar_one_or_none()
         if bm_row:
-            if pt == "land" and bm_row.rate_per_perch:
+            if unit_type == "per_perch" and bm_row.rate_per_perch:
                 target_median = float(bm_row.rate_per_perch)
-            elif pt in ("apartment", "commercial") and bm_row.rate_per_sqft:
+            elif unit_type == "per_sqft" and bm_row.rate_per_sqft:
                 target_median = float(bm_row.rate_per_sqft)
-            elif pt == "house":
-                if unit_label == "LKR / Sq.Ft." and bm_row.rate_per_sqft:
-                    target_median = float(bm_row.rate_per_sqft)
-                elif unit_label == "LKR / Perch" and bm_row.rate_per_perch:
-                    target_median = float(bm_row.rate_per_perch)
+
+    # Verify that valuation unit matches property unit before comparing
+    val_unit = valuation.get("unit_pricing", {}).get("primary_unit")
+    if target_median and val_unit and val_unit != unit_type:
+        target_median = None
 
     if not target_median or target_median <= 0:
         return {

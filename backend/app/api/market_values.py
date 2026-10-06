@@ -58,6 +58,7 @@ def get_market_value_estimate(
     property_type: str | None = Query(None, description="house, apartment, land, commercial"),
     listing_type: str = Query("sale", description="sale or rent"),
     max_days: int = Query(90, description="Listing sourcing lookback window in days (default 90)"),
+    unit_type: str | None = Query(None, description="Optional unit type ('per_perch' or 'per_sqft')"),
 ) -> dict[str, Any]:
     """
     Returns estimated market value, per-unit price percentiles (per perch/sqft),
@@ -70,6 +71,7 @@ def get_market_value_estimate(
         property_type=property_type,
         listing_type=listing_type,
         max_days=max_days,
+        unit_type=unit_type,
     )
 
 
@@ -81,6 +83,7 @@ def get_market_trends(
     property_type: str | None = Query("land", description="land, house, apartment, commercial"),
     listing_type: str = Query("sale", description="sale or rent"),
     months_back: int = Query(6, ge=1, le=24, description="Months of historical trend data"),
+    unit_type: str | None = Query(None, description="Optional unit type ('per_perch' or 'per_sqft')"),
 ) -> dict[str, Any]:
     """
     Returns monthly median unit rate trends and month-over-month percentage changes.
@@ -93,6 +96,7 @@ def get_market_trends(
         property_type=property_type,
         listing_type=listing_type,
         months_back=months_back,
+        unit_type=unit_type,
     )
 
 
