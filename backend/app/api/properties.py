@@ -133,7 +133,7 @@ def extract_property_from_text(
     1. Language & Output:
        - Regardless of whether the input is in Sinhala, Singlish, or English, generate the 'title' and 'description' in polished, professional English suitable for a Colombo-focused real estate catalog.
        - Title should be concise and descriptive (e.g. "Newly Built 3-Bedroom House in Homagama", "Luxury 2-Bedroom Apartment in Colombo 3").
-       - Description should be well-written, informative English highlighting key property features, specifications, and neighborhood context, while omitting conversational/chat noise (e.g. "call quickly", "urgent sale", "genuine buyers only").
+       - Description should be well-written, informative English highlighting key property features, specifications, and neighborhood context, while omitting conversational/chat noise (e.g. "call quickly", "urgent sale", "genuine buyers only"). Never use terms like "lakhs" or "crores" in the description; standardize all price references to millions or thousands (e.g. "35M LKR", "2.5 Million LKR").
        - 'location' should be the standard Sri Lankan town or neighborhood name in English (e.g. "Homagama", "Colombo 4", "Rajagiriya", "Kaduwela", "Nugegoda", "Galle").
 
     2. Sri Lankan Currency & Price Conversion (CRITICAL):

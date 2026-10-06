@@ -48,11 +48,15 @@ import {
 
 function formatLKR(amount: number | null | undefined): string {
   if (amount == null) return "—";
-  if (amount >= 10_000_000) {
-    return `LKR ${(amount / 10_000_000).toFixed(2)} Cr`;
+  if (amount >= 1_000_000) {
+    const m = amount / 1_000_000;
+    const formatted = m < 100 ? m.toFixed(2).replace(/\.?0+$/, "") : m.toFixed(1).replace(/\.?0+$/, "");
+    return `LKR ${formatted}M`;
   }
-  if (amount >= 100_000) {
-    return `LKR ${(amount / 100_000).toFixed(1)} Lakhs`;
+  if (amount >= 1_000) {
+    const k = amount / 1_000;
+    const formatted = k < 10 ? k.toFixed(1).replace(/\.?0+$/, "") : Math.round(k).toString();
+    return `LKR ${formatted}K`;
   }
   return `LKR ${Math.round(amount).toLocaleString()}`;
 }

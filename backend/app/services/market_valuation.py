@@ -197,10 +197,14 @@ def _calculate_grading_thresholds(median_rate: float | None) -> dict[str, float 
 def _format_lkr_short(val: float | None) -> str:
     if val is None:
         return "—"
-    if val >= 10_000_000:
-        return f"LKR {val / 10_000_000:.2f} Cr"
-    if val >= 100_000:
-        return f"LKR {val / 100_000:.1f} Lakhs"
+    if val >= 1_000_000:
+        m = val / 1_000_000
+        formatted = f"{m:.2f}".rstrip("0").rstrip(".") if m < 100 else f"{m:.1f}".rstrip("0").rstrip(".")
+        return f"LKR {formatted}M"
+    if val >= 1_000:
+        k = val / 1_000
+        formatted = f"{k:.1f}".rstrip("0").rstrip(".") if k < 10 else f"{k:.0f}"
+        return f"LKR {formatted}K"
     return f"LKR {val:,.0f}"
 
 
