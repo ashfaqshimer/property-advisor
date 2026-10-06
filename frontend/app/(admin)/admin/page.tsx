@@ -63,6 +63,7 @@ export default function AdminPropertiesPage() {
 	const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 	const [selectingPhotoProperty, setSelectingPhotoProperty] = useState<Property | null>(null);
 	const [savingPhotoId, setSavingPhotoId] = useState<string | null>(null);
+	const [savingPhotoUrl, setSavingPhotoUrl] = useState<string | null>(null);
 
 	// Filters
 	const [searchQuery, setSearchQuery] = useState('');
@@ -107,7 +108,9 @@ export default function AdminPropertiesPage() {
 	}, []);
 
 	async function handleSelectFeaturedPhoto(propertyId: string, url: string) {
+		if (savingPhotoId || savingPhotoUrl) return;
 		setSavingPhotoId(propertyId);
+		setSavingPhotoUrl(url);
 		try {
 			await updateAdminProperty(propertyId, { featured_image_url: url });
 			setProperties((current) =>
@@ -121,6 +124,7 @@ export default function AdminPropertiesPage() {
 			toast.error(err instanceof Error ? err.message : 'Could not update featured photo.');
 		} finally {
 			setSavingPhotoId(null);
+			setSavingPhotoUrl(null);
 		}
 	}
 
@@ -583,8 +587,15 @@ export default function AdminPropertiesPage() {
 				</div>
 			)}
 			{selectingPhotoProperty && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-					<div className="bg-card text-card-foreground border border-border rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] flex flex-col">
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+					onClick={(e) => {
+						if (e.target === e.currentTarget && !savingPhotoId) {
+							setSelectingPhotoProperty(null);
+						}
+					}}
+				>
+					<div className="bg-card text-card-foreground border border-border rounded-xl shadow-2xl w-full max-w-lg p-4 sm:p-6 max-h-[90vh] flex flex-col">
 						<div className="flex items-start justify-between pb-3 border-b border-border">
 							<div>
 								<h3 className="text-base font-semibold text-foreground">Select Featured Photo</h3>
@@ -592,8 +603,12 @@ export default function AdminPropertiesPage() {
 							</div>
 							<button
 								type="button"
-								onClick={() => setSelectingPhotoProperty(null)}
-								className="text-muted-foreground hover:text-foreground transition cursor-pointer p-1 text-base leading-none"
+								disabled={Boolean(savingPhotoId)}
+								onClick={() => {
+									if (!savingPhotoId) setSelectingPhotoProperty(null);
+								}}
+								className="text-muted-foreground hover:text-foreground transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 p-1 text-base leading-none"
+								aria-label="Close"
 							>
 								✕
 							</button>
@@ -603,30 +618,69 @@ export default function AdminPropertiesPage() {
 							Click any photo to set it as the primary cover photo displayed for this property in the featured section.
 						</p>
 
+						{savingPhotoId && (
+							<div className="mt-3 flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+								<Spinner className="h-3.5 w-3.5 shrink-0" />
+								<span>Setting featured photo... Please wait.</span>
+							</div>
+						)}
+
 						<div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto p-1 flex-1 min-h-0">
 							{selectingPhotoProperty.imageUrls.map((url, idx) => {
 								const isCurrent = selectingPhotoProperty.featuredImageUrl
 									? selectingPhotoProperty.featuredImageUrl === url
 									: idx === 0;
+								const isProcessingThis = savingPhotoUrl === url;
+								const isSavingAny = Boolean(savingPhotoId);
+								const isDisabled = isSavingAny || isCurrent;
 								return (
 									<button
 										key={url + idx}
 										type="button"
-										disabled={savingPhotoId === selectingPhotoProperty.id}
-										onClick={() => handleSelectFeaturedPhoto(selectingPhotoProperty.id, url)}
-										className={`group relative aspect-square overflow-hidden rounded-lg border text-left transition cursor-pointer ${
-											isCurrent
-												? 'border-amber-500 ring-2 ring-amber-500/40'
-												: 'border-border hover:border-primary/50'
+										disabled={isDisabled}
+										aria-busy={isProcessingThis}
+										aria-label={
+											isProcessingThis
+												? `Setting photo ${idx + 1} as featured...`
+												: isCurrent
+												? `Photo ${idx + 1} is currently the featured photo`
+												: `Set photo ${idx + 1} as featured photo`
+										}
+										onClick={() => {
+											if (!isDisabled) {
+												handleSelectFeaturedPhoto(selectingPhotoProperty.id, url);
+											}
+										}}
+										className={`group relative aspect-square overflow-hidden rounded-lg border text-left transition select-none ${
+											isProcessingThis
+												? 'border-amber-500 ring-2 ring-amber-500/50 cursor-wait'
+												: isCurrent
+												? 'border-amber-500 ring-2 ring-amber-500/40 cursor-default'
+												: isSavingAny
+												? 'border-border opacity-40 cursor-not-allowed'
+												: 'border-border hover:border-primary/50 cursor-pointer'
 										}`}
 									>
-										<img src={url} alt={`Photo ${idx + 1}`} className="h-full w-full object-cover" />
-										{isCurrent ? (
+										<img
+											src={url}
+											alt={`Photo ${idx + 1}`}
+											className={`h-full w-full object-cover transition duration-150 ${
+												isProcessingThis ? 'brightness-50 filter' : ''
+											}`}
+										/>
+										{isProcessingThis ? (
+											<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 bg-black/60 p-2 text-white">
+												<Spinner className="h-5 w-5 text-amber-400" />
+												<span className="text-center text-[11px] font-semibold leading-tight">
+													Saving...
+												</span>
+											</div>
+										) : isCurrent ? (
 											<span className="absolute bottom-1.5 left-1.5 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-xs">
 												★ Active
 											</span>
 										) : (
-											<span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white opacity-0 group-hover:opacity-100 transition">
+											<span className="absolute bottom-1.5 left-1.5 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-medium text-white opacity-0 group-hover:opacity-100 transition">
 												Select
 											</span>
 										)}
@@ -640,7 +694,10 @@ export default function AdminPropertiesPage() {
 								type="button"
 								variant="outline"
 								size="sm"
-								onClick={() => setSelectingPhotoProperty(null)}
+								disabled={Boolean(savingPhotoId)}
+								onClick={() => {
+									if (!savingPhotoId) setSelectingPhotoProperty(null);
+								}}
 							>
 								Close
 							</Button>
