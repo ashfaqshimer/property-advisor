@@ -136,3 +136,32 @@ def test_site_configuration_has_benchmark_sync_settings(db_session: Session):
     db_session.commit()
     db_session.refresh(cfg)
     assert cfg.benchmark_sync_settings["frequency_days"] == 14
+
+
+def test_prospect_grading_with_market_benchmark(db_session: Session, sample_benchmarks):
+    from app.models.prospect import Prospect
+    from app.services.market_valuation import grade_prospect_pricing
+
+    # Colombo 3 apartment benchmark rate is ~66,596/sqft.
+    # An apartment of 1,000 sqft priced at 45,000,000 (45,000/sqft) is >32% below market benchmark -> underpriced
+    p = Prospect(
+        title="Spacious 2BR Sea View Apartment in Colombo 3",
+        price="Rs. 45,000,000",
+        price_numeric=Decimal("45000000.00"),
+        location="Colombo 3",
+        property_type="apartment",
+        listing_type="sale",
+        floor_area_sqft=1000,
+        classification="owner",
+        confidence=90,
+        classification_reasons=["direct owner"],
+        classification_method="heuristic",
+    )
+    db_session.add(p)
+    db_session.commit()
+
+    grade = grade_prospect_pricing(db_session, p)
+    assert grade["price_grade"] == "underpriced"
+    assert "below market" in grade["price_grade_label"]
+    assert grade["price_diff_percent"] < -15.0
+

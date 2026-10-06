@@ -441,20 +441,31 @@ def calculate_suburb_market_value(
     total_stats = _percentiles(raw_prices)
 
     # MarketBenchmark fallback if active listing samples are sparse or empty
-    if not unit_stats["median"]:
+    if not unit_stats["median"] or len(filtered_listings) < 3:
         from app.models.market_benchmark import MarketBenchmark
+        from app.services.benchmark_sync import normalize_location_name
         from sqlalchemy import func as sa_func
+        norm_canonical = normalize_location_name(canonical_name)
         pt_target = property_type.lower() if property_type else ("land" if primary_property_type == "land" else "house")
         bm_stmt = select(MarketBenchmark).where(
-            sa_func.lower(MarketBenchmark.location) == canonical_name.lower(),
+            sa_func.lower(MarketBenchmark.location) == norm_canonical.lower(),
             MarketBenchmark.property_type == pt_target,
             MarketBenchmark.listing_type == listing_type.lower(),
             MarketBenchmark.status == "active",
         ).limit(1)
         bm_row = db.execute(bm_stmt).scalar_one_or_none()
         if bm_row:
-            bm_rate = float(bm_row.rate_per_perch) if (pt_target == "land" and bm_row.rate_per_perch) else (float(bm_row.rate_per_sqft) if bm_row.rate_per_sqft else None)
-            if bm_rate:
+            bm_rate = None
+            if primary_unit == "per_perch" and bm_row.rate_per_perch:
+                bm_rate = float(bm_row.rate_per_perch)
+            elif primary_unit == "per_sqft" and bm_row.rate_per_sqft:
+                bm_rate = float(bm_row.rate_per_sqft)
+            elif pt_target == "land" and bm_row.rate_per_perch:
+                bm_rate = float(bm_row.rate_per_perch)
+            elif bm_row.rate_per_sqft:
+                bm_rate = float(bm_row.rate_per_sqft)
+
+            if bm_rate and (not unit_stats["median"] or len(filtered_listings) < 3):
                 unit_stats["median"] = bm_rate
                 unit_stats["min"] = round(bm_rate * 0.85, 2)
                 unit_stats["max"] = round(bm_rate * 1.15, 2)
@@ -854,7 +865,11 @@ def grade_prospect_pricing(
     target_median: float | None = None
 
     for sa in valuation.get("sub_areas", []):
-        if sa["name"].lower() == extracted_area.lower() and sa["median_unit_rate"]:
+        if (
+            sa["name"].lower() == extracted_area.lower()
+            and sa["median_unit_rate"]
+            and sa.get("sample_count", 0) >= 3
+        ):
             target_median = sa["median_unit_rate"]
             break
 
@@ -866,6 +881,33 @@ def grade_prospect_pricing(
         b_range = valuation.get("unit_pricing", {}).get("benchmark_range")
         if b_range and b_range[0] and b_range[1]:
             target_median = (b_range[0] + b_range[1]) / 2
+
+    # Direct MarketBenchmark fallback for prospects where suburb listing data is missing or unmapped
+    if not target_median:
+        from app.models.market_benchmark import MarketBenchmark
+        from app.services.benchmark_sync import normalize_location_name
+        from sqlalchemy import func as sa_func
+
+        norm_loc = normalize_location_name(target_loc)
+        l_type = "sale" if "sale" in (prospect.listing_type or "sale") else "rent"
+        bm_row = db.execute(
+            select(MarketBenchmark).where(
+                sa_func.lower(MarketBenchmark.location) == norm_loc.lower(),
+                MarketBenchmark.property_type == pt,
+                MarketBenchmark.listing_type == l_type,
+                MarketBenchmark.status == "active",
+            ).limit(1)
+        ).scalar_one_or_none()
+        if bm_row:
+            if pt == "land" and bm_row.rate_per_perch:
+                target_median = float(bm_row.rate_per_perch)
+            elif pt in ("apartment", "commercial") and bm_row.rate_per_sqft:
+                target_median = float(bm_row.rate_per_sqft)
+            elif pt == "house":
+                if unit_label == "LKR / Sq.Ft." and bm_row.rate_per_sqft:
+                    target_median = float(bm_row.rate_per_sqft)
+                elif unit_label == "LKR / Perch" and bm_row.rate_per_perch:
+                    target_median = float(bm_row.rate_per_perch)
 
     if not target_median or target_median <= 0:
         return {
