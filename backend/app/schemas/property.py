@@ -50,6 +50,7 @@ class PropertyRead(BaseModel):
     amenities: dict | None
     image_urls: list[str]
     image_alt: str
+    featured_image_url: str | None = None
     status: PropertyStatus
     created_at: datetime
     property_contact_id: UUID | None
@@ -93,6 +94,7 @@ class PropertyCreate(BaseModel):
     amenities: dict | None = None
     image_urls: list[str] = Field(default_factory=list)
     image_alt: str = ""
+    featured_image_url: str | None = None
     status: PropertyStatus = PropertyStatus.AVAILABLE
     property_contact_id: UUID | None = None
 
@@ -126,6 +128,7 @@ class PropertyUpdate(BaseModel):
     amenities: dict | None = None
     image_urls: list[str] | None = None
     image_alt: str | None = None
+    featured_image_url: str | None = None
     status: PropertyStatus | None = None
     property_contact_id: UUID | None = None
 

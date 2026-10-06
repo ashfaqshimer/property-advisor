@@ -272,3 +272,24 @@ def test_trigger_default_lpw_scanner_when_not_in_db(authenticated_client: TestCl
             assert "House" in req.categories
 
 
+def test_site_configuration_update_featured_settings(authenticated_client: TestClient) -> None:
+    payload = {
+        "featured_settings": {
+            "visible_count": 3,
+            "cycle_interval_seconds": 8,
+            "auto_cycle": True,
+        }
+    }
+    update_res = authenticated_client.put("/admin/site-configuration", json=payload)
+    assert update_res.status_code == 200
+    data = update_res.json()
+    assert data["featured_settings"]["visible_count"] == 3
+    assert data["featured_settings"]["cycle_interval_seconds"] == 8
+    assert data["featured_settings"]["auto_cycle"] is True
+
+    get_res = authenticated_client.get("/site-configuration")
+    assert get_res.status_code == 200
+    assert get_res.json()["featured_settings"]["visible_count"] == 3
+
+
+

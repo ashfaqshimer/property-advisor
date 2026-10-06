@@ -110,6 +110,7 @@ class Property(Base):
     # asserts exactly that). Describes image_urls[0]; becomes per-image when a gallery
     # lands.
     image_alt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    featured_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[PropertyStatus] = mapped_column(
         enum_column(PropertyStatus, "property_status"),

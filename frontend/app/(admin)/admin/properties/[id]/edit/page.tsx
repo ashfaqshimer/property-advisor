@@ -44,6 +44,7 @@ type FormValues = {
 	status: string;
 	isFeatured: boolean;
 	propertyContactId: string;
+	featuredImageUrl: string;
 };
 
 type ImagePreview = { file: File; url: string };
@@ -84,6 +85,7 @@ const emptyForm: FormValues = {
 	status: 'available',
 	isFeatured: false,
 	propertyContactId: '',
+	featuredImageUrl: '',
 };
 
 export default function EditPropertyPage({ params }: { params: Promise<{ id: string }> }) {
@@ -156,6 +158,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 					status: record.status,
 					isFeatured: record.is_featured,
 					propertyContactId: record.property_contact_id ?? '',
+					featuredImageUrl: record.featured_image_url ?? (record.image_urls?.[0] ?? ''),
 				});
 				setExistingImages(record.image_urls ?? []);
 			})
@@ -327,7 +330,13 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 	}
 
 	function removeExistingImage(urlToRemove: string) {
-		setExistingImages((current) => current.filter((url) => url !== urlToRemove));
+		setExistingImages((current) => {
+			const next = current.filter((url) => url !== urlToRemove);
+			if (form.featuredImageUrl === urlToRemove) {
+				updateField('featuredImageUrl', next[0] || '');
+			}
+			return next;
+		});
 	}
 
 	function removeNewImage(url: string) {
@@ -398,6 +407,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 				has_maids_room: form.amenities.includes('Maid Room'),
 				image_urls: allImageUrls,
 				image_alt: form.title.trim(),
+				featured_image_url: form.featuredImageUrl || (allImageUrls[0] ?? null),
 				is_featured: form.isFeatured,
 				status: form.status as 'available' | 'under_offer' | 'sold',
 				property_contact_id: form.propertyContactId || null,
@@ -931,26 +941,48 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 									Current photos ({existingImages.length})
 								</p>
 								<div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
-									{existingImages.map((imageUrl, idx) => (
-										<div
-											key={imageUrl + idx}
-											className='group relative aspect-square overflow-hidden rounded-lg bg-muted border border-border'
-										>
-											<img
-												src={imageUrl}
-												alt={`Property photo ${idx + 1}`}
-												className='h-full w-full object-cover'
-											/>
-											<button
-												type='button'
-												onClick={() => removeExistingImage(imageUrl)}
-												className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer'
-												aria-label={`Remove photo ${idx + 1}`}
+									{existingImages.map((imageUrl, idx) => {
+										const isFeatured = form.featuredImageUrl
+											? form.featuredImageUrl === imageUrl
+											: idx === 0;
+										return (
+											<div
+												key={imageUrl + idx}
+												className={`group relative aspect-square overflow-hidden rounded-lg bg-muted border ${
+													isFeatured
+														? 'border-amber-500 ring-2 ring-amber-500/30'
+														: 'border-border'
+												}`}
 											>
-												×
-											</button>
-										</div>
-									))}
+												<img
+													src={imageUrl}
+													alt={`Property photo ${idx + 1}`}
+													className='h-full w-full object-cover'
+												/>
+												{isFeatured ? (
+													<span className='absolute bottom-2 left-2 inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-xs'>
+														★ Featured
+													</span>
+												) : (
+													<button
+														type='button'
+														onClick={() => updateField('featuredImageUrl', imageUrl)}
+														className='absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white opacity-80 transition hover:bg-black hover:opacity-100 cursor-pointer'
+													>
+														Set featured
+													</button>
+												)}
+												<button
+													type='button'
+													onClick={() => removeExistingImage(imageUrl)}
+													className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer'
+													aria-label={`Remove photo ${idx + 1}`}
+												>
+													×
+												</button>
+											</div>
+										);
+									})}
 								</div>
 							</div>
 						)}

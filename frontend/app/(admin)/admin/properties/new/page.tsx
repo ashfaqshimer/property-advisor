@@ -329,6 +329,7 @@ export default function NewPropertyPage() {
 					: null,
 				image_urls: imageUrls,
 				image_alt: form.title.trim(),
+				featured_image_url: imageUrls[0] ?? null,
 				is_featured: form.isFeatured,
 				status: form.status as 'available' | 'under_offer' | 'sold',
 				property_contact_id: form.propertyContactId || null,

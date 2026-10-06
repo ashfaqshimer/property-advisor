@@ -36,6 +36,11 @@ class SiteConfiguration(Base):
         nullable=False,
         server_default=sa.text("'{\"enabled\": true, \"frequency_days\": 7, \"last_run_at\": null, \"last_run_status\": null, \"next_run_at\": null, \"custom_locations\": []}'"),
     )
+    featured_settings: Mapped[dict[str, Any]] = mapped_column(
+        JSON(),
+        nullable=False,
+        server_default=sa.text("'{\"visible_count\": 4, \"cycle_interval_seconds\": 6, \"auto_cycle\": true}'"),
+    )
 
     extra_settings: Mapped[dict[str, Any] | None] = mapped_column(JSON(), nullable=True, default=dict)
     prospect_retention_days: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default=sa.text("30"))

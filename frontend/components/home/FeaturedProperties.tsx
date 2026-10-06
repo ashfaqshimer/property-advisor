@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Container from "@/components/layout/Container";
 import { Badge } from "@/components/ui/badge";
 import { openChat } from "@/lib/chat-dialog";
-import { getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
+import {
+  getFeaturedProperties,
+  getSiteConfiguration,
+  type PropertyApiRecord,
+} from "@/lib/api";
 
 export type FeaturedItem = {
   id: string;
@@ -108,22 +112,54 @@ function mapRecordToFeaturedItem(record: PropertyApiRecord): FeaturedItem {
     specs: formatSpecs(record),
     price: formatPrice(record),
     imageUrl:
-      record.image_urls && record.image_urls.length > 0 && record.image_urls[0]
-        ? record.image_urls[0]
-        : "/images/apartment_colombo03.jpg",
+      record.featured_image_url ||
+      (record.image_urls && record.image_urls.length > 0 && record.image_urls[0]) ||
+      "/images/apartment_colombo03.jpg",
     imageAlt: record.image_alt || record.title,
   };
+}
+
+function getGridColsClass(count: number): string {
+  switch (count) {
+    case 1:
+      return "grid-cols-1";
+    case 2:
+      return "grid-cols-1 sm:grid-cols-2";
+    case 3:
+      return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+    case 5:
+      return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
+    case 6:
+      return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6";
+    case 4:
+    default:
+      return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
+  }
 }
 
 export default function FeaturedProperties() {
   const [items, setItems] = useState<FeaturedItem[] | null>(null);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [visibleCount, setVisibleCount] = useState<number>(4);
+  const [cycleIntervalMs, setCycleIntervalMs] = useState<number>(6000);
+  const [autoCycle, setAutoCycle] = useState<boolean>(true);
+  const [startIndex, setStartIndex] = useState<number>(0);
+  const [isFading, setIsFading] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
-    getFeaturedProperties()
-      .then((records) => {
+    Promise.all([
+      getFeaturedProperties(50),
+      getSiteConfiguration().catch(() => null),
+    ])
+      .then(([records, config]) => {
         if (!isMounted) return;
+        if (config?.featured_settings) {
+          setVisibleCount(config.featured_settings.visible_count || 4);
+          setCycleIntervalMs((config.featured_settings.cycle_interval_seconds || 6) * 1000);
+          setAutoCycle(config.featured_settings.auto_cycle ?? true);
+        }
         if (records && records.length > 0) {
           setItems(records.map(mapRecordToFeaturedItem));
         } else {
@@ -140,6 +176,23 @@ export default function FeaturedProperties() {
     };
   }, []);
 
+  // Periodic cycling through properties
+  useEffect(() => {
+    if (!autoCycle || !items || items.length <= visibleCount || isPaused) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setIsFading(true);
+      setTimeout(() => {
+        setStartIndex((prev) => (prev + visibleCount) % items.length);
+        setIsFading(false);
+      }, 300);
+    }, cycleIntervalMs);
+
+    return () => clearInterval(timer);
+  }, [autoCycle, items, visibleCount, isPaused, cycleIntervalMs]);
+
   const toggleFavorite = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -149,11 +202,44 @@ export default function FeaturedProperties() {
     openChat(`Tell me more about ${item.title} in ${item.location}`);
   };
 
+  const navigatePrev = () => {
+    if (!items || items.length <= visibleCount) return;
+    setIsFading(true);
+    setTimeout(() => {
+      setStartIndex((prev) => (prev - visibleCount + items.length * visibleCount) % items.length);
+      setIsFading(false);
+    }, 300);
+  };
+
+  const navigateNext = () => {
+    if (!items || items.length <= visibleCount) return;
+    setIsFading(true);
+    setTimeout(() => {
+      setStartIndex((prev) => (prev + visibleCount) % items.length);
+      setIsFading(false);
+    }, 300);
+  };
+
+  const visibleItems = useMemo(() => {
+    if (!items || items.length === 0) return [];
+    if (items.length <= visibleCount) return items;
+    const result: FeaturedItem[] = [];
+    for (let i = 0; i < visibleCount; i++) {
+      result.push(items[(startIndex + i) % items.length]);
+    }
+    return result;
+  }, [items, visibleCount, startIndex]);
+
+  const totalPages = items && items.length > 0 ? Math.ceil(items.length / visibleCount) : 1;
+  const currentPage = Math.floor(startIndex / visibleCount);
+
   return (
     <section
       id="featured-properties"
       aria-labelledby="featured-properties-heading"
       className="scroll-mt-20 border-b border-neutral-200/80 bg-white py-16 sm:py-24"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
     >
       <Container>
         {/* Header Row */}
@@ -171,34 +257,61 @@ export default function FeaturedProperties() {
             </h2>
           </div>
 
-          <button
-            type="button"
-            onClick={() => openChat("Show me all available properties in Colombo and Sri Lanka")}
-            className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-brand transition-colors hover:text-[#233c32]"
-          >
-            <span>View all properties</span>
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="size-4 transition-transform group-hover:translate-x-0.5"
-              aria-hidden="true"
+          <div className="flex flex-wrap items-center gap-4">
+            {items && items.length > visibleCount && (
+              <div className="flex items-center gap-1.5" aria-label="Carousel navigation">
+                <button
+                  type="button"
+                  onClick={navigatePrev}
+                  aria-label="Previous featured properties"
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-600 transition hover:border-neutral-300 hover:bg-neutral-50 hover:text-ink active:scale-95"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden="true">
+                    <path d="m15 18-6-6 6-6" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={navigateNext}
+                  aria-label="Next featured properties"
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-600 transition hover:border-neutral-300 hover:bg-neutral-50 hover:text-ink active:scale-95"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden="true">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => openChat("Show me all available properties in Colombo and Sri Lanka")}
+              className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-brand transition-colors hover:text-[#233c32]"
             >
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </button>
+              <span>View all properties</span>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-4 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              >
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Cards Grid */}
         {items === null ? (
           <div
             data-testid="featured-properties-skeleton"
-            className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
+            className={`mt-10 grid gap-6 ${getGridColsClass(visibleCount)}`}
           >
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: Math.min(visibleCount, 4) }).map((_, i) => (
               <div
                 key={i}
                 className="flex flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-xs animate-pulse"
@@ -214,8 +327,14 @@ export default function FeaturedProperties() {
             ))}
           </div>
         ) : (
-          <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {items.map((item) => {
+          <div
+            className={`mt-10 grid gap-6 ${getGridColsClass(
+              visibleCount
+            )} transition-opacity duration-300 ease-in-out ${
+              isFading ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            {visibleItems.map((item) => {
               const isFav = !!favorites[item.id];
               return (
                 <article
@@ -304,6 +423,34 @@ export default function FeaturedProperties() {
                     </div>
                   </div>
                 </article>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Page / Indicator Dots */}
+        {items && items.length > visibleCount && totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-center gap-2">
+            {Array.from({ length: totalPages }).map((_, pageIdx) => {
+              const pageStartIdx = pageIdx * visibleCount;
+              const isActive = currentPage === pageIdx;
+              return (
+                <button
+                  key={pageIdx}
+                  type="button"
+                  onClick={() => {
+                    if (isActive) return;
+                    setIsFading(true);
+                    setTimeout(() => {
+                      setStartIndex(pageStartIdx);
+                      setIsFading(false);
+                    }, 300);
+                  }}
+                  aria-label={`Go to page ${pageIdx + 1}`}
+                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                    isActive ? "w-6 bg-brand" : "w-2 bg-neutral-300 hover:bg-neutral-400"
+                  }`}
+                />
               );
             })}
           </div>

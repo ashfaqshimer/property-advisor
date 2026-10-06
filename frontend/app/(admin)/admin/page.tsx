@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, Image as ImageIcon } from 'lucide-react';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
@@ -36,6 +36,8 @@ type Property = {
 	featured: boolean;
 	contactId: string | null;
 	contactName: string | null;
+	imageUrls: string[];
+	featuredImageUrl: string | null;
 };
 
 const statusVariant: Record<PropertyStatus, 'success' | 'warning' | 'secondary'> = {
@@ -52,6 +54,8 @@ export default function AdminPropertiesPage() {
 	const [canDelete, setCanDelete] = useState(false);
 	const [assigningId, setAssigningId] = useState<string | null>(null);
 	const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+	const [selectingPhotoProperty, setSelectingPhotoProperty] = useState<Property | null>(null);
+	const [savingPhotoId, setSavingPhotoId] = useState<string | null>(null);
 
 	useEffect(() => {
 		getCurrentUser().then((user) => setCanDelete(user?.role === 'root' || user?.role === 'admin')).catch(() => {});
@@ -69,6 +73,8 @@ export default function AdminPropertiesPage() {
 						featured: record.is_featured,
 						contactId: record.property_contact_id,
 						contactName: record.property_contact?.full_name ?? null,
+						imageUrls: record.image_urls ?? [],
+						featuredImageUrl: record.featured_image_url ?? null,
 					})),
 				),
 			)
@@ -81,6 +87,24 @@ export default function AdminPropertiesPage() {
 			)
 			.finally(() => setLoading(false));
 	}, []);
+
+	async function handleSelectFeaturedPhoto(propertyId: string, url: string) {
+		setSavingPhotoId(propertyId);
+		try {
+			await updateAdminProperty(propertyId, { featured_image_url: url });
+			setProperties((current) =>
+				current.map((p) =>
+					p.id === propertyId ? { ...p, featuredImageUrl: url } : p
+				)
+			);
+			setSelectingPhotoProperty(null);
+			toast.success('Featured photo updated.');
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Could not update featured photo.');
+		} finally {
+			setSavingPhotoId(null);
+		}
+	}
 
 	async function toggleFeatured(id: string, featured: boolean) {
 		setBusyProperty(id);
@@ -232,18 +256,31 @@ export default function AdminPropertiesPage() {
 										)}
 									</TableCell>
 									<TableCell className='px-4 py-4'>
-										<button
-											type='button'
-											disabled={busyProperty === property.id}
-											aria-label={`${property.featured ? 'Remove from' : 'Add to'} featured properties`}
-											aria-pressed={property.featured}
-											onClick={() =>
-												toggleFeatured(property.id, property.featured)
-											}
-											className={`text-2xl leading-none transition cursor-pointer ${property.featured ? 'text-amber-500' : 'text-muted-foreground/30 hover:text-amber-500'}`}
-										>
-											{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
-										</button>
+										<div className="flex items-center gap-1.5">
+											<button
+												type='button'
+												disabled={busyProperty === property.id}
+												aria-label={`${property.featured ? 'Remove from' : 'Add to'} featured properties`}
+												aria-pressed={property.featured}
+												onClick={() =>
+													toggleFeatured(property.id, property.featured)
+												}
+												className={`text-2xl leading-none transition cursor-pointer ${property.featured ? 'text-amber-500' : 'text-muted-foreground/30 hover:text-amber-500'}`}
+											>
+												{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
+											</button>
+											{property.imageUrls.length > 0 && (
+												<button
+													type='button'
+													onClick={() => setSelectingPhotoProperty(property)}
+													title='Select featured photo'
+													aria-label={`Select featured photo for ${property.title}`}
+													className='rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer'
+												>
+													<ImageIcon className='h-4 w-4' />
+												</button>
+											)}
+										</div>
 									</TableCell>
 									<TableCell className='px-5 py-4 text-right'>
 										<div className="flex items-center justify-end gap-2">
@@ -318,14 +355,27 @@ export default function AdminPropertiesPage() {
 								)}
 							</div>
 							<div className='mt-2 flex items-center justify-between border-t border-border pt-4'>
-								<button
-									type='button'
-									disabled={busyProperty === property.id}
-									onClick={() => toggleFeatured(property.id, property.featured)}
-									className={`text-2xl leading-none transition cursor-pointer ${property.featured ? 'text-amber-500' : 'text-muted-foreground/30 hover:text-amber-500'}`}
-								>
-									{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
-								</button>
+								<div className="flex items-center gap-2">
+									<button
+										type='button'
+										disabled={busyProperty === property.id}
+										onClick={() => toggleFeatured(property.id, property.featured)}
+										className={`text-2xl leading-none transition cursor-pointer ${property.featured ? 'text-amber-500' : 'text-muted-foreground/30 hover:text-amber-500'}`}
+									>
+										{busyProperty === property.id ? <Spinner className='inline h-5 w-5' /> : '★'}
+									</button>
+									{property.imageUrls.length > 0 && (
+										<button
+											type='button'
+											onClick={() => setSelectingPhotoProperty(property)}
+											title='Select featured photo'
+											className='flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer'
+										>
+											<ImageIcon className='h-3.5 w-3.5' />
+											<span>Photo</span>
+										</button>
+									)}
+								</div>
 								<div className='flex gap-2'>
 									<Button
 										asChild
@@ -384,6 +434,72 @@ export default function AdminPropertiesPage() {
 								className="w-full sm:w-auto"
 							>
 								Delete
+							</Button>
+						</div>
+					</div>
+				</div>
+			)}
+			{selectingPhotoProperty && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+					<div className="bg-card text-card-foreground border border-border rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] flex flex-col">
+						<div className="flex items-start justify-between pb-3 border-b border-border">
+							<div>
+								<h3 className="text-base font-semibold text-foreground">Select Featured Photo</h3>
+								<p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{selectingPhotoProperty.title}</p>
+							</div>
+							<button
+								type="button"
+								onClick={() => setSelectingPhotoProperty(null)}
+								className="text-muted-foreground hover:text-foreground transition cursor-pointer p-1 text-base leading-none"
+							>
+								✕
+							</button>
+						</div>
+
+						<p className="text-xs text-muted-foreground mt-3">
+							Click any photo to set it as the primary cover photo displayed for this property in the featured section.
+						</p>
+
+						<div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto p-1 flex-1 min-h-0">
+							{selectingPhotoProperty.imageUrls.map((url, idx) => {
+								const isCurrent = selectingPhotoProperty.featuredImageUrl
+									? selectingPhotoProperty.featuredImageUrl === url
+									: idx === 0;
+								return (
+									<button
+										key={url + idx}
+										type="button"
+										disabled={savingPhotoId === selectingPhotoProperty.id}
+										onClick={() => handleSelectFeaturedPhoto(selectingPhotoProperty.id, url)}
+										className={`group relative aspect-square overflow-hidden rounded-lg border text-left transition cursor-pointer ${
+											isCurrent
+												? 'border-amber-500 ring-2 ring-amber-500/40'
+												: 'border-border hover:border-primary/50'
+										}`}
+									>
+										<img src={url} alt={`Photo ${idx + 1}`} className="h-full w-full object-cover" />
+										{isCurrent ? (
+											<span className="absolute bottom-1.5 left-1.5 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-xs">
+												★ Active
+											</span>
+										) : (
+											<span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white opacity-0 group-hover:opacity-100 transition">
+												Select
+											</span>
+										)}
+									</button>
+								);
+							})}
+						</div>
+
+						<div className="mt-4 flex justify-end gap-2 border-t border-border pt-3">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => setSelectingPhotoProperty(null)}
+							>
+								Close
 							</Button>
 						</div>
 					</div>

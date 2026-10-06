@@ -124,6 +124,7 @@ export type PropertyApiRecord = {
   amenities: Record<string, boolean> | null;
   image_urls: string[];
   image_alt: string;
+  featured_image_url?: string | null;
   status: string;
   created_at: string;
   property_contact_id: string | null;
@@ -153,6 +154,7 @@ export type CreatePropertyPayload = {
   amenities?: Record<string, boolean> | null;
   image_urls: string[];
   image_alt: string;
+  featured_image_url?: string | null;
   status: "available" | "under_offer" | "sold";
   is_featured?: boolean;
   source_platform?: string | null;
@@ -173,6 +175,7 @@ export type AdminPropertyUpdatePayload = Partial<CreatePropertyPayload> & {
   furnishing_status?: "unfurnished" | "semi_furnished" | "fully_furnished" | null;
   amenities?: Record<string, boolean> | null;
   property_contact_id?: string | null;
+  featured_image_url?: string | null;
 };
 
 export type LeadSource = "ai_agent" | "manual" | "fallback";
@@ -264,6 +267,12 @@ export type BenchmarkSyncSettings = {
   custom_locations?: string[];
 };
 
+export type FeaturedSettings = {
+  visible_count: number;
+  cycle_interval_seconds: number;
+  auto_cycle: boolean;
+};
+
 export type SiteConfiguration = {
   id: string;
   phone_numbers: ListConfigField;
@@ -276,6 +285,7 @@ export type SiteConfiguration = {
   city: StringConfigField;
   scanner_settings: ScannerSettingsConfigField;
   benchmark_sync_settings?: BenchmarkSyncSettings;
+  featured_settings?: FeaturedSettings;
   extra_settings: Record<string, unknown> | null;
   prospect_retention_days: number;
 };
@@ -575,6 +585,9 @@ function isPropertyApiRecord(value: unknown): value is PropertyApiRecord {
     (typeof candidate.amenities === "object" || candidate.amenities === null) &&
     Array.isArray(candidate.image_urls) &&
     candidate.image_urls.every((url) => typeof url === "string") &&
+    (candidate.featured_image_url === undefined ||
+      typeof candidate.featured_image_url === "string" ||
+      candidate.featured_image_url === null) &&
     typeof candidate.image_alt === "string" &&
     typeof candidate.status === "string" &&
     typeof candidate.created_at === "string" &&
@@ -809,10 +822,11 @@ export async function captureFallbackLead({
   }
 }
 
-export async function getFeaturedProperties(): Promise<PropertyApiRecord[]> {
+export async function getFeaturedProperties(limit?: number): Promise<PropertyApiRecord[]> {
   let response: Response;
+  const url = limit ? `${baseUrl()}/properties/featured?limit=${limit}` : `${baseUrl()}/properties/featured`;
   try {
-    response = await fetch(`${baseUrl()}/properties/featured`, {
+    response = await fetch(url, {
       method: "GET",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });

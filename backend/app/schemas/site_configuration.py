@@ -189,6 +189,12 @@ class BenchmarkSyncSettingsConfigField(BaseModel):
     custom_locations: list[str] = Field(default_factory=list)
 
 
+class FeaturedSettingsConfigField(BaseModel):
+    visible_count: int = Field(default=4, ge=1, le=12, description="Number of featured cards to show concurrently")
+    cycle_interval_seconds: int = Field(default=6, ge=2, le=60, description="Cycle interval in seconds")
+    auto_cycle: bool = True
+
+
 class SiteConfigurationBase(BaseModel):
     phone_numbers: ListConfigField = Field(default_factory=ListConfigField)
     contact_email: StringConfigField = Field(default_factory=StringConfigField)
@@ -200,6 +206,7 @@ class SiteConfigurationBase(BaseModel):
     city: StringConfigField = Field(default_factory=StringConfigField)
     scanner_settings: ScannerSettingsConfigField = Field(default_factory=ScannerSettingsConfigField)
     benchmark_sync_settings: BenchmarkSyncSettingsConfigField = Field(default_factory=BenchmarkSyncSettingsConfigField)
+    featured_settings: FeaturedSettingsConfigField = Field(default_factory=FeaturedSettingsConfigField)
     extra_settings: dict[str, Any] | None = Field(default_factory=dict)
     prospect_retention_days: int = Field(default=30)
 
@@ -219,6 +226,7 @@ class SiteConfigurationUpdate(BaseModel):
     city: StringConfigField | None = None
     scanner_settings: ScannerSettingsConfigField | None = None
     benchmark_sync_settings: BenchmarkSyncSettingsConfigField | None = None
+    featured_settings: FeaturedSettingsConfigField | None = None
     extra_settings: dict[str, Any] | None = None
     prospect_retention_days: int | None = None
 

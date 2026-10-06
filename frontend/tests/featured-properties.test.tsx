@@ -101,4 +101,24 @@ describe("FeaturedProperties", () => {
       ).toBeInTheDocument();
     });
   });
+
+  it("prioritizes featured_image_url over image_urls[0]", async () => {
+    const customImageRecord: api.PropertyApiRecord = {
+      ...baseRecord,
+      id: "prop-custom-img",
+      title: "Penthouse with Custom Cover",
+      image_urls: ["https://example.com/regular.jpg"],
+      featured_image_url: "https://example.com/chosen-featured-photo.jpg",
+    };
+    vi.spyOn(api, "getFeaturedProperties").mockResolvedValueOnce([customImageRecord]);
+
+    render(<FeaturedProperties />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Penthouse with Custom Cover")).toBeInTheDocument();
+    });
+
+    const img = screen.getByRole("img", { name: "Condo balcony overlooking ocean" });
+    expect(img).toHaveAttribute("src", "https://example.com/chosen-featured-photo.jpg");
+  });
 });

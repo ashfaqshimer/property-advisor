@@ -21,6 +21,7 @@ import {
   triggerBenchmarkSync,
   type SiteConfiguration,
   type MarketBenchmark,
+  type FeaturedSettings,
 } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -145,6 +146,21 @@ export default function SiteConfigurationPage() {
       ...s,
       extra_settings: {
         ...(s.extra_settings || {}),
+        [key]: value,
+      },
+    }));
+  }
+
+  function updateFeaturedSetting<K extends keyof FeaturedSettings>(
+    key: K,
+    value: FeaturedSettings[K]
+  ) {
+    setSiteConfig((s) => ({
+      ...s,
+      featured_settings: {
+        visible_count: s.featured_settings?.visible_count ?? 4,
+        cycle_interval_seconds: s.featured_settings?.cycle_interval_seconds ?? 6,
+        auto_cycle: s.featured_settings?.auto_cycle ?? true,
         [key]: value,
       },
     }));
@@ -597,6 +613,86 @@ export default function SiteConfigurationPage() {
           >
             {updatingSiteConfig ? "Saving..." : "Save Layout Preference"}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="text-lg font-medium">Featured Listings Display</CardTitle>
+          <CardDescription>
+            Configure how featured properties appear and cycle on the homepage.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="max-w-md space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="featured_visible_count">Visible cards count</Label>
+              <Input
+                id="featured_visible_count"
+                type="number"
+                min="1"
+                max="12"
+                value={siteConfig.featured_settings?.visible_count ?? 4}
+                onChange={(e) =>
+                  updateFeaturedSetting(
+                    "visible_count",
+                    Math.max(1, Math.min(12, parseInt(e.target.value) || 1))
+                  )
+                }
+                className="w-full sm:w-32"
+              />
+              <p className="text-xs text-muted-foreground">
+                Number of featured property cards to display concurrently on the homepage (e.g. 4).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="featured_cycle_interval">Cycle interval (seconds)</Label>
+              <Input
+                id="featured_cycle_interval"
+                type="number"
+                min="2"
+                max="60"
+                value={siteConfig.featured_settings?.cycle_interval_seconds ?? 6}
+                onChange={(e) =>
+                  updateFeaturedSetting(
+                    "cycle_interval_seconds",
+                    Math.max(2, Math.min(60, parseInt(e.target.value) || 2))
+                  )
+                }
+                className="w-full sm:w-32"
+              />
+              <p className="text-xs text-muted-foreground">
+                How often the UI fades to the next batch of featured properties (e.g. every 6 seconds).
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border p-3.5">
+              <div className="space-y-0.5">
+                <Label htmlFor="featured_auto_cycle" className="text-sm font-medium cursor-pointer">
+                  Auto-cycle through properties
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Automatically cycle through all featured properties periodically.
+                </p>
+              </div>
+              <Switch
+                id="featured_auto_cycle"
+                checked={siteConfig.featured_settings?.auto_cycle ?? true}
+                onCheckedChange={(checked) =>
+                  updateFeaturedSetting("auto_cycle", checked)
+                }
+              />
+            </div>
+
+            <Button
+              type="button"
+              onClick={(e) => handleUpdateSiteConfig(e as any)}
+              disabled={updatingSiteConfig}
+            >
+              {updatingSiteConfig ? "Saving..." : "Save Featured Settings"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

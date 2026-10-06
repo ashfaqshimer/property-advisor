@@ -159,3 +159,15 @@ def test_admin_extract_from_text_success(authenticated_client: TestClient, monke
     assert data["contact_name"] == "Ranjith"
     assert data["contact_phone"] == "0771234567"
     assert data["contact_type"] == "owner"
+
+
+def test_admin_patch_featured_image_url(authenticated_client: TestClient) -> None:
+    property_id = seed_id("garden-villa-ward-place")
+
+    response = authenticated_client.patch(
+        f"/admin/properties/{property_id}",
+        json={"featured_image_url": "https://example.com/custom-featured.jpg"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["featured_image_url"] == "https://example.com/custom-featured.jpg"
