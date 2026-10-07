@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import AdminUserMenu from "@/components/admin/AdminUserMenu";
@@ -40,7 +40,7 @@ describe("AdminUserMenu", () => {
     render(<AdminUserMenu user={mockUser} onSignOut={vi.fn()} />);
 
     const button = screen.getByRole("button", { name: /user menu for john doe/i });
-    fireEvent.click(button);
+    fireEvent.pointerDown(button);
 
     expect(button).toHaveAttribute("aria-expanded", "true");
     const menu = screen.getByRole("menu");
@@ -66,7 +66,7 @@ describe("AdminUserMenu", () => {
     render(<AdminUserMenu user={mockUser} onSignOut={handleSignOut} />);
 
     const button = screen.getByRole("button", { name: /user menu for john doe/i });
-    fireEvent.click(button);
+    fireEvent.pointerDown(button);
 
     const signOutButton = screen.getByRole("menuitem", { name: /sign out/i });
     fireEvent.click(signOutButton);
@@ -78,26 +78,26 @@ describe("AdminUserMenu", () => {
     render(<AdminUserMenu user={mockUser} onSignOut={vi.fn()} signingOut={true} />);
 
     const button = screen.getByRole("button", { name: /user menu for john doe/i });
-    fireEvent.click(button);
+    fireEvent.pointerDown(button);
 
     const signOutButton = screen.getByRole("menuitem", { name: /sign out/i });
     expect(signOutButton).toBeDisabled();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
-  it("closes on Escape key press and restores focus to trigger button", () => {
+  it("closes on Escape key press and restores focus to trigger button", async () => {
     render(<AdminUserMenu user={mockUser} onSignOut={vi.fn()} />);
 
     const button = screen.getByRole("button", { name: /user menu for john doe/i });
-    fireEvent.click(button);
+    fireEvent.pointerDown(button);
     expect(screen.getByRole("menu")).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(button).toHaveFocus();
+    await waitFor(() => expect(button).toHaveFocus());
   });
 
-  it("closes when clicking outside the menu", () => {
+  it("closes when clicking outside the menu", async () => {
     render(
       <div>
         <div data-testid="outside">Outside area</div>
@@ -106,9 +106,10 @@ describe("AdminUserMenu", () => {
     );
 
     const button = screen.getByRole("button", { name: /user menu for john doe/i });
-    fireEvent.click(button);
+    fireEvent.pointerDown(button);
     expect(screen.getByRole("menu")).toBeInTheDocument();
 
+    await new Promise((resolve) => setTimeout(resolve, 10));
     fireEvent.pointerDown(screen.getByTestId("outside"));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });

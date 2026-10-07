@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import type { AuthUser } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -23,63 +23,19 @@ export default function AdminUserMenu({
   onSignOut,
   signingOut = false,
 }: AdminUserMenuProps) {
-  const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const pointerDownTriggeredRef = useRef(false);
-
-  useEffect(() => {
-    if (!open) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      buttonRef.current?.focus();
-    }
-
-    function onPointerDown(event: PointerEvent) {
-      const target = event.target as Node | null;
-      if (buttonRef.current?.contains(target)) return;
-      const dropdown = document.getElementById("admin-user-menu-dropdown");
-      if (dropdown?.contains(target)) return;
-      setOpen(false);
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [open]);
-
-  const handlePointerDown = () => {
-    pointerDownTriggeredRef.current = true;
-    window.setTimeout(() => {
-      pointerDownTriggeredRef.current = false;
-    }, 200);
-  };
-
-  const handleClick = () => {
-    if (pointerDownTriggeredRef.current) return;
-    setOpen((wasOpen) => !wasOpen);
-  };
-
   const displayName = user.name?.trim() || "User";
   const initial = (user.name?.trim()?.[0] || user.email?.[0] || "U").toUpperCase();
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           ref={buttonRef}
           id="admin-user-menu-button"
           type="button"
-          aria-haspopup="menu"
-          aria-expanded={open}
           aria-label={`User menu for ${displayName}`}
-          onPointerDown={handlePointerDown}
-          onClick={handleClick}
-          className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-1.5 text-left transition hover:border-border hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-1.5 text-left transition hover:border-border hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary cursor-pointer"
         >
           <div
             className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-accent text-sm font-semibold text-accent-foreground"
@@ -94,7 +50,7 @@ export default function AdminUserMenu({
             <span className="text-xs text-muted-foreground">{user.email}</span>
           </div>
           <svg
-            className={`size-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -137,7 +93,7 @@ export default function AdminUserMenu({
               type="button"
               onClick={() => onSignOut()}
               disabled={signingOut}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destructive disabled:cursor-wait disabled:opacity-60"
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destructive disabled:cursor-wait disabled:opacity-60 cursor-pointer"
             >
               {signingOut ? (
                 <Spinner className="mr-0.5 size-4 shrink-0 text-destructive" />
