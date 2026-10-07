@@ -25,6 +25,7 @@ export default function AdminUserMenu({
 }: AdminUserMenuProps) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const pointerDownTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +52,18 @@ export default function AdminUserMenu({
     };
   }, [open]);
 
+  const handlePointerDown = () => {
+    pointerDownTriggeredRef.current = true;
+    window.setTimeout(() => {
+      pointerDownTriggeredRef.current = false;
+    }, 200);
+  };
+
+  const handleClick = () => {
+    if (pointerDownTriggeredRef.current) return;
+    setOpen((wasOpen) => !wasOpen);
+  };
+
   const displayName = user.name?.trim() || "User";
   const initial = (user.name?.trim()?.[0] || user.email?.[0] || "U").toUpperCase();
 
@@ -64,7 +77,8 @@ export default function AdminUserMenu({
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label={`User menu for ${displayName}`}
-          onClick={() => setOpen((wasOpen) => !wasOpen)}
+          onPointerDown={handlePointerDown}
+          onClick={handleClick}
           className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-1.5 text-left transition hover:border-border hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <div

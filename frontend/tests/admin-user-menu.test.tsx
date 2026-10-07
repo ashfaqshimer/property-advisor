@@ -50,6 +50,17 @@ describe("AdminUserMenu", () => {
     expect(screen.getByText("root")).toBeInTheDocument();
   });
 
+  it("remains open when a browser click sequence (pointerdown followed by click) occurs", () => {
+    render(<AdminUserMenu user={mockUser} onSignOut={vi.fn()} />);
+
+    const button = screen.getByRole("button", { name: /user menu for john doe/i });
+    fireEvent.pointerDown(button);
+    fireEvent.click(button);
+
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
   it("calls onSignOut when the Sign out button is clicked", () => {
     const handleSignOut = vi.fn();
     render(<AdminUserMenu user={mockUser} onSignOut={handleSignOut} />);
