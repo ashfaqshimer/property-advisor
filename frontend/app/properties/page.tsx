@@ -8,6 +8,8 @@ import ChatDialog from "@/components/chat/ChatDialog";
 import PropertyCatalog from "@/components/properties/PropertyCatalog";
 import { getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: "Properties for Sale & Rent in Colombo & Across Sri Lanka | Property Advisor",
   description:

@@ -132,7 +132,7 @@ class Property(Base):
     )
     property_contact: Mapped["PropertyContact | None"] = relationship(
         back_populates="properties",
-        lazy="select",
+        lazy="selectin",
     )
 
     # Origin & Source Tracking

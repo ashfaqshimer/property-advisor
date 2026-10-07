@@ -338,6 +338,7 @@ export type SiteConfigurationUpdate = Partial<Omit<SiteConfiguration, "id">>;
 export async function getSiteConfiguration(): Promise<SiteConfiguration | null> {
   const response = await fetch(`${baseUrl()}/site-configuration`, {
     method: "GET",
+    next: { revalidate: 60 },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (response.status === 404) return null;
@@ -871,6 +872,7 @@ export async function getFeaturedProperties(limit?: number): Promise<PropertyApi
   try {
     response = await fetch(url, {
       method: "GET",
+      next: { revalidate: 60 },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
@@ -900,6 +902,7 @@ export async function getProperty(propertyId: string): Promise<PropertyApiRecord
   try {
     response = await fetch(`${baseUrl()}/properties/${propertyId}`, {
       method: "GET",
+      next: { revalidate: 60 },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (error) {

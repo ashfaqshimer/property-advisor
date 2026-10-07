@@ -11,6 +11,8 @@ import PropertyInquiryCta from "@/components/properties/PropertyInquiryCta";
 import { Badge } from "@/components/ui/badge";
 import { getProperty, type PropertyApiRecord } from "@/lib/api";
 
+export const revalidate = 60;
+
 type PageProps = {
   params: Promise<{ id: string }>;
 };
