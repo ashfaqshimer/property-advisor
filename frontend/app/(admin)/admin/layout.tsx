@@ -103,6 +103,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
           ))}
           {["root", "admin"].includes(user.role) && (
             <>
+              <Link href="/admin/conversations" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/conversations") ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>Conversations</Link>
               <Link href="/admin/scans" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/scans") ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>Scanner Hub</Link>
               <Link href="/admin/assignments" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/assignments") ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>Assignments</Link>
               <Link href="/admin/users" className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/admin/users") ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>Users</Link>

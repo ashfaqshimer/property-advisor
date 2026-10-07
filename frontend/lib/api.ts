@@ -223,6 +223,43 @@ export type AdminLead = {
   updated_at: string;
 };
 
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  tool_payload: Record<string, unknown> | null;
+  seq: number;
+  created_at: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  session_id: string;
+  created_at: string;
+  updated_at: string | null;
+  message_count: number;
+  preview: string | null;
+  lead: AdminLead | null;
+}
+
+export interface ConversationDetail {
+  id: string;
+  session_id: string;
+  created_at: string;
+  updated_at: string | null;
+  message_count: number;
+  lead: AdminLead | null;
+  messages: ConversationMessage[];
+}
+
+export interface ConversationListResponse {
+  items: ConversationSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 export type StringConfigField = { value: string | null; show: boolean };
 export type ListConfigField = { values: string[]; show: boolean };
 
@@ -1042,6 +1079,53 @@ export async function deleteAdminLead(leadId: string): Promise<void> {
   });
   if (!response.ok) {
     throw new ChatError("unexpected", `Lead deletion failed (${response.status}).`, response.status);
+  }
+}
+
+export async function getAdminConversations(params?: {
+  search?: string;
+  has_lead?: boolean;
+  offset?: number;
+  limit?: number;
+}): Promise<ConversationListResponse> {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.has_lead !== undefined) query.set("has_lead", String(params.has_lead));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+
+  const url = `${baseUrl()}/admin/conversations${query.toString() ? `?${query.toString()}` : ""}`;
+  const response = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Conversation list failed (${response.status}).`, response.status);
+  }
+  return (await response.json()) as ConversationListResponse;
+}
+
+export async function getAdminConversation(id: string): Promise<ConversationDetail> {
+  const response = await fetch(`${baseUrl()}/admin/conversations/${id}`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to load conversation (${response.status}).`, response.status);
+  }
+  return (await response.json()) as ConversationDetail;
+}
+
+export async function deleteAdminConversation(id: string): Promise<void> {
+  const response = await fetch(`${baseUrl()}/admin/conversations/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new ChatError("unexpected", `Failed to delete conversation (${response.status}).`, response.status);
   }
 }
 
