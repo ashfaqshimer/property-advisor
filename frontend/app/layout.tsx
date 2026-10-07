@@ -13,11 +13,11 @@ const siteUrl = (
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Property Advisor — Property in Colombo and across Sri Lanka",
+    default: "Property Advisor | Real Estate Brokerage & Advisory Sri Lanka",
     template: "%s | Property Advisor",
   },
   description:
-    "Your expert real estate partner in Sri Lanka. Buy, sell, rent, or get professional property advice with Amaya, our AI property advisor.",
+    "Find prime property in Sri Lanka. Curated brokerage, market advice, and end-to-end guidance with vetted legal and renovation partners. Powered by Amaya AI.",
   keywords: [
     "Property in Sri Lanka",
     "Colombo real estate",
@@ -42,9 +42,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "Property Advisor — Property in Colombo and across Sri Lanka",
+    title: "Property Advisor | Real Estate Brokerage & Advisory Sri Lanka",
     description:
-      "Your expert real estate partner in Sri Lanka. Buy, sell, rent, or get professional property advice with Amaya, our AI property advisor.",
+      "Find prime property in Sri Lanka. Curated brokerage, market advice, and end-to-end guidance with vetted legal and renovation partners. Powered by Amaya AI.",
     url: siteUrl,
     siteName: "Property Advisor",
     locale: "en_LK",
@@ -54,15 +54,15 @@ export const metadata: Metadata = {
         url: "/images/hero_apartment.jpg",
         width: 1200,
         height: 630,
-        alt: "Property Advisor — Real Estate in Colombo and across Sri Lanka",
+        alt: "Property Advisor | Real Estate Brokerage & Advisory in Sri Lanka",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Property Advisor — Property in Colombo and across Sri Lanka",
+    title: "Property Advisor | Real Estate Brokerage & Advisory Sri Lanka",
     description:
-      "Your expert real estate partner in Sri Lanka. Buy, sell, rent, or get professional property advice.",
+      "Find prime property in Sri Lanka. Curated brokerage, market advice, and end-to-end guidance with vetted legal and renovation partners. Powered by Amaya AI.",
     images: ["/images/hero_apartment.jpg"],
   },
   robots: {

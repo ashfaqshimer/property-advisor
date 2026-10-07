@@ -31,7 +31,7 @@ export default async function JsonLd() {
         logo: `${siteUrl}/Property_Advisor_Logo_Vector.svg`,
         image: `${siteUrl}/images/hero_apartment.jpg`,
         description:
-          "Expert real estate partner in Sri Lanka. Buy, sell, rent, or get professional property advice powered by Amaya AI.",
+          "Curated real estate brokerage, market advice, and end-to-end transaction guidance with vetted legal and renovation partners in Sri Lanka. Powered by Amaya AI.",
         areaServed: [
           {
             "@type": "City",
@@ -62,7 +62,7 @@ export default async function JsonLd() {
         url: siteUrl,
         name: "Property Advisor",
         description:
-          "Property in Colombo and across Sri Lanka. Curated prime listings and AI-guided real estate advisory.",
+          "Find prime property in Sri Lanka. Curated brokerage, market advice, and end-to-end guidance with vetted legal and renovation partners. Powered by Amaya AI.",
         publisher: {
           "@id": `${siteUrl}/#organization`,
         },
