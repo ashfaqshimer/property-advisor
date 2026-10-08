@@ -212,7 +212,7 @@ export default function LandAreaConverter() {
       {/* Quick Links Back to Properties */}
       <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-neutral-200/80 text-sm">
         <Link href="/properties" className="text-brand font-semibold hover:underline inline-flex items-center gap-1">
-          <span>← Browse all verified properties in Sri Lanka</span>
+          <span>← Browse featured properties in Sri Lanka</span>
         </Link>
         <Link href="/locations/colombo" className="text-neutral-600 hover:text-brand transition-colors">
           Explore Colombo Real Estate →

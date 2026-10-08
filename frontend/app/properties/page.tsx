@@ -11,29 +11,29 @@ import { getFeaturedProperties, type PropertyApiRecord } from "@/lib/api";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Properties for Sale & Rent in Colombo & Across Sri Lanka | Property Advisor",
+  title: "Featured Properties for Sale & Rent in Sri Lanka | Property Advisor",
   description:
-    "Browse verified residential apartments, houses, land, and commercial properties across Colombo, Rajagiriya, Kandy, Galle, and Sri Lanka. Verified pricing and 24/7 AI advisory with Amaya.",
+    "Explore curated and verified featured residential apartments, luxury houses, and prime land plots across Colombo and Sri Lanka. 24/7 AI advisory with Amaya.",
   alternates: {
     canonical: "/properties",
   },
   openGraph: {
-    title: "Properties for Sale & Rent in Colombo & Across Sri Lanka | Property Advisor",
+    title: "Featured Properties in Colombo & Sri Lanka | Property Advisor",
     description:
-      "Explore prime real estate listings across Sri Lanka. Filter by location, price, and property type.",
+      "Explore curated prime real estate listings across Sri Lanka. Verified pricing and 24/7 AI advisory.",
     url: "/properties",
     type: "website",
     images: [
       {
         url: "/images/hero_apartment.jpg",
-        alt: "Properties in Colombo and across Sri Lanka",
+        alt: "Featured properties in Colombo and across Sri Lanka",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Properties for Sale & Rent in Colombo & Sri Lanka",
-    description: "Browse verified residential apartments, houses, and land across Sri Lanka.",
+    title: "Featured Properties in Colombo & Sri Lanka",
+    description: "Explore curated residential apartments, luxury houses, and land across Sri Lanka.",
     images: ["/images/hero_apartment.jpg"],
   },
 };
@@ -169,9 +169,9 @@ export default async function PropertiesIndexPage() {
   const schema = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "Properties for Sale & Rent in Colombo & Across Sri Lanka",
+    name: "Featured Properties for Sale & Rent in Sri Lanka",
     description:
-      "Curated real estate catalog for apartments, houses, land, and commercial properties across Sri Lanka.",
+      "Curated featured real estate catalog for apartments, houses, land, and commercial properties across Sri Lanka.",
     url: `${siteUrl}/properties`,
     mainEntity: {
       "@type": "ItemList",
@@ -201,19 +201,19 @@ export default async function PropertiesIndexPage() {
               Home
             </Link>
             <span>/</span>
-            <span className="text-neutral-800 font-medium">Properties</span>
+            <span className="text-neutral-800 font-medium">Featured Properties</span>
           </nav>
 
           {/* Heading */}
           <header className="space-y-2">
             <p className="text-xs font-semibold tracking-[0.2em] text-neutral-500 uppercase">
-              ALL LISTINGS
+              CURATED SELECTION
             </p>
             <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-ink">
-              Properties for Sale &amp; Rent in Sri Lanka
+              Featured Properties in Sri Lanka
             </h1>
             <p className="text-base text-neutral-600 max-w-2xl">
-              Explore prime apartments, family residences, land plots, and commercial opportunities across Colombo and island-wide.
+              Explore our handpicked prime listings across Colombo and island-wide. Looking for specific criteria or off-market options? Amaya is ready to assist you.
             </p>
           </header>
 

@@ -104,7 +104,7 @@ export default async function Footer() {
               </li>
               <li>
                 <Link href="/properties" className={linkClass}>
-                  Properties
+                  Featured Properties
                 </Link>
               </li>
               <li>

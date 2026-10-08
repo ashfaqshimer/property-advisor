@@ -288,7 +288,7 @@ export default function FeaturedProperties() {
               href="/properties"
               className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-brand transition-colors hover:text-[#233c32]"
             >
-              <span>View all properties</span>
+              <span>View all featured properties</span>
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
