@@ -286,7 +286,18 @@ export default function FeaturedProperties() {
 
             <button
               type="button"
-              onClick={() => openChat("Show me all available properties in Colombo and Sri Lanka")}
+              onClick={() =>
+                openChat({
+                  initialMessage:
+                    "Which part of Sri Lanka are you looking for properties in? Tell me a city, suburb, or neighborhood (like Colombo, Kandy, or Galle), and I'll find what matches.",
+                  suggestionChips: [
+                    "Properties in Colombo",
+                    "Properties in Kandy",
+                    "Properties in Galle",
+                    "Greater Colombo / Suburbs",
+                  ],
+                })
+              }
               className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-brand transition-colors hover:text-[#233c32]"
             >
               <span>View all properties</span>

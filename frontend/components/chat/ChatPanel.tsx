@@ -99,6 +99,7 @@ export default function ChatPanel({
   const [fallbackPending, setFallbackPending] = useState(false);
   const [fallbackSubmitted, setFallbackSubmitted] = useState(false);
   const [fallbackError, setFallbackError] = useState(false);
+  const [activeCustomChips, setActiveCustomChips] = useState<string[] | null>(null);
 
   const sessionIdRef = useRef<string | null>(null);
   const messageCountRef = useRef(0);
@@ -180,6 +181,7 @@ export default function ChatPanel({
   const handleResetChat = useCallback(() => {
     sessionIdRef.current = crypto.randomUUID();
     setMessages([{ id: "greeting", role: "agent", text: GREETING }]);
+    setActiveCustomChips(null);
     setDraft("");
     setFailure(null);
     setStatusHint(null);
@@ -372,13 +374,29 @@ export default function ChatPanel({
     }
   };
 
+  const hasStartedChat = messages.some((message) => message.role === "user");
+
   useEffect(() => {
     const handleOpenChat = (e: Event) => {
-      const customEvent = e as CustomEvent<{ prompt?: string }>;
-      const prompt = customEvent.detail?.prompt;
+      const customEvent = e as CustomEvent<{
+        prompt?: string;
+        initialMessage?: string;
+        suggestionChips?: string[];
+      }>;
+      const { prompt, initialMessage, suggestionChips: customChips } =
+        customEvent.detail || {};
+
       if (prompt) {
         submit(prompt);
+      } else if (initialMessage && !hasStartedChat) {
+        setMessages([
+          { id: "greeting-custom", role: "agent", text: initialMessage },
+        ]);
+        if (customChips && customChips.length > 0) {
+          setActiveCustomChips(customChips);
+        }
       }
+
       setTimeout(() => {
         textareaRef.current?.focus();
       }, 100);
@@ -386,10 +404,9 @@ export default function ChatPanel({
 
     window.addEventListener("open-amaya-chat", handleOpenChat);
     return () => window.removeEventListener("open-amaya-chat", handleOpenChat);
-  }, [pending]);
+  }, [hasStartedChat, pending]);
 
   const canSend = draft.trim().length > 0 && !pending;
-  const hasStartedChat = messages.some((message) => message.role === "user");
   const isServicesMode =
     isServicesLayout ||
     (featuredProperties !== null && featuredProperties.length === 0);
@@ -397,13 +414,14 @@ export default function ChatPanel({
   const propertySuggestions = (featuredProperties ?? []).map(
     (property) => `Tell me more about ${property.title} in ${property.location}`,
   );
-  const suggestionChips = isServicesMode
+  const defaultSuggestionChips = isServicesMode
     ? SERVICES_SUGGESTION_CHIPS
     : [
         SELLING_SUGGESTION,
         ...propertySuggestions,
         ...FALLBACK_PROPERTY_SUGGESTIONS.slice(0, 3 - propertySuggestions.length),
       ];
+  const suggestionChips = activeCustomChips ?? defaultSuggestionChips;
 
   let statusText = AGENT_STATUS_LINE;
   let statusColor = "bg-green-500";
@@ -697,7 +715,7 @@ export default function ChatPanel({
         /* `items-start` shrink-wraps each pill to its label, as in the mockup;
             `max-w-full` keeps the longest one inside the panel at 375px. */
         <div className="flex shrink-0 flex-col items-start gap-2 px-4 pb-4">
-          {featuredProperties === null ? (
+          {featuredProperties === null && !activeCustomChips ? (
             <>
               <div className="h-[34px] w-64 animate-pulse rounded-full bg-neutral-200" />
               <div className="h-[34px] w-80 animate-pulse rounded-full bg-neutral-200" />

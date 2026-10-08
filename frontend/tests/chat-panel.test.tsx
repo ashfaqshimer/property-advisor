@@ -700,3 +700,27 @@ describe("chat panel as a jump target", () => {
     expect(panel).toHaveClass("scroll-mt-panel-inset");
   });
 });
+
+describe("custom openChat event handling", () => {
+  it("displays custom initial question and location chips when triggered via open-amaya-chat", () => {
+    stubBackend();
+    render(<ChatPanel />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("open-amaya-chat", {
+          detail: {
+            initialMessage: "Which part of Sri Lanka are you looking for properties in?",
+            suggestionChips: ["Properties in Colombo", "Properties in Kandy"],
+          },
+        })
+      );
+    });
+
+    expect(
+      screen.getByText("Which part of Sri Lanka are you looking for properties in?")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Properties in Colombo/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Properties in Kandy/ })).toBeInTheDocument();
+  });
+});
