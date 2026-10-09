@@ -80,6 +80,20 @@ class Settings(BaseSettings):
     telegram_agent_chat_id: str = ""          # Legacy/direct agent DM chat_id for field dispatch
     telegram_webhook_secret: str = ""         # Optional: validates incoming webhook requests
 
+    # WhatsApp Business Cloud API settings
+    whatsapp_verify_token: str = ""           # Meta webhook challenge verification token
+    whatsapp_access_token: str = ""           # System user or Page access token for Graph API
+    whatsapp_phone_number_id: str = ""        # Meta WhatsApp Phone Number ID
+    whatsapp_app_secret: str = ""             # App secret for HMAC SHA256 signature verification
+    whatsapp_api_version: str = "v21.0"        # Meta Graph API version
+
+    @property
+    def whatsapp_configured(self) -> bool:
+        return bool(
+            self.whatsapp_access_token.strip()
+            and self.whatsapp_phone_number_id.strip()
+        )
+
     @property
     def telegram_field_dispatch_configured(self) -> bool:
         return bool(
