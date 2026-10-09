@@ -37,6 +37,7 @@ from app.scraper.ikman_locations import resolve_ikman_location_slug
 from app.scraper.location_extractor import extract_suburb
 from app.agent.client import get_gemini_extractor_client
 from app.schemas.extractor import ExtractedPropertyDraft, GeminiPropertyExtraction
+from app.services.extraction_cleaner import clean_and_build_draft
 from app.services.geocoding import geocode_location
 from app.services.market_valuation import bulk_grade_prospects
 from app.services.price_parser import parse_lkr_price
@@ -1318,24 +1319,20 @@ async def generate_property_draft(
     extractor = get_gemini_extractor_client()
     try:
         raw_draft = extractor.generate_structured(prompt=prompt, schema=GeminiPropertyExtraction)
-        
-        amenities_dict = None
-        if raw_draft.amenities:
-            amenities_dict = {a: True for a in raw_draft.amenities}
-            
-        draft_dict = raw_draft.model_dump()
-        draft_dict["amenities"] = amenities_dict
-        
-        draft_dict["contact_name"] = prospect.poster_name
-        draft_dict["contact_phone"] = prospect.phone_number
-        draft_dict["contact_type"] = "broker" if prospect.classification == "broker" else "owner"
-        
-        draft_dict["source_platform"] = "lankapropertyweb.com" if is_lpw else "ikman.lk"
-        draft_dict["source_url"] = prospect.source_url or prospect.ikman_url
-        draft_dict["source_id"] = prospect.source_id or prospect.ikman_ad_id
-        draft_dict["prospect_id"] = prospect.id
-        
-        return ExtractedPropertyDraft(**draft_dict)
+        extra_overrides = {
+            "contact_name": prospect.poster_name,
+            "contact_phone": prospect.phone_number,
+            "contact_type": "broker" if prospect.classification == "broker" else "owner",
+            "source_platform": "lankapropertyweb.com" if is_lpw else "ikman.lk",
+            "source_url": prospect.source_url or prospect.ikman_url,
+            "source_id": prospect.source_id or prospect.ikman_ad_id,
+            "prospect_id": prospect.id,
+        }
+        return clean_and_build_draft(
+            raw_draft,
+            raw_text=raw_desc,
+            extra_overrides=extra_overrides,
+        )
     except Exception as e:
         logger.exception("property_extraction_failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"LLM extraction failed: {str(e)}")

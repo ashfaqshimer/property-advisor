@@ -23,6 +23,7 @@ from app.schemas.extractor import (
     GeminiPropertyExtraction,
 )
 from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
+from app.services.extraction_cleaner import clean_and_build_draft
 from app.services.market_valuation import bulk_grade_properties, grade_property_pricing
 
 logger = structlog.get_logger()
@@ -146,9 +147,10 @@ def extract_property_from_text(
     Instructions:
     1. Language & Output:
        - Regardless of whether the input is in Sinhala, Singlish, or English, generate the 'title' and 'description' in polished, professional English suitable for a Colombo-focused real estate catalog.
-       - Title should be concise and descriptive (e.g. "Newly Built 3-Bedroom House in Homagama", "Luxury 2-Bedroom Apartment in Colombo 3").
-       - Description should be well-written, informative English highlighting key property features, specifications, and neighborhood context, while omitting conversational/chat noise (e.g. "call quickly", "urgent sale", "genuine buyers only"). Never use terms like "lakhs" or "crores" in the description; standardize all price references to millions or thousands (e.g. "35M LKR", "2.5 Million LKR").
-       - 'location' should be the standard Sri Lankan town or neighborhood name in English (e.g. "Homagama", "Colombo 4", "Rajagiriya", "Kaduwela", "Nugegoda", "Galle").
+       - Title should be concise and descriptive (e.g. "Prime Commercial Building on Galle Road, Dehiwala", "Newly Built 3-Bedroom House in Homagama", "Luxury 2-Bedroom Apartment in Colombo 3").
+       - Description should be well-written, informative English highlighting key property features, specifications, and neighborhood context, while omitting conversational/chat noise (e.g. "call quickly", "urgent sale", "genuine buyers only"). Never use terms like "lakhs" or "crores" in the description; standardize all price references to millions or thousands (e.g. "35M LKR", "2.5 Million LKR", "160 Million LKR").
+       - 'location': Extract the primary Sri Lankan town, city, or Colombo suburb in English (e.g. "Dehiwala", "Homagama", "Colombo 3", "Kollupitiya", "Rajagiriya", "Kaduwela", "Nugegoda", "Battaramulla", "Malabe", "Galle").
+         If an arterial road or landmark is mentioned (e.g. "Galle Road, Dehiwala", "High Level Road, Pannipitiya"), extract the suburb ("Dehiwala", "Pannipitiya") as 'location', and include the street context in the title/description.
 
     2. Sri Lankan Currency & Price Conversion (CRITICAL):
        - Convert all prices into standard numerical LKR values.
@@ -160,63 +162,61 @@ def extract_property_from_text(
        - "කෝටි" / "Koti" / "Crore": 1 Koti = 10,000,000 LKR (10 Million).
          Examples:
          - "කෝටි 2" -> 20000000.0
-         - "කෝටි 3.5" -> 35000000.0
-       - "මිලියන" / "Million" / "M": 1 Million = 1,000,000 LKR.
-         Example: "45 Million" / "45M" -> 45000000.0
-       - Price per perch: If the price is stated per perch (e.g., "පර්චසය ලක්ෂ 15", "15 lakhs per perch", "1.5M pp"), set is_price_per_perch = True, and set price to the per-perch amount (e.g. 1500000.0). Otherwise set is_price_per_perch = False.
-       - Rent: If the property is for rent / lease (e.g., "කුලියට", "rent", "monthly"), set listing_type = 'rent', and price to the monthly rent amount (e.g. 85000.0).
+         - "කෝටි 16" -> 160000000.0
+         - "කෝටි 3.5" -> 350000000.0
+       - "මිලියන" / "Million" / "M" / "Mn": 1 Million = 1,000,000 LKR.
+         Examples: "45 Million" / "45M" -> 45000000.0, "160 Million" / "160M" -> 160000000.0
+       - Price per perch: If the price is stated per perch (e.g., "පර්චසය ලක්ෂ 15", "15 lakhs per perch", "1.5M pp", "15 laks per perch"), set is_price_per_perch = True, and set price to the per-perch amount (e.g. 1500000.0).
+         If total price is given, set is_price_per_perch = False, and set price to total amount.
+       - Rent: If the property is for rent / lease (e.g., "කුලියට", "rent", "monthly", "badhata"), set listing_type = 'rent', and price to monthly rent (e.g. 85000.0).
+       - If price is omitted or purely "call for price", set price = None. If negotiable price is given (e.g. "160M negotiable" / "ලක්ෂ 1600යි සාකච්ඡා කල හැක"), extract the numeric price.
 
     3. Property & Listing Type:
-       - property_type: 'house' ("නිවස", "ගෙයක්"), 'apartment' ("මහල් නිවාසය"), 'land' ("ඉඩම"), 'commercial' ("වෙළඳසැල", "ගොඩනැගිල්ල", "කාර්යාලය"), or 'mixed_use' ("නිවසක් සමඟ කර්මාන්ත ශාලාවක්", "house with factory/warehouse/workshop/commercial space").
-       - listing_type: 'sale' ("විකිණීමට") or 'rent' ("කුලියට").
+       - property_type:
+         - 'mixed_use': Combined commercial and residential, building with factory/workshop, or house with shop ("Commercial and Residential", "නිවසක් සමඟ කර්මාන්ත ශාලාවක්/වෙළඳසැලක්").
+         - 'commercial': Pure commercial buildings, showrooms, office spaces, warehouses ("වෙළඳසැල", "ගොඩනැගිල්ල", "කාර්යාලය").
+         - 'apartment': Apartments, flats, condominium units ("මහල් නිවාසය").
+         - 'house': Independent houses, villas, single/multi-story homes ("නිවස", "ගෙයක්").
+         - 'land': Bare land, estate plots, commercial blocks ("ඉඩම").
+       - listing_type: 'sale' ("විකිණීමට", "wikineemata") or 'rent' ("කුලියට", "kuliyata").
 
     4. Features & Specs:
-       - bedrooms ("කාමර", "නිදන කාමර")
-       - bathrooms ("නාන කාමර")
-       - land_size_perches ("පර්චස්", "perches"). If stated in sqft, convert to perches (sqft / 272.25).
-       - floor_area_sqft ("වර්ග අඩි", "sqft" of main house or primary building). Secondary buildings (like factory/warehouse) should be detailed in the description.
-       - parking_spaces ("වාහන නැවැත්වීම", "parking", "garage spaces")
-       - road_access_ft ("අඩි පාර", "road width in feet")
+       - bedrooms ("කාමර", "නිදන කාමර", "rooms", "beds")
+       - bathrooms ("නාන කාමර", "baths")
+       - land_size_perches ("පර්චස්", "perches", "P"). If given in acres ("අක්කර"), 1 acre = 160 perches. If given in sqft, convert (sqft / 272.25).
+       - floor_area_sqft ("වර්ග අඩි", "sqft", "sq.ft" of main house or primary building). Secondary buildings should be detailed in the description.
+       - parking_spaces ("වාහන නැවැත්වීම", "parking", "garage spaces", "parking for X vehicles")
+       - road_access_ft ("අඩි පාර", "road width in feet", "ft road access")
        - furnishing_status: 'unfurnished', 'semi_furnished', or 'fully_furnished' ("සම්පූර්ණ ගෘහ භාණ්ඩ සහිත")
-       - has_maids_room: True if maid's/servant's room or quarters is mentioned ("සේවක කාමරය")
-       - has_maids_toilet: True if maid's/servant's toilet or bathroom is mentioned ("සේවක වැසිකිළිය")
+       - has_maids_room: True if maid's/servant's room or quarters is mentioned ("සේවක කාමරය", "sewaka kamara")
+       - has_maids_toilet: True if maid's/servant's toilet or bathroom is mentioned ("සේවක වැසිකිළිය", "sewaka wasikili")
        - is_gated_community: True if gated community or secured housing scheme
 
     5. Amenities & Key Facilities:
        - Extract features into a list of lowercase keys including:
          - "ac", "pool", "gym", "generator", "security", "garden", "hot_water"
-         - "three_phase_electricity" ("තෙකලා විදුලිය")
+         - "three_phase_electricity" ("තෙකලා විදුලිය", "3 phase")
          - "well_water" ("ළිං ජලය")
-         - "boundary_wall" ("තාප්ප" / "වට තාප්ප")
-         - "clear_deeds" ("නිරවුල් ඔප්පු" / "සින්නක්කර")
+         - "boundary_wall" ("තාප්ප", "වට තාප්ප")
+         - "clear_deeds" ("නිරවුල් ඔප්පු", "සින්නක්කර", "බිම් සවිය")
          - "cctv"
          - "wifi"
 
     6. Contact Information:
-       - If a contact name or phone number is mentioned in the text:
+       - Extract any contact details mentioned:
          - contact_name (e.g. "Ranjith", "Mrs. Silva")
          - contact_phone (primary number e.g. "0771234567")
-         - contact_phones (list of all phone numbers mentioned)
+         - contact_phones (list of all phone numbers mentioned e.g. ["0771234567", "0719876543"])
          - contact_type: "owner" if owner ("අයිතිකරු"), "broker" if broker ("බ්‍රෝකර්", "නියෝජිත"), or None.
 
     7. image_alt:
-       - A short descriptive alt text in English for the primary listing photo (e.g. "Modern two-story house with factory in Ja-Ela").
+       - A short descriptive alt text in English for the primary listing photo (e.g. "Commercial and residential building on Galle Road, Dehiwala").
     """
 
     extractor = get_gemini_extractor_client()
     try:
         raw_draft = extractor.generate_structured(prompt=prompt, schema=GeminiPropertyExtraction)
-
-        amenities_dict = None
-        if raw_draft.amenities:
-            amenities_dict = {a: True for a in raw_draft.amenities}
-
-        draft_dict = raw_draft.model_dump()
-        draft_dict["amenities"] = amenities_dict
-        if not draft_dict.get("contact_phones") and draft_dict.get("contact_phone"):
-            draft_dict["contact_phones"] = [draft_dict["contact_phone"]]
-
-        return ExtractedPropertyDraft(**draft_dict)
+        return clean_and_build_draft(raw_draft, raw_text=raw_text)
     except Exception as exc:
         logger.exception("admin_property_extract_failed", error=str(exc))
         raise HTTPException(
