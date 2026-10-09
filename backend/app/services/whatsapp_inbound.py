@@ -153,6 +153,8 @@ def process_inbound_whatsapp_message(
         phone_number=poster_phone,
         classification="owner" if draft.contact_type == "owner" else ("broker" if draft.contact_type == "broker" else "unknown"),
         confidence=90 if draft.contact_type == "owner" else 70,
+        classification_reasons=["whatsapp_inbound_submission"],
+        classification_method="llm",
         status="new",
     )
     db.add(prospect)
