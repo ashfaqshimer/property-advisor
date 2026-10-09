@@ -106,7 +106,7 @@ export type PropertyApiRecord = {
   id: string;
   title: string;
   description: string;
-  price: number;
+  price: number | null;
   currency: "LKR";
   listing_type: "sale" | "rent";
   is_price_per_perch: boolean;
@@ -611,7 +611,7 @@ function isPropertyApiRecord(value: unknown): value is PropertyApiRecord {
     typeof candidate.id === "string" &&
     typeof candidate.title === "string" &&
     typeof candidate.description === "string" &&
-    typeof candidate.price === "number" &&
+    (typeof candidate.price === "number" || candidate.price === null) &&
     candidate.currency === "LKR" &&
     (candidate.listing_type === "sale" || candidate.listing_type === "rent") &&
     typeof candidate.is_price_per_perch === "boolean" &&

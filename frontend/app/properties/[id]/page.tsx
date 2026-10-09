@@ -33,9 +33,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const priceText = `${property.currency || "LKR"} ${property.price.toLocaleString("en-US")}${
-    property.listing_type === "rent" ? " / month" : ""
-  }`;
+  const priceText = property.price !== null
+    ? `${property.currency || "LKR"} ${property.price.toLocaleString("en-US")}${
+        property.listing_type === "rent" ? " / month" : ""
+      }`
+    : "Price on request";
   const title = `${property.title} — ${property.location} (${priceText})`;
   const description =
     property.description?.slice(0, 155) ||
@@ -89,9 +91,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     process.env.NEXT_PUBLIC_SITE_URL || "https://propertyadvisor.lk"
   ).replace(/\/+$/, "");
 
-  const priceFormatted = `${property.currency || "LKR"} ${property.price.toLocaleString("en-US")}${
-    property.listing_type === "rent" ? " / month" : ""
-  }`;
+  const priceFormatted = property.price !== null
+    ? `${property.currency || "LKR"} ${property.price.toLocaleString("en-US")}${
+        property.listing_type === "rent" ? " / month" : ""
+      }`
+    : "Price on request";
 
   const mainImageUrl =
     property.featured_image_url ||

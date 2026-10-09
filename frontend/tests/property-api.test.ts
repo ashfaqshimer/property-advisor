@@ -68,6 +68,14 @@ describe("featured property API", () => {
     await expect(getFeaturedProperties()).resolves.toEqual([]);
   });
 
+  it("accepts unpriced property with null price", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const unpricedRecord = { ...record, price: null };
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(200, [unpricedRecord])));
+
+    await expect(getFeaturedProperties()).resolves.toEqual([unpricedRecord]);
+  });
+
   it("rejects malformed responses", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(200, [{ ...record, price: "185000000" }])));
@@ -168,6 +176,10 @@ describe("property mapping", () => {
 
   it("formats non-million prices without rounding them away", () => {
     expect(formatPrice(185500000, "LKR")).toBe("LKR 185,500,000");
+  });
+
+  it("formats null price as Price on request", () => {
+    expect(formatPrice(null, "LKR")).toBe("Price on request");
   });
 });
 

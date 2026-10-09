@@ -95,6 +95,9 @@ function formatSpecs(record: PropertyApiRecord): string[] {
 }
 
 function formatPrice(record: PropertyApiRecord): string {
+  if (record.price === null) {
+    return "Price on request";
+  }
   const currency = record.currency || "LKR";
   const formatted = `${currency} ${record.price.toLocaleString("en-US")}`;
   if (record.listing_type === "rent") {

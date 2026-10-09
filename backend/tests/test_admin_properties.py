@@ -328,3 +328,33 @@ def test_admin_extract_from_text_amenity_synonyms_and_maid_quarters(
     assert data["amenities"]["three_phase_electricity"] is True
     assert data["amenities"]["boundary_wall"] is True
     assert data["has_maids_room"] is True
+
+
+def test_admin_create_property_and_deduplication_guard(
+    authenticated_client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        "app.api.properties._geocode_location",
+        lambda _location: Coordinates(latitude=6.89, longitude=79.87),
+    )
+
+    payload = {
+        "title": "Unique Villa in Nugegoda",
+        "description": "Spacious family home.",
+        "listing_type": "sale",
+        "price": None,
+        "is_price_per_perch": False,
+        "location": "Nugegoda",
+        "property_type": "house",
+    }
+
+    # First creation succeeds with null price
+    res1 = authenticated_client.post("/admin/properties", json=payload)
+    assert res1.status_code == 201
+    assert res1.json()["price"] is None
+    assert res1.json()["title"] == "Unique Villa in Nugegoda"
+
+    # Immediate duplicate creation is rejected with 409 Conflict
+    res2 = authenticated_client.post("/admin/properties", json=payload)
+    assert res2.status_code == 409
+    assert "already created" in res2.json()["detail"].lower()

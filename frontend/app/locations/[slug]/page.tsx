@@ -201,9 +201,11 @@ export default async function LocationDetailPage({ params }: PageProps) {
             {matchingProperties.length > 0 ? (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {matchingProperties.map((item) => {
-                  const priceFormatted = `${item.currency || "LKR"} ${item.price.toLocaleString("en-US")}${
-                    item.listing_type === "rent" ? " / month" : ""
-                  }`;
+                  const priceFormatted = item.price !== null
+                    ? `${item.currency || "LKR"} ${item.price.toLocaleString("en-US")}${
+                        item.listing_type === "rent" ? " / month" : ""
+                      }`
+                    : "Price on request";
                   const imageUrl =
                     item.featured_image_url ||
                     (item.image_urls && item.image_urls[0]) ||

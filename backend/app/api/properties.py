@@ -1,12 +1,14 @@
 """Property read endpoints."""
 
 from collections.abc import Sequence
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
 import cloudinary
 import cloudinary.uploader
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 import structlog
 
@@ -106,6 +108,27 @@ def _attach_market_valuation(property_record: Property, grade_info: dict | None)
 @admin_router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffUser) -> PropertyRead:
     property_data = payload.model_dump()
+
+    # Deduplication guard: reject identical listings created within a 5-minute window
+    five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
+    existing_dup = (
+        db.execute(
+            select(Property).where(
+                Property.title == property_data["title"],
+                Property.location == property_data["location"],
+                Property.listing_type == property_data["listing_type"],
+                Property.created_at >= five_minutes_ago,
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if existing_dup:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A listing with this title and location was already created recently.",
+        )
+
     coordinates = _geocode_location(property_data["location"])
     property_record = Property(
         **property_data,

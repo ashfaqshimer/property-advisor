@@ -81,7 +81,7 @@ export default function AdminPropertiesPage() {
 						title: record.title,
 						type: record.property_type,
 						location: record.location,
-						price: `LKR ${record.price.toLocaleString()}`,
+						price: record.price !== null ? `LKR ${record.price.toLocaleString()}` : 'Price on inquiry',
 						status: record.status as PropertyStatus,
 						featured: record.is_featured,
 						contactId: record.property_contact_id,

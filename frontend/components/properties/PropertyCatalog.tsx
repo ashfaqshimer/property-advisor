@@ -26,9 +26,11 @@ export default function PropertyCatalog({
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {initialProperties.map((item) => {
           const isFav = !!favorites[item.id];
-          const priceFormatted = `${item.currency || "LKR"} ${item.price.toLocaleString("en-US")}${
-            item.listing_type === "rent" ? " / month" : ""
-          }`;
+          const priceFormatted = item.price !== null
+            ? `${item.currency || "LKR"} ${item.price.toLocaleString("en-US")}${
+                item.listing_type === "rent" ? " / month" : ""
+              }`
+            : "Price on request";
           const imageUrl =
             item.featured_image_url ||
             (item.image_urls && item.image_urls[0]) ||
