@@ -169,6 +169,13 @@ describe("property mapping", () => {
   it("formats non-million prices without rounding them away", () => {
     expect(formatPrice(185500000, "LKR")).toBe("LKR 185,500,000");
   });
+
+  it("formats null price as Price on request", () => {
+    expect(formatPrice(null, "LKR")).toBe("Price on request");
+    expect(mapProperty({ ...record, price: null })).toEqual(
+      expect.objectContaining({ priceLkr: "Price on request" })
+    );
+  });
 });
 
 describe("extractPropertyFromText API", () => {
@@ -251,5 +258,15 @@ describe("getAdminProperty and updateAdminProperty API", () => {
       "http://127.0.0.1:8000/admin/properties?price_grade=underpriced",
       expect.objectContaining({ method: "GET" }),
     );
+  });
+
+  it("successfully parses properties with null price", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:8000");
+    const propertyWithNullPrice = { ...record, price: null };
+    const fetchSpy = vi.fn(async () => jsonResponse(200, [propertyWithNullPrice]));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await getAdminProperties();
+    expect(result).toEqual([propertyWithNullPrice]);
   });
 });

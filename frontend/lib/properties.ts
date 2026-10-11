@@ -31,7 +31,10 @@ export type Property = {
   listingType: "sale" | "rent";
 };
 
-export function formatPrice(price: number, currency: "LKR"): string {
+export function formatPrice(price: number | null, currency: "LKR"): string {
+  if (price === null) {
+    return "Price on request";
+  }
   if (price >= 1_000_000 && price % 1_000_000 === 0) {
     return `${currency} ${(price / 1_000_000).toLocaleString("en-US")}M`;
   }
