@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { cn } from "@/lib/utils";
+
 import {
   ChatError,
   captureFallbackLead,
@@ -436,7 +438,10 @@ export default function ChatPanel({
       id="chat"
       aria-label="AI agent chat"
       tabIndex={-1}
-      className={`relative flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand transition-[height] duration-300 ease-in-out lg:sticky lg:top-panel-inset lg:max-h-panel-max lg:h-[760px] ${className}`}
+      className={cn(
+        "relative flex min-h-[580px] scroll-mt-panel-inset flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-surface shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand transition-[height] duration-300 ease-in-out",
+        className
+      )}
     >
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
         {hasStartedChat && (

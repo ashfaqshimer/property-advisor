@@ -111,7 +111,7 @@ export default function ChatDialog() {
         >
           <div className="h-full w-full overflow-hidden">
             <ChatPanel
-              className="h-full max-h-none min-h-0 rounded-none border-0 shadow-none lg:h-full lg:max-h-none lg:sticky-none"
+              className="h-full max-h-none min-h-0 rounded-none border-0 shadow-none"
               onClose={() => setIsOpen(false)}
               isOpen={isOpen}
             />
