@@ -14,7 +14,7 @@ export default function Navbar() {
           {/* Brand Logo */}
           <Link
             href="/"
-            className="shrink-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+            className="flex shrink-0 items-center rounded-sm translate-y-0.5 sm:translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
           >
             <Logo variant="vector" />
           </Link>
