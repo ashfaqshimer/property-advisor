@@ -7,6 +7,7 @@ from uuid import UUID
 import cloudinary
 import cloudinary.uploader
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 import structlog
 
@@ -17,12 +18,13 @@ from app.db import queries
 from app.db.session import get_db
 from app.geocoding import Coordinates, GeocodingError, GoogleGeocoder
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
+from app.models.prospect import Prospect
 from app.schemas.extractor import (
     ExtractedPropertyDraft,
     ExtractPropertyTextRequest,
     GeminiPropertyExtraction,
 )
-from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
+from app.schemas.property import InventorySummary, PropertyCreate, PropertyRead, PropertyUpdate
 from app.services.extraction_cleaner import clean_and_build_draft
 from app.services.market_valuation import bulk_grade_properties, grade_property_pricing
 
@@ -236,6 +238,22 @@ def get_featured_properties(
 ) -> Sequence[Property]:
     """Curated set for the homepage grid. Empty table returns [], not a 404."""
     return queries.featured_properties(db, limit=limit)
+
+
+@router.get("/inventory-summary", response_model=InventorySummary)
+def get_inventory_summary(db: DbSession) -> InventorySummary:
+    """Public aggregate counts of available properties and active market prospects."""
+    verified_count = db.scalar(
+        select(func.count()).select_from(Property).where(Property.status == PropertyStatus.AVAILABLE)
+    ) or 0
+    prospects_count = db.scalar(
+        select(func.count()).select_from(Prospect).where(Prospect.status != "discarded")
+    ) or 0
+    return InventorySummary(
+        total_listings=verified_count + prospects_count,
+        verified_properties=verified_count,
+        tracked_prospects=prospects_count,
+    )
 
 
 @router.get("/{property_id}", response_model=PropertyRead)

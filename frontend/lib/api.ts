@@ -897,6 +897,35 @@ export async function getFeaturedProperties(limit?: number): Promise<PropertyApi
   return payload;
 }
 
+export interface InventorySummary {
+  total_listings: number;
+  verified_properties: number;
+  tracked_prospects: number;
+}
+
+export async function getInventorySummary(): Promise<InventorySummary> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl()}/properties/inventory-summary`, {
+      method: "GET",
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw classifyTransportFailure(error);
+  }
+
+  if (!response.ok) {
+    throw classifyStatus(response.status);
+  }
+
+  try {
+    return await response.json();
+  } catch {
+    throw new ChatError("unexpected", "The backend returned a malformed body.");
+  }
+}
+
 export async function getProperty(propertyId: string): Promise<PropertyApiRecord | null> {
   let response: Response;
   try {

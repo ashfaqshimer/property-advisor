@@ -92,3 +92,14 @@ def test_get_public_property_not_found(client: TestClient) -> None:
     non_existent = str(uuid.uuid4())
     response = client.get(f"/properties/{non_existent}")
     assert response.status_code == 404
+
+
+def test_get_inventory_summary(client: TestClient) -> None:
+    response = client.get("/properties/inventory-summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_listings" in data
+    assert "verified_properties" in data
+    assert "tracked_prospects" in data
+    assert data["verified_properties"] == 8
+    assert data["total_listings"] >= 8

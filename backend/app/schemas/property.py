@@ -148,3 +148,9 @@ class PropertyUpdate(BaseModel):
     has_maids_room: bool | None = None
     has_maids_toilet: bool | None = None
     is_gated_community: bool | None = None
+
+
+class InventorySummary(BaseModel):
+    total_listings: int
+    verified_properties: int
+    tracked_prospects: int

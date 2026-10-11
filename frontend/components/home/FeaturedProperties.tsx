@@ -8,9 +8,20 @@ import { Badge } from "@/components/ui/badge";
 import { openChat } from "@/lib/chat-dialog";
 import {
   getFeaturedProperties,
+  getInventorySummary,
   getSiteConfiguration,
   type PropertyApiRecord,
 } from "@/lib/api";
+
+function formatInventoryCount(count: number | null): string {
+  if (!count || count < 100) return "1,300+";
+  if (count >= 1000) {
+    const rounded = Math.floor(count / 100) * 100;
+    return `${rounded.toLocaleString()}+`;
+  }
+  const rounded = Math.floor(count / 10) * 10;
+  return `${rounded}+`;
+}
 
 export type FeaturedItem = {
   id: string;
@@ -141,6 +152,7 @@ function getGridColsClass(count: number): string {
 export default function FeaturedProperties() {
   const [items, setItems] = useState<FeaturedItem[] | null>(null);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [inventoryCount, setInventoryCount] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState<number>(4);
   const [cycleIntervalMs, setCycleIntervalMs] = useState<number>(6000);
   const [autoCycle, setAutoCycle] = useState<boolean>(true);
@@ -153,9 +165,13 @@ export default function FeaturedProperties() {
     Promise.all([
       getFeaturedProperties(50),
       getSiteConfiguration().catch(() => null),
+      getInventorySummary().catch(() => null),
     ])
-      .then(([records, config]) => {
+      .then(([records, config, summary]) => {
         if (!isMounted) return;
+        if (summary?.total_listings) {
+          setInventoryCount(summary.total_listings);
+        }
         if (config?.featured_settings) {
           setVisibleCount(config.featured_settings.visible_count || 4);
           setCycleIntervalMs((config.featured_settings.cycle_interval_seconds || 6) * 1000);
@@ -233,6 +249,7 @@ export default function FeaturedProperties() {
 
   const totalPages = items && items.length > 0 ? Math.ceil(items.length / visibleCount) : 1;
   const currentPage = Math.floor(startIndex / visibleCount);
+  const displayCount = formatInventoryCount(inventoryCount);
 
   return (
     <section
@@ -246,16 +263,25 @@ export default function FeaturedProperties() {
         {/* Header Row */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold tracking-[0.2em] text-neutral-500 uppercase">
-              FEATURED PROPERTIES
-            </p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <p className="text-xs font-semibold tracking-[0.2em] text-neutral-500 uppercase">
+                TRENDING LISTINGS
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 shadow-2xs">
+                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {displayCount} Properties &amp; Market Listings
+              </span>
+            </div>
             <h2
               id="featured-properties-heading"
-              aria-label="Featured properties"
+              aria-label="Trending properties"
               className="mt-3 font-display text-3xl font-bold leading-tight text-ink sm:text-4xl"
             >
-              Curated prime listings
+              Trending properties across Colombo &amp; beyond
             </h2>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-neutral-500">
+              Explore a live preview of active market listings, or ask Amaya to search our complete database of {displayCount} properties across Sri Lanka.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
@@ -300,7 +326,7 @@ export default function FeaturedProperties() {
               }
               className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-brand transition-colors hover:text-[#233c32]"
             >
-              <span>View all properties</span>
+              <span>Search all {displayCount} listings</span>
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
