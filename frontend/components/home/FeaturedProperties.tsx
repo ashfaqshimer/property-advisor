@@ -329,11 +329,13 @@ export default function FeaturedProperties() {
                 className="flex flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-xs animate-pulse"
               >
                 <div className="aspect-[4/3] w-full bg-neutral-200" />
-                <div className="flex flex-1 flex-col p-5 space-y-3">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="h-4 w-3/4 rounded bg-neutral-200" />
-                  <div className="h-3 w-1/2 rounded bg-neutral-100" />
-                  <div className="mt-4 h-5 w-1/3 rounded bg-neutral-200" />
-                  <div className="h-3 w-1/4 rounded bg-neutral-100" />
+                  <div className="mt-2 h-3 w-1/3 rounded bg-neutral-100" />
+                  <div className="mt-3 h-3 w-1/2 rounded bg-neutral-100" />
+                  <div className="mt-auto pt-4 border-t border-neutral-100">
+                    <div className="h-5 w-2/5 rounded bg-neutral-200" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -406,8 +408,26 @@ export default function FeaturedProperties() {
                       </Link>
                     </h3>
 
+                    {/* Location Pin */}
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-500">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="size-3.5 shrink-0 text-neutral-400"
+                        aria-hidden="true"
+                      >
+                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      <span className="truncate">{item.location}</span>
+                    </div>
+
                     {/* Specs */}
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
+                    <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
                       {item.specs.map((spec, i) => (
                         <span key={spec} className="inline-flex items-center">
                           {spec}
@@ -419,26 +439,10 @@ export default function FeaturedProperties() {
                     </div>
 
                     {/* Price */}
-                    <p className="mt-4 font-bold text-base text-ink">
-                      {item.price}
-                    </p>
-
-                    {/* Location Pin */}
-                    <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="size-3.5 shrink-0"
-                        aria-hidden="true"
-                      >
-                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                        <circle cx="12" cy="10" r="3" />
-                      </svg>
-                      <span>{item.location}</span>
+                    <div className="mt-auto pt-4 border-t border-neutral-100 flex items-baseline justify-between">
+                      <p className="font-bold text-base text-ink">
+                        {item.price}
+                      </p>
                     </div>
                   </div>
                 </article>

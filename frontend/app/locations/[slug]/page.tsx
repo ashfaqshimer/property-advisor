@@ -242,22 +242,24 @@ export default async function LocationDetailPage({ params }: PageProps) {
                           </Link>
                         </h3>
 
-                        <p className="mt-3 font-bold text-base text-ink text-brand">
-                          {priceFormatted}
-                        </p>
-
-                        <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
+                        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-500">
                           <svg
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="1.8"
-                            className="size-3.5 shrink-0"
+                            className="size-3.5 shrink-0 text-neutral-400"
                           >
                             <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
                             <circle cx="12" cy="10" r="3" />
                           </svg>
-                          <span>{item.location}</span>
+                          <span className="truncate">{item.location}</span>
+                        </div>
+
+                        <div className="mt-auto pt-4 border-t border-neutral-100 flex items-baseline justify-between">
+                          <p className="font-bold text-base text-ink">
+                            {priceFormatted}
+                          </p>
                         </div>
                       </div>
                     </article>

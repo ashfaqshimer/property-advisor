@@ -93,9 +93,25 @@ export default function PropertyCatalog({
                   </Link>
                 </h2>
 
+                {/* Location */}
+                <div className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-500">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="size-3.5 shrink-0 text-neutral-400"
+                    aria-hidden="true"
+                  >
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  <span className="truncate">{item.location}</span>
+                </div>
+
                 {/* Specs */}
                 {specs.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
                     {specs.map((spec, i) => (
                       <span key={spec} className="inline-flex items-center">
                         {spec}
@@ -105,22 +121,11 @@ export default function PropertyCatalog({
                   </div>
                 )}
 
-                <p className="mt-4 font-bold text-base text-ink text-brand">
-                  {priceFormatted}
-                </p>
-
-                <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className="size-3.5 shrink-0"
-                  >
-                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                  <span>{item.location}</span>
+                {/* Price */}
+                <div className="mt-auto pt-4 border-t border-neutral-100 flex items-baseline justify-between">
+                  <p className="font-bold text-base text-ink">
+                    {priceFormatted}
+                  </p>
                 </div>
               </div>
             </article>
