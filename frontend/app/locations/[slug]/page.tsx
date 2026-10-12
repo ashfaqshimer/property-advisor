@@ -71,7 +71,7 @@ export default async function LocationDetailPage({ params }: PageProps) {
   }
 
   const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL || "https://propertyadvisor.lk"
+    process.env.NEXT_PUBLIC_SITE_URL || "https://www.propertyadvisor.lk"
   ).replace(/\/+$/, "");
 
   let allProperties: PropertyApiRecord[] = [];

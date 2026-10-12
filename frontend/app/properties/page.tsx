@@ -151,7 +151,7 @@ const FALLBACK_PROPERTIES: PropertyApiRecord[] = [
 
 export default async function PropertiesIndexPage() {
   const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL || "https://propertyadvisor.lk"
+    process.env.NEXT_PUBLIC_SITE_URL || "https://www.propertyadvisor.lk"
   ).replace(/\/+$/, "");
 
   let properties: PropertyApiRecord[] = [];

@@ -4,7 +4,7 @@ import { CITIES } from "@/lib/locations";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL || "https://propertyadvisor.lk"
+    process.env.NEXT_PUBLIC_SITE_URL || "https://www.propertyadvisor.lk"
   ).replace(/\/+$/, "");
 
   const routes: MetadataRoute.Sitemap = [

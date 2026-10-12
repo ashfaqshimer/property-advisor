@@ -116,7 +116,7 @@ The following variables govern canonical URL construction and webmaster verifica
 
 | Variable | Environment | Default / Example | Purpose |
 |---|---|---|---|
-| `NEXT_PUBLIC_SITE_URL` | Production / Preview | `https://propertyadvisor.lk` | Base URL for sitemaps, robots.txt, canonical links, and Open Graph previews |
+| `NEXT_PUBLIC_SITE_URL` | Production / Preview | `https://www.propertyadvisor.lk` | Base URL for sitemaps, robots.txt, canonical links, and Open Graph previews |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Production | `e.g. abcd1234efgh` | Automatically renders `<meta name="google-site-verification" content="..." />` |
 | `NEXT_PUBLIC_BING_SITE_VERIFICATION` | Production | `e.g. 5678IJKL` | Automatically renders `<meta name="msvalidate.01" content="..." />` |
 | `NEXT_PUBLIC_API_URL` | All | `http://127.0.0.1:8000` (Dev) / `/api` (Prod) | FastAPI backend target |

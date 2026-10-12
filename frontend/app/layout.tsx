@@ -7,7 +7,7 @@ import JsonLd from "@/components/seo/JsonLd";
 import "./globals.css";
 
 const siteUrl = (
-  process.env.NEXT_PUBLIC_SITE_URL || "https://propertyadvisor.lk"
+  process.env.NEXT_PUBLIC_SITE_URL || "https://www.propertyadvisor.lk"
 ).replace(/\/+$/, "");
 
 export const metadata: Metadata = {

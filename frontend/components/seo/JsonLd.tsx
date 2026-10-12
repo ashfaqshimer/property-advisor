@@ -2,7 +2,7 @@ import { getSiteConfiguration, type SiteConfiguration } from "@/lib/api";
 
 export default async function JsonLd() {
   const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL || "https://propertyadvisor.lk"
+    process.env.NEXT_PUBLIC_SITE_URL || "https://www.propertyadvisor.lk"
   ).replace(/\/+$/, "");
 
   let siteConfig: SiteConfiguration | null = null;

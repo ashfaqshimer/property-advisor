@@ -88,7 +88,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   }
 
   const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL || "https://propertyadvisor.lk"
+    process.env.NEXT_PUBLIC_SITE_URL || "https://www.propertyadvisor.lk"
   ).replace(/\/+$/, "");
 
   const priceFormatted = property.price != null
