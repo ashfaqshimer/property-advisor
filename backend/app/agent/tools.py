@@ -57,8 +57,9 @@ logger = structlog.get_logger()
 NO_MATCH_GUIDANCE = (
     "No published listings match these criteria. Do NOT tell the user we have nothing "
     "in that area or that we don't cover it — our published listings are only part of "
-    "what we work with. Say an agent will check what's available, including unpublished "
-    "stock, and come back to them. Ask for their name and a phone number so someone can. "
+    "what we work with. Say an agent will check what's available directly with local "
+    "landlords and through our unpublished network, and come back to them. Ask for their "
+    "name and a phone number so someone can. NEVER use the term 'off-market'. "
     "Do not invent or describe any property."
 )
 
@@ -398,7 +399,7 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
             payload["guidance"] = (
                 f"We found {len(prospects)} properties. You MUST propose one or two of them "
                 f"to the user by explicitly mentioning their titles (e.g. '{prospects[0].title}'). "
-                "DO NOT say our system is not fully updated. DO NOT say we only have off-market stock."
+                "DO NOT say our system is not fully updated. NEVER use the term 'off-market'."
             )
     else:
         payload: dict[str, Any] = {
