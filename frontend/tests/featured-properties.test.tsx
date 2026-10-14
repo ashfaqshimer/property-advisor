@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import FeaturedProperties from "@/components/home/FeaturedProperties";
@@ -74,6 +74,8 @@ describe("FeaturedProperties", () => {
     expect(screen.getByText("LKR 350,000 / month")).toBeInTheDocument();
     expect(screen.getByText("For Sale")).toBeInTheDocument();
     expect(screen.getByText("For Rent")).toBeInTheDocument();
+    // Concept B: AI Concierge Card is rendered
+    expect(screen.getByLabelText("Amaya AI Property Concierge")).toBeInTheDocument();
   });
 
   it("falls back to default featured items if the database returns empty", async () => {
@@ -86,6 +88,7 @@ describe("FeaturedProperties", () => {
         screen.getByText("Modern Apartment – Colombo 03"),
       ).toBeInTheDocument();
     });
+    expect(screen.getByLabelText("Amaya AI Property Concierge")).toBeInTheDocument();
   });
 
   it("falls back to default featured items if the fetch fails", async () => {
@@ -120,5 +123,51 @@ describe("FeaturedProperties", () => {
 
     const img = screen.getByRole("img", { name: "Condo balcony overlooking ocean" });
     expect(img).toHaveAttribute("src", "https://example.com/chosen-featured-photo.jpg");
+  });
+
+  it("triggers open-amaya-chat with property context when clicking Ask Amaya on a card (Concept A)", async () => {
+    vi.spyOn(api, "getFeaturedProperties").mockResolvedValueOnce(mockRecords);
+    const eventSpy = vi.fn();
+    window.addEventListener("open-amaya-chat", eventSpy);
+
+    render(<FeaturedProperties />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Luxury Seaview Condo")).toBeInTheDocument();
+    });
+
+    const askButton = screen.getByRole("button", {
+      name: "Ask Amaya about Luxury Seaview Condo",
+    });
+    expect(askButton).toBeInTheDocument();
+    fireEvent.click(askButton);
+
+    expect(eventSpy).toHaveBeenCalledTimes(1);
+    const event = eventSpy.mock.calls[0][0] as CustomEvent;
+    expect(event.detail?.prompt).toContain("Luxury Seaview Condo");
+    expect(event.detail?.prompt).toContain("Kollupitiya, Colombo 03");
+
+    window.removeEventListener("open-amaya-chat", eventSpy);
+  });
+
+  it("triggers open-amaya-chat when clicking the Concierge card actions (Concept B)", async () => {
+    vi.spyOn(api, "getFeaturedProperties").mockResolvedValueOnce(mockRecords);
+    const eventSpy = vi.fn();
+    window.addEventListener("open-amaya-chat", eventSpy);
+
+    render(<FeaturedProperties />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Amaya AI Property Concierge")).toBeInTheDocument();
+    });
+
+    const quickChip = screen.getByRole("button", { name: "Off-Market" });
+    fireEvent.click(quickChip);
+
+    expect(eventSpy).toHaveBeenCalledTimes(1);
+    const event = eventSpy.mock.calls[0][0] as CustomEvent;
+    expect(event.detail?.prompt).toContain("off-market");
+
+    window.removeEventListener("open-amaya-chat", eventSpy);
   });
 });
