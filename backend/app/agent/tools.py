@@ -474,8 +474,10 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
         }
         if prospects:
             payload["guidance"] = (
-                f"We found {len(prospects)} properties. You MUST propose one or two of them "
-                f"to the user by explicitly mentioning their titles (e.g. '{prospects[0].title}'). "
+                f"We found {len(prospects)} properties. Propose one or two of them to the user "
+                "by describing their key features (such as bedrooms, furnishing, amenities, or general area). "
+                "CRITICAL GUARDRAIL: DO NOT reveal specific property names, building names, or complex names "
+                "before having the person's name and contact information, as they could be another agent. "
                 "DO NOT say our system is not fully updated. NEVER use the term 'off-market'."
             )
     else:
@@ -499,13 +501,14 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
                 _serialize(p) if isinstance(p, Property) else _serialize_prospect(p)
                 for p in alternatives
             ]
-            alt_titles = ", ".join(
-                f"'{p['title']}' ({p.get('location', '')})"
+            alt_options = ", ".join(
+                f"{p.get('bedrooms', '')} bed {p.get('property_type', 'property')} in {p.get('location', '')}".strip()
                 for p in payload["suggested_alternatives"]
             )
             payload["guidance"] = (
-                f"No exact published listings match in {location}. However, we have relevant nearby or alternative options: {alt_titles}. "
-                "Acknowledge that we don't have an exact match right at this moment, then warmly suggest these alternatives. "
+                f"No exact published listings match in {location}. However, we have relevant nearby or alternative options: {alt_options}. "
+                "Acknowledge that we don't have an exact match right at this moment, then warmly suggest these alternatives by type, area, and features. "
+                "CRITICAL GUARDRAIL: DO NOT reveal specific building or complex names before getting the person's contact info. "
                 "Do NOT tell the user we have nothing in that area or that we don't cover it — our published listings are only part "
                 "of what we work with. Say an agent will also check direct landlord contacts and our unpublished network. "
                 "Do NOT demand their name or phone number immediately; ask natural qualifying questions first (such as budget, bedrooms, or flexibility with nearby areas). "

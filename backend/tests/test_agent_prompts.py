@@ -55,6 +55,13 @@ class TestPersona:
         assert "add a brief `remarks` note" in build_system_prompt(db_session)
         assert "Do not invent, infer" in build_system_prompt(db_session)
 
+    def test_property_identity_protection_guardrail_is_present(self, db_session):
+        prompt = build_system_prompt(db_session)
+        assert "Property Identity Protection" in prompt
+        assert "NEVER reveal specific property names, building names" in prompt
+        assert "without getting more information about the person inquiring first" in prompt
+        assert "as they could be another agent" in prompt or "competitor" in prompt.lower()
+
 class TestSchemaIntro:
     def test_seller_fields_reflect_property_create(self):
         fields_prompt = build_seller_fields_prompt()
