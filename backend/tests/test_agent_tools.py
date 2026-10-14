@@ -462,3 +462,57 @@ class TestDeclarations:
             for declaration in tool.function_declarations
         }
         assert names == set(tools.IMPLEMENTATIONS)
+
+
+class TestSearchProspects:
+    def test_search_prospects_matches_suburb_and_title(self, db_session: Session):
+        from app.models.prospect import Prospect
+        from app.models.property import ListingType
+
+        p1 = Prospect(
+            source="ikman",
+            title="House for Rent in Kawdana",
+            price="Rs 150,000 /month",
+            location="Colombo",
+            suburb="Dehiwala",
+            listing_type="rent",
+            property_type="house",
+            classification="owner",
+            confidence=90,
+            classification_reasons=["test"],
+            classification_method="heuristic",
+            status="new",
+        )
+        p2 = Prospect(
+            source="ikman",
+            title="3 Bedroom Apartment in Dehiwala",
+            price="Rs 200,000 /month",
+            location="Colombo",
+            suburb=None,
+            listing_type="rent",
+            property_type="property",
+            classification="owner",
+            confidence=90,
+            classification_reasons=["test"],
+            classification_method="heuristic",
+            status="new",
+        )
+        db_session.add_all([p1, p2])
+        db_session.commit()
+
+        # Matches by suburb
+        results_suburb = tools.queries.search_prospects(
+            db_session, location="Dehiwala", listing_type=ListingType.RENT
+        )
+        assert len(results_suburb) == 2
+
+        # Matches apartment with generic 'property' type via title
+        results_apt = tools.queries.search_prospects(
+            db_session,
+            location="Dehiwala",
+            listing_type=ListingType.RENT,
+            property_type=PropertyType.APARTMENT,
+        )
+        assert len(results_apt) == 1
+        assert results_apt[0].title == "3 Bedroom Apartment in Dehiwala"
+

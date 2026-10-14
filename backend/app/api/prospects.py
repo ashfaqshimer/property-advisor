@@ -231,13 +231,38 @@ def _save_prospects_sync(
                 cat_slug = ""
                 if ad.category:
                     cat_slug = (ad.category.slug or ad.category.name or "").lower()
-                if "land" in cat_slug: prop_type = "land"
-                elif "apartments" in cat_slug: prop_type = "apartment"
-                elif "houses" in cat_slug: prop_type = "house"
-                elif "commercial" in cat_slug: prop_type = "commercial"
+                title_lower = (ad.title or "").lower()
+                if "land" in cat_slug or "land" in title_lower or "bare land" in title_lower:
+                    prop_type = "land"
+                elif (
+                    "apartment" in cat_slug
+                    or "flat" in cat_slug
+                    or "apartment" in title_lower
+                    or "flat" in title_lower
+                    or "condo" in title_lower
+                ):
+                    prop_type = "apartment"
+                elif (
+                    "house" in cat_slug
+                    or "home" in cat_slug
+                    or "villa" in title_lower
+                    or "house" in title_lower
+                    or "bungalow" in title_lower
+                    or "annex" in title_lower
+                ):
+                    prop_type = "house"
+                elif (
+                    "commercial" in cat_slug
+                    or "shop" in cat_slug
+                    or "office" in cat_slug
+                    or "building" in cat_slug
+                    or "warehouse" in cat_slug
+                ):
+                    prop_type = "commercial"
                 
                 listing_type = "sale"
-                if "rentals" in cat_slug: listing_type = "rent"
+                if "rental" in cat_slug or "rent" in cat_slug or "for rent" in title_lower or "rent in" in title_lower:
+                    listing_type = "rent"
 
                 ad_url = f"{IKMAN_BASE_URL}/en/ad/{ad.slug}" if ad.slug else ""
                 ad_slug = ad.slug or ""

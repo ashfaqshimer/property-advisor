@@ -170,19 +170,98 @@ def search_prospects(
         geo_match = func.ST_DWithin(prospect_point, search_point, radius_km * 1000)
         has_no_coords = (Prospect.latitude == None) | (Prospect.longitude == None)  # noqa: E711
         if location:
-            text_match = Prospect.location.ilike(f"%{location.strip()}%")
+            term = f"%{location.strip()}%"
+            text_match = (
+                Prospect.location.ilike(term)
+                | Prospect.suburb.ilike(term)
+                | Prospect.title.ilike(term)
+            )
             stmt = stmt.where(geo_match | (has_no_coords & text_match))
         else:
             stmt = stmt.where(geo_match)
     elif location:
-        stmt = stmt.where(Prospect.location.ilike(f"%{location.strip()}%"))
+        term = f"%{location.strip()}%"
+        stmt = stmt.where(
+            Prospect.location.ilike(term)
+            | Prospect.suburb.ilike(term)
+            | Prospect.title.ilike(term)
+        )
 
     if listing_type is not None:
         stmt = stmt.where(Prospect.listing_type == listing_type.value)
     if property_type is not None:
-        stmt = stmt.where(Prospect.property_type == property_type.value)
+        if property_type == PropertyType.APARTMENT:
+            stmt = stmt.where(
+                (Prospect.property_type == PropertyType.APARTMENT.value)
+                | (
+                    (Prospect.property_type == "property")
+                    & (
+                        Prospect.title.ilike("%apartment%")
+                        | Prospect.title.ilike("%flat%")
+                        | Prospect.title.ilike("%condo%")
+                    )
+                )
+            )
+        elif property_type == PropertyType.HOUSE:
+            stmt = stmt.where(
+                (Prospect.property_type == PropertyType.HOUSE.value)
+                | (
+                    (Prospect.property_type == "property")
+                    & (
+                        Prospect.title.ilike("%house%")
+                        | Prospect.title.ilike("%villa%")
+                        | Prospect.title.ilike("%bungalow%")
+                        | Prospect.title.ilike("%annex%")
+                        | Prospect.title.ilike("%home%")
+                    )
+                )
+            )
+        elif property_type == PropertyType.LAND:
+            stmt = stmt.where(
+                (Prospect.property_type == PropertyType.LAND.value)
+                | (
+                    (Prospect.property_type == "property")
+                    & (
+                        Prospect.title.ilike("%land%")
+                        | Prospect.title.ilike("%plot%")
+                        | Prospect.title.ilike("%perch%")
+                    )
+                )
+            )
+        elif property_type == PropertyType.COMMERCIAL:
+            stmt = stmt.where(
+                (Prospect.property_type == PropertyType.COMMERCIAL.value)
+                | (
+                    Prospect.property_type.in_(
+                        [
+                            "commercial",
+                            "warehouse",
+                            "building",
+                            "office space",
+                            "shop space",
+                            "multipurpose",
+                            "factory",
+                            "hotel",
+                            "guest house",
+                            "co-working",
+                        ]
+                    )
+                )
+            )
+        else:
+            stmt = stmt.where(Prospect.property_type == property_type.value)
 
-    stmt = stmt.order_by(Prospect.first_seen_at.desc(), Prospect.id).limit(limit)
+    if location:
+        term = f"%{location.strip()}%"
+        text_priority = case(
+            (Prospect.suburb.ilike(term), 0),
+            (Prospect.title.ilike(term), 1),
+            (Prospect.location.ilike(term), 2),
+            else_=3,
+        )
+        stmt = stmt.order_by(text_priority, Prospect.first_seen_at.desc(), Prospect.id)
+    else:
+        stmt = stmt.order_by(Prospect.first_seen_at.desc(), Prospect.id)
     return db.execute(stmt).scalars().all()
 
 
