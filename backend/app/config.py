@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str
+    prod_database_url: str = ""
 
     # Only needed when database_url points at Neon's `-pooler` endpoint: Alembic runs
     # DDL and wants a plain session rather than PgBouncer transaction pooling.
