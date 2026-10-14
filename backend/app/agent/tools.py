@@ -332,6 +332,83 @@ def _serialize_prospect(prop: Prospect) -> dict[str, Any]:
 # --------------------------------------------------------------------------------------
 
 
+def _find_alternatives(
+    context: ToolContext,
+    *,
+    location: str | None,
+    listing_type: ListingType | None,
+    property_type: PropertyType | None,
+    bedrooms: int | None = None,
+    budget_max: Decimal | None = None,
+    coordinates: Any = None,
+) -> list[Property | Prospect]:
+    """Find nearby or alternative listings when an exact search returns zero matches."""
+    has_constraints = any([property_type, bedrooms, budget_max])
+    if not has_constraints or not location:
+        return []
+
+    alternatives: list[Property | Prospect] = []
+    seen_ids: set[Any] = set()
+
+    # 1. Nearby wider radius (if coordinates available)
+    if coordinates:
+        wider_props = queries.search_properties(
+            context.db,
+            latitude=coordinates.latitude,
+            longitude=coordinates.longitude,
+            radius_km=15.0,
+            listing_type=listing_type,
+            property_type=property_type,
+            limit=2,
+        )
+        for p in wider_props:
+            if p.id not in seen_ids:
+                seen_ids.add(p.id)
+                alternatives.append(p)
+
+        if len(alternatives) < 2:
+            wider_prospects = queries.search_prospects(
+                context.db,
+                latitude=coordinates.latitude,
+                longitude=coordinates.longitude,
+                radius_km=15.0,
+                listing_type=listing_type,
+                property_type=property_type,
+                limit=2,
+            )
+            for pr in wider_prospects:
+                if pr.id not in seen_ids:
+                    seen_ids.add(pr.id)
+                    alternatives.append(pr)
+
+    # 2. Alternative property types in the same location (e.g. houses/annexes in the same suburb)
+    if len(alternatives) < 2 and location:
+        alt_props = queries.search_properties(
+            context.db,
+            location=location,
+            listing_type=listing_type,
+            limit=2,
+        )
+        for p in alt_props:
+            if p.id not in seen_ids:
+                seen_ids.add(p.id)
+                alternatives.append(p)
+
+        if len(alternatives) < 2:
+            alt_prospects = queries.search_prospects(
+                context.db,
+                location=location,
+                listing_type=listing_type,
+                limit=2,
+            )
+            for pr in alt_prospects:
+                if pr.id not in seen_ids:
+                    seen_ids.add(pr.id)
+                    alternatives.append(pr)
+
+    return alternatives[:3]
+
+
 def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     """Find listings matching the criteria the model extracted from the conversation."""
     budget_min = _as_decimal(args.get("budget_min"), "budget_min")
@@ -408,7 +485,34 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
         }
 
     if payload["match_count"] == 0:
-        payload["guidance"] = NO_MATCH_GUIDANCE
+        alternatives = _find_alternatives(
+            context,
+            location=location,
+            listing_type=listing_type,
+            property_type=property_type,
+            bedrooms=bedrooms,
+            budget_max=budget_max,
+            coordinates=coordinates,
+        )
+        if alternatives:
+            payload["suggested_alternatives"] = [
+                _serialize(p) if isinstance(p, Property) else _serialize_prospect(p)
+                for p in alternatives
+            ]
+            alt_titles = ", ".join(
+                f"'{p['title']}' ({p.get('location', '')})"
+                for p in payload["suggested_alternatives"]
+            )
+            payload["guidance"] = (
+                f"No exact published listings match in {location}. However, we have relevant nearby or alternative options: {alt_titles}. "
+                "Acknowledge that we don't have an exact match right at this moment, then warmly suggest these alternatives. "
+                "Do NOT tell the user we have nothing in that area or that we don't cover it — our published listings are only part "
+                "of what we work with. Say an agent will also check direct landlord contacts and our unpublished network. "
+                "Do NOT demand their name or phone number immediately; ask natural qualifying questions first (such as budget, bedrooms, or flexibility with nearby areas). "
+                "NEVER use the term 'off-market'. Do not invent or describe any property not listed here."
+            )
+        else:
+            payload["guidance"] = NO_MATCH_GUIDANCE
     return payload
 
 
