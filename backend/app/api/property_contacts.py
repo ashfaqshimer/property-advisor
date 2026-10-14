@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth import CurrentStaffUser
 from app.schemas.auth import StaffRole
 from app.db.session import get_db
-from app.models.property_contact import PropertyContact, PropertyContactPhone
+from app.models.property_contact import PropertyContact, PropertyContactPhone, PropertyContactType
 from app.schemas.property_contact import (
     PropertyContactCreate,
     PropertyContactRead,
@@ -51,6 +51,8 @@ def list_property_contacts(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> Sequence[PropertyContact]:
     stmt = select(PropertyContact)
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        stmt = stmt.where(PropertyContact.contact_type != PropertyContactType.OWNER)
     if search:
         term = f"%{search.strip()}%"
         stmt = stmt.where(
@@ -70,6 +72,12 @@ def create_property_contact(
     db: DbSession,
     _user: CurrentStaffUser,
 ) -> PropertyContact:
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        if payload.contact_type in (PropertyContactType.OWNER, "owner"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Agents are not permitted to create property owner details.",
+            )
     contact = PropertyContact(
         contact_type=payload.contact_type,
         full_name=payload.full_name,
@@ -102,6 +110,12 @@ def get_property_contact(
     contact = db.get(PropertyContact, contact_id)
     if contact is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found.")
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        if contact.contact_type in (PropertyContactType.OWNER, "owner"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Agents are not permitted to view property owner details.",
+            )
     return contact
 
 
@@ -115,6 +129,18 @@ def update_property_contact(
     contact = db.get(PropertyContact, contact_id)
     if contact is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found.")
+
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        if contact.contact_type in (PropertyContactType.OWNER, "owner"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Agents are not permitted to edit property owner details.",
+            )
+        if payload.contact_type in (PropertyContactType.OWNER, "owner"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Agents are not permitted to set contact type to owner.",
+            )
 
     changes = payload.model_dump(exclude_unset=True)
     phone_payloads = changes.pop("phones", None)

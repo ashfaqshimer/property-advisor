@@ -59,6 +59,7 @@ export default function AdminPropertiesPage() {
 	const [loading, setLoading] = useState(true);
 	const [busyProperty, setBusyProperty] = useState<string | null>(null);
 	const [canDelete, setCanDelete] = useState(false);
+	const [isAgent, setIsAgent] = useState(false);
 	const [assigningId, setAssigningId] = useState<string | null>(null);
 	const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 	const [selectingPhotoProperty, setSelectingPhotoProperty] = useState<Property | null>(null);
@@ -71,7 +72,12 @@ export default function AdminPropertiesPage() {
 	const [filterPriceGrade, setFilterPriceGrade] = useState<string>('all');
 
 	useEffect(() => {
-		getCurrentUser().then((user) => setCanDelete(user?.role === 'root' || user?.role === 'admin')).catch(() => {});
+		getCurrentUser()
+			.then((user) => {
+				setCanDelete(user?.role === 'root' || user?.role === 'admin');
+				setIsAgent(user?.role === 'agent');
+			})
+			.catch(() => {});
 		getPropertyContacts().then(setContacts).catch(() => {});
 		getAdminProperties()
 			.then((records) =>
@@ -357,7 +363,11 @@ export default function AdminPropertiesPage() {
 										</Badge>
 									</TableCell>
 									<TableCell className='px-4 py-4 text-sm'>
-										{assigningId === property.id ? (
+										{isAgent ? (
+											<span className='text-xs text-muted-foreground'>
+												{property.contactName || '—'}
+											</span>
+										) : assigningId === property.id ? (
 											<Spinner className='h-4 w-4 text-primary' />
 										) : (
 											<Select
@@ -486,7 +496,11 @@ export default function AdminPropertiesPage() {
 							{/* Contact assign on mobile */}
 							<div className='flex items-center gap-2 text-xs text-muted-foreground'>
 								<span className='shrink-0'>Contact:</span>
-								{assigningId === property.id ? (
+								{isAgent ? (
+									<span className='text-xs text-foreground'>
+										{property.contactName || '—'}
+									</span>
+								) : assigningId === property.id ? (
 									<Spinner className='h-3.5 w-3.5 text-primary' />
 								) : (
 									<Select

@@ -1344,10 +1344,14 @@ async def generate_property_draft(
     extractor = get_gemini_extractor_client()
     try:
         raw_draft = extractor.generate_structured(prompt=prompt, schema=GeminiPropertyExtraction)
+        contact_type = "broker" if prospect.classification == "broker" else "owner"
+        is_owner = contact_type == "owner"
+        agent_redact = _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN) and is_owner
+
         extra_overrides = {
-            "contact_name": prospect.poster_name,
-            "contact_phone": prospect.phone_number,
-            "contact_type": "broker" if prospect.classification == "broker" else "owner",
+            "contact_name": None if agent_redact else prospect.poster_name,
+            "contact_phone": None if agent_redact else prospect.phone_number,
+            "contact_type": None if agent_redact else contact_type,
             "source_platform": "lankapropertyweb.com" if is_lpw else "ikman.lk",
             "source_url": prospect.source_url or prospect.ikman_url,
             "source_id": prospect.source_id or prospect.ikman_ad_id,

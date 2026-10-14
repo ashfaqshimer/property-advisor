@@ -16,6 +16,7 @@ export function ContactForm({
 	onSave,
 	onCancel,
 	saving,
+	disableOwner = false,
 }: {
 	initial?: PropertyContact;
 	onSave: (data: {
@@ -28,8 +29,11 @@ export function ContactForm({
 	}) => void;
 	onCancel: () => void;
 	saving: boolean;
+	disableOwner?: boolean;
 }) {
-	const [contactType, setContactType] = useState<'owner' | 'broker'>(initial?.contact_type ?? 'owner');
+	const [contactType, setContactType] = useState<'owner' | 'broker'>(
+		initial?.contact_type ?? (disableOwner ? 'broker' : 'owner')
+	);
 	const [fullName, setFullName] = useState(initial?.full_name ?? '');
 	const [companyName, setCompanyName] = useState(initial?.company_name ?? '');
 	const [email, setEmail] = useState(initial?.email ?? '');
@@ -70,7 +74,7 @@ export function ContactForm({
 				<div>
 					<label className={labelCls}>Type</label>
 					<Select value={contactType} onChange={(e) => setContactType(e.target.value as 'owner' | 'broker')} className="w-full">
-						<option value='owner'>Owner</option>
+						{!disableOwner && <option value='owner'>Owner</option>}
 						<option value='broker'>Broker</option>
 					</Select>
 				</div>

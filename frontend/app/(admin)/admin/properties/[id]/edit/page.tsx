@@ -9,6 +9,7 @@ import {
 	updateAdminProperty,
 	createPropertyContact,
 	getPropertyContacts,
+	getCurrentUser,
 	uploadPropertyImages,
 	extractPropertyFromText,
 	type PropertyContact,
@@ -104,6 +105,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 	const [contacts, setContacts] = useState<PropertyContact[]>([]);
 	const [showContactForm, setShowContactForm] = useState(false);
 	const [creatingContact, setCreatingContact] = useState(false);
+	const [isAgent, setIsAgent] = useState(false);
 	const [isDragging, setIsDragging] = useState(false);
 
 	// AI Smart Autofill state
@@ -127,6 +129,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 	} | null>(null);
 
 	useEffect(() => {
+		getCurrentUser().then((user) => setIsAgent(user?.role === 'agent')).catch(() => {});
 		getPropertyContacts().then(setContacts).catch(() => {});
 
 		getAdminProperty(propertyId)
@@ -428,7 +431,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 				featured_image_url: form.featuredImageUrl || (allImageUrls[0] ?? null),
 				is_featured: form.isFeatured,
 				status: form.status as 'available' | 'under_offer' | 'sold',
-				property_contact_id: form.propertyContactId || null,
+				property_contact_id: isAgent ? (form.propertyContactId || undefined) : (form.propertyContactId || null),
 			});
 
 			setExistingImages(allImageUrls);
@@ -620,7 +623,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 							</p>
 						</div>
 
-						{extractedContact && (extractedContact.name || extractedContact.phone) && (
+						{extractedContact && (extractedContact.name || extractedContact.phone) && !(isAgent && extractedContact.type === 'owner') && (
 							<div className='mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5 text-xs text-foreground'>
 								<div className='flex items-center gap-1.5'>
 									<CheckCircle2 className='h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0' />
@@ -758,7 +761,9 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 
 							<div className='space-y-2 sm:col-span-2'>
 								<div className='flex items-center justify-between'>
-									<Label htmlFor='propertyContactId'>Contact (Owner / Broker)</Label>
+									<Label htmlFor='propertyContactId'>
+										{isAgent ? 'Contact (Broker)' : 'Contact (Owner / Broker)'}
+									</Label>
 									<Button
 										type='button'
 										variant='link'
@@ -789,6 +794,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 												onSave={handleCreateContact}
 												onCancel={() => setShowContactForm(false)}
 												saving={creatingContact}
+												disableOwner={isAgent}
 											/>
 										</div>
 									</div>

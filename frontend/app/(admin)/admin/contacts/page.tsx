@@ -36,6 +36,7 @@ export default function AdminContactsPage() {
 	const formRef = useRef<HTMLDivElement>(null);
 
 	const canDelete = currentUser?.role === 'root' || currentUser?.role === 'admin';
+	const isAgent = currentUser?.role === 'agent';
 
 	useEffect(() => {
 		getCurrentUser().then(setCurrentUser).catch(() => {});
@@ -118,6 +119,7 @@ export default function AdminContactsPage() {
 						onSave={handleCreate}
 						onCancel={() => setShowCreate(false)}
 						saving={creating}
+						disableOwner={isAgent}
 					/>
 				</div>
 			)}
@@ -225,6 +227,7 @@ export default function AdminContactsPage() {
 											onSave={(data) => handleUpdate(contact.id, data)}
 											onCancel={() => setEditingContact(null)}
 											saving={updating}
+											disableOwner={isAgent}
 										/>
 									</div>
 								)}

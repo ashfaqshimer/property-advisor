@@ -17,8 +17,11 @@ from app.auth import CurrentStaffUser, RootStaffUser
 from app.db import queries
 from app.db.session import get_db
 from app.geocoding import Coordinates, GeocodingError, GoogleGeocoder
+from app.models.auth import StaffUser
 from app.models.property import ListingType, Property, PropertyStatus, PropertyType
+from app.models.property_contact import PropertyContact, PropertyContactType
 from app.models.prospect import Prospect
+from app.schemas.auth import StaffRole
 from app.schemas.extractor import (
     ExtractedPropertyDraft,
     ExtractPropertyTextRequest,
@@ -105,8 +108,35 @@ def _attach_market_valuation(property_record: Property, grade_info: dict | None)
     return read_obj
 
 
+def _redact_owner_details(
+    read_obj: PropertyRead,
+    property_record: Property,
+    user: StaffUser,
+) -> PropertyRead:
+    if user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        contact = property_record.property_contact
+        is_owner = (
+            (contact and contact.contact_type in (PropertyContactType.OWNER, "owner"))
+            or (
+                read_obj.property_contact
+                and read_obj.property_contact.contact_type in (PropertyContactType.OWNER, "owner")
+            )
+        )
+        if is_owner:
+            read_obj.property_contact = None
+            read_obj.property_contact_id = None
+    return read_obj
+
+
 @admin_router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffUser) -> PropertyRead:
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN) and payload.property_contact_id:
+        contact = db.get(PropertyContact, payload.property_contact_id)
+        if contact and contact.contact_type in (PropertyContactType.OWNER, "owner"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Agents are not permitted to assign property owner details.",
+            )
     property_data = payload.model_dump()
     coordinates = _geocode_location(property_data["location"])
     property_record = Property(
@@ -118,7 +148,8 @@ def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffU
     db.commit()
     db.refresh(property_record)
     grade_info = grade_property_pricing(db, property_record)
-    return _attach_market_valuation(property_record, grade_info)
+    read_obj = _attach_market_valuation(property_record, grade_info)
+    return _redact_owner_details(read_obj, property_record, _user)
 
 
 @admin_router.post("/extract-from-text", response_model=ExtractedPropertyDraft)
@@ -218,7 +249,14 @@ def extract_property_from_text(
     extractor = get_gemini_extractor_client()
     try:
         raw_draft = extractor.generate_structured(prompt=prompt, schema=GeminiPropertyExtraction)
-        return clean_and_build_draft(raw_draft, raw_text=raw_text)
+        draft = clean_and_build_draft(raw_draft, raw_text=raw_text)
+        if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+            if draft.contact_type in (None, "owner"):
+                draft.contact_name = None
+                draft.contact_phone = None
+                draft.contact_phones = []
+                draft.contact_type = None
+        return draft
     except Exception as exc:
         logger.exception("admin_property_extract_failed", error=str(exc))
         raise HTTPException(
@@ -290,7 +328,10 @@ def get_admin_properties(
         limit=limit,
     )
     grades_map = bulk_grade_properties(db, records)
-    reads = [_attach_market_valuation(p, grades_map.get(p.id)) for p in records]
+    reads = [
+        _redact_owner_details(_attach_market_valuation(p, grades_map.get(p.id)), p, _user)
+        for p in records
+    ]
     if price_grade and price_grade != "all":
         reads = [r for r in reads if r.price_grade == price_grade]
     return reads
@@ -302,7 +343,8 @@ def get_admin_property(property_id: UUID, db: DbSession, _user: CurrentStaffUser
     if property_record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
     grade_info = grade_property_pricing(db, property_record)
-    return _attach_market_valuation(property_record, grade_info)
+    read_obj = _attach_market_valuation(property_record, grade_info)
+    return _redact_owner_details(read_obj, property_record, _user)
 
 
 @admin_router.patch("/{property_id}", response_model=PropertyRead)
@@ -314,6 +356,30 @@ def update_admin_property(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
 
     changes = payload.model_dump(exclude_unset=True)
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        has_owner_contact = bool(
+            property_record.property_contact
+            and property_record.property_contact.contact_type in (PropertyContactType.OWNER, "owner")
+        )
+        if "property_contact_id" in changes:
+            new_contact_id = changes["property_contact_id"]
+            if new_contact_id is not None:
+                new_contact = db.get(PropertyContact, new_contact_id)
+                if new_contact and new_contact.contact_type in (PropertyContactType.OWNER, "owner"):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Agents are not permitted to edit or assign property owner details.",
+                    )
+                if has_owner_contact and new_contact_id != property_record.property_contact_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Agents are not permitted to edit property owner details.",
+                    )
+            elif has_owner_contact:
+                # Agent submitted update where property_contact_id was unset/None in form because owner was hidden.
+                # Preserve the existing owner contact.
+                changes.pop("property_contact_id")
+
     if "location" in changes and (
         changes["location"] != property_record.location
         or property_record.latitude is None
@@ -328,7 +394,8 @@ def update_admin_property(
     db.commit()
     db.refresh(property_record)
     grade_info = grade_property_pricing(db, property_record)
-    return _attach_market_valuation(property_record, grade_info)
+    read_obj = _attach_market_valuation(property_record, grade_info)
+    return _redact_owner_details(read_obj, property_record, _user)
 
 
 @admin_router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)

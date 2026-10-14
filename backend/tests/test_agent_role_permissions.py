@@ -134,34 +134,177 @@ def test_agent_cannot_delete_anything(agent_client: TestClient, db_session: Sess
     assert contact_del.status_code == 403
 
 
-def test_agent_can_manage_contacts_add_and_edit(agent_client: TestClient, db_session: Session) -> None:
-    # Can create contact
-    create_res = agent_client.post(
+def test_agent_can_manage_broker_contacts_but_not_owner_contacts(
+    agent_client: TestClient, authenticated_client: TestClient, db_session: Session
+) -> None:
+    # 1. Agent CANNOT create owner contact
+    create_owner_res = agent_client.post(
         "/admin/property-contacts",
         json={
             "contact_type": "owner",
-            "full_name": "Nimal Silva",
-            "company_name": "Silva Holdings",
-            "email": "nimal@example.com",
-            "notes": "Met at property site",
-            "phones": [{"phone": "0771234567", "is_whatsapp": True, "label": "Mobile"}],
+            "full_name": "Direct Property Owner",
+            "phones": [{"phone": "0771234567", "is_whatsapp": True}],
         },
     )
-    assert create_res.status_code == 201
-    contact_id = create_res.json()["id"]
+    assert create_owner_res.status_code == 403
 
-    # Can edit contact
-    update_res = agent_client.patch(
-        f"/admin/property-contacts/{contact_id}",
-        json={"notes": "Updated notes after second call"},
+    # Admin CAN create owner contact
+    admin_create_owner = authenticated_client.post(
+        "/admin/property-contacts",
+        json={
+            "contact_type": "owner",
+            "full_name": "Direct Property Owner",
+            "phones": [{"phone": "0771234567", "is_whatsapp": True}],
+        },
     )
-    assert update_res.status_code == 200
-    assert update_res.json()["notes"] == "Updated notes after second call"
+    assert admin_create_owner.status_code == 201
+    owner_contact_id = admin_create_owner.json()["id"]
 
-    # Can read contact
-    get_res = agent_client.get(f"/admin/property-contacts/{contact_id}")
-    assert get_res.status_code == 200
-    assert get_res.json()["full_name"] == "Nimal Silva"
+    # Agent CANNOT view owner contact directly
+    agent_get_owner = agent_client.get(f"/admin/property-contacts/{owner_contact_id}")
+    assert agent_get_owner.status_code == 403
+
+    # Agent CANNOT edit owner contact
+    agent_edit_owner = agent_client.patch(
+        f"/admin/property-contacts/{owner_contact_id}",
+        json={"notes": "Trying to edit owner"},
+    )
+    assert agent_edit_owner.status_code == 403
+
+    # 2. Agent CAN create broker contact
+    create_broker_res = agent_client.post(
+        "/admin/property-contacts",
+        json={
+            "contact_type": "broker",
+            "full_name": "Co-Broke Partner",
+            "company_name": "Prime Realty",
+            "phones": [{"phone": "0779876543", "is_whatsapp": False}],
+        },
+    )
+    assert create_broker_res.status_code == 201
+    broker_contact_id = create_broker_res.json()["id"]
+
+    # Agent CAN read broker contact
+    agent_get_broker = agent_client.get(f"/admin/property-contacts/{broker_contact_id}")
+    assert agent_get_broker.status_code == 200
+    assert agent_get_broker.json()["full_name"] == "Co-Broke Partner"
+
+    # Agent CAN edit broker contact
+    agent_edit_broker = agent_client.patch(
+        f"/admin/property-contacts/{broker_contact_id}",
+        json={"notes": "Updated notes on partner"},
+    )
+    assert agent_edit_broker.status_code == 200
+
+    # Agent cannot turn broker contact into owner contact
+    agent_change_to_owner = agent_client.patch(
+        f"/admin/property-contacts/{broker_contact_id}",
+        json={"contact_type": "owner"},
+    )
+    assert agent_change_to_owner.status_code == 403
+
+    # 3. Contacts list: agent sees broker, but NOT owner
+    contacts_list = agent_client.get("/admin/property-contacts")
+    assert contacts_list.status_code == 200
+    contact_ids = [c["id"] for c in contacts_list.json()]
+    assert broker_contact_id in contact_ids
+    assert owner_contact_id not in contact_ids
+
+
+def test_agent_can_view_all_properties_with_owner_details_redacted(
+    agent_client: TestClient, authenticated_client: TestClient, db_session: Session
+) -> None:
+    # Create an owner contact and a broker contact
+    owner = PropertyContact(
+        id=uuid.uuid4(),
+        contact_type="owner",
+        full_name="Secret Landlord",
+    )
+    broker = PropertyContact(
+        id=uuid.uuid4(),
+        contact_type="broker",
+        full_name="Public Broker",
+    )
+    # Property 1 with owner
+    prop_owner = Property(
+        id=uuid.uuid4(),
+        title="Owner House in Colombo 7",
+        description="Luxury villa",
+        price=150000000.0,
+        location="Colombo 07",
+        property_type=PropertyType.HOUSE,
+        listing_type=ListingType.SALE,
+        status=PropertyStatus.AVAILABLE,
+        property_contact=owner,
+    )
+    # Property 2 with broker
+    prop_broker = Property(
+        id=uuid.uuid4(),
+        title="Broker Condo in Colombo 3",
+        description="Sea view apartment",
+        price=85000000.0,
+        location="Colombo 03",
+        property_type=PropertyType.APARTMENT,
+        listing_type=ListingType.SALE,
+        status=PropertyStatus.AVAILABLE,
+        property_contact=broker,
+    )
+    db_session.add_all([owner, broker, prop_owner, prop_broker])
+    db_session.commit()
+
+    # Admin sees both properties with their contacts
+    admin_res = authenticated_client.get("/admin/properties")
+    assert admin_res.status_code == 200
+    admin_props = {p["id"]: p for p in admin_res.json()}
+    assert admin_props[str(prop_owner.id)]["property_contact"]["full_name"] == "Secret Landlord"
+    assert admin_props[str(prop_broker.id)]["property_contact"]["full_name"] == "Public Broker"
+
+    # Agent sees ALL properties in the DB
+    agent_res = agent_client.get("/admin/properties")
+    assert agent_res.status_code == 200
+    agent_props = {p["id"]: p for p in agent_res.json()}
+    assert str(prop_owner.id) in agent_props
+    assert str(prop_broker.id) in agent_props
+
+    # BUT owner details are redacted for the agent
+    owner_prop_for_agent = agent_props[str(prop_owner.id)]
+    assert owner_prop_for_agent["property_contact"] is None
+    assert owner_prop_for_agent["property_contact_id"] is None
+
+    # Broker details remain visible to the agent
+    broker_prop_for_agent = agent_props[str(prop_broker.id)]
+    assert broker_prop_for_agent["property_contact"]["full_name"] == "Public Broker"
+    assert broker_prop_for_agent["property_contact_id"] == str(broker.id)
+
+    # Single property endpoint: GET /admin/properties/{id}
+    single_owner = agent_client.get(f"/admin/properties/{prop_owner.id}")
+    assert single_owner.status_code == 200
+    assert single_owner.json()["property_contact"] is None
+    assert single_owner.json()["property_contact_id"] is None
+
+    single_broker = agent_client.get(f"/admin/properties/{prop_broker.id}")
+    assert single_broker.status_code == 200
+    assert single_broker.json()["property_contact"]["full_name"] == "Public Broker"
+
+    # Agent cannot assign owner contact to property
+    agent_assign_owner = agent_client.patch(
+        f"/admin/properties/{prop_broker.id}",
+        json={"property_contact_id": str(owner.id)},
+    )
+    assert agent_assign_owner.status_code == 403
+
+    # Agent updating owner property doesn't wipe owner contact in DB
+    agent_edit_prop = agent_client.patch(
+        f"/admin/properties/{prop_owner.id}",
+        json={"description": "Updated by agent without touching owner"},
+    )
+    assert agent_edit_prop.status_code == 200
+    assert agent_edit_prop.json()["description"] == "Updated by agent without touching owner"
+    assert agent_edit_prop.json()["property_contact"] is None  # still redacted for agent
+
+    # Verify DB still has owner attached
+    db_session.refresh(prop_owner)
+    assert prop_owner.property_contact_id == owner.id
 
 
 def test_agent_can_update_profile_settings(agent_client: TestClient) -> None:
