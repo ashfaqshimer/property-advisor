@@ -427,13 +427,20 @@ def send_shortlist_message(
 ) -> int | None:
     """Send a prospect card to the shortlist review topic on Telegram."""
     settings = get_settings()
-    token = settings.telegram_bot_token.strip()
+    token = str(settings.telegram_bot_token or "").strip()
     chat_id = (
-        settings.telegram_shortlist_chat_id.strip()
-        or settings.telegram_assignments_chat_id.strip()
-        or settings.telegram_chat_id.strip()
+        str(getattr(settings, "telegram_shortlist_chat_id", "") or "").strip()
+        or str(getattr(settings, "telegram_shortlist_group_id", "") or "").strip()
+        or str(getattr(settings, "telegram_assignments_chat_id", "") or "").strip()
+        or str(getattr(settings, "telegram_chat_id", "") or "").strip()
     )
-    thread_id = settings.telegram_shortlist_thread_id
+    raw_thread = getattr(settings, "telegram_shortlist_thread_id", None)
+    if raw_thread is None:
+        raw_thread = getattr(settings, "telegram_shortlist_topic_id", None)
+    try:
+        thread_id = int(raw_thread) if raw_thread is not None else None
+    except (ValueError, TypeError):
+        thread_id = None
 
     if not token or not chat_id:
         logger.warning("telegram_shortlist_skipped.unconfigured")
@@ -459,21 +466,44 @@ def send_shortlist_message(
         "parse_mode": "HTML",
         "reply_markup": keyboard,
     }
-    if thread_id is not None and str(chat_id).startswith("-"):
-        payload["message_thread_id"] = thread_id
+    if thread_id is not None:
+        payload["message_thread_id"] = int(thread_id)
+
+    logger.info(
+        "telegram_shortlist_dispatching",
+        prospect_id=prospect_id,
+        chat_id=chat_id,
+        thread_id=thread_id,
+    )
 
     try:
         with httpx.Client(timeout=8.0) as client:
             resp = client.post(_api_url(token, "sendMessage"), json=payload)
             data = resp.json()
             if not data.get("ok"):
-                logger.warning("telegram_shortlist_send_failed", response=data)
+                logger.warning(
+                    "telegram_shortlist_send_failed",
+                    response=data,
+                    chat_id=chat_id,
+                    thread_id=thread_id,
+                )
                 return None
             message_id: int = data["result"]["message_id"]
-            logger.info("telegram_shortlist_sent", prospect_id=prospect_id, message_id=message_id)
+            logger.info(
+                "telegram_shortlist_sent",
+                prospect_id=prospect_id,
+                message_id=message_id,
+                chat_id=chat_id,
+                thread_id=thread_id,
+            )
             return message_id
     except Exception as exc:
-        logger.warning("telegram_shortlist_send_error", error=str(exc))
+        logger.warning(
+            "telegram_shortlist_send_error",
+            error=str(exc),
+            chat_id=chat_id,
+            thread_id=thread_id,
+        )
         return None
 
 

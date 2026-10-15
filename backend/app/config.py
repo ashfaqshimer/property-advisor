@@ -86,8 +86,27 @@ class Settings(BaseSettings):
     telegram_assignments_thread_id: int | None = None  # Optional topic thread ID for assignments
     telegram_agent_chat_id: str = ""          # Legacy/direct agent DM chat_id for field dispatch
     telegram_shortlist_chat_id: str = ""      # Dedicated group or chat for shortlist (defaults to assignments_chat_id or chat_id)
+    telegram_shortlist_group_id: str = ""     # Alias for telegram_shortlist_chat_id
     telegram_shortlist_thread_id: int | None = None  # Optional topic thread ID for shortlist
+    telegram_shortlist_topic_id: int | None = None   # Alias for telegram_shortlist_thread_id
     telegram_webhook_secret: str = ""         # Optional: validates incoming webhook requests
+
+    @property
+    def effective_shortlist_chat_id(self) -> str:
+        return (
+            self.telegram_shortlist_chat_id.strip()
+            or self.telegram_shortlist_group_id.strip()
+            or self.telegram_assignments_chat_id.strip()
+            or self.telegram_chat_id.strip()
+        )
+
+    @property
+    def effective_shortlist_thread_id(self) -> int | None:
+        if self.telegram_shortlist_thread_id is not None:
+            return self.telegram_shortlist_thread_id
+        if self.telegram_shortlist_topic_id is not None:
+            return self.telegram_shortlist_topic_id
+        return None
 
     @property
     def telegram_field_dispatch_configured(self) -> bool:
@@ -104,11 +123,7 @@ class Settings(BaseSettings):
     def telegram_shortlist_configured(self) -> bool:
         return bool(
             self.telegram_bot_token.strip()
-            and (
-                self.telegram_shortlist_chat_id.strip()
-                or self.telegram_assignments_chat_id.strip()
-                or self.telegram_chat_id.strip()
-            )
+            and self.effective_shortlist_chat_id
         )
 
     @property

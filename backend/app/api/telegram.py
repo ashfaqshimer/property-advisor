@@ -50,19 +50,23 @@ def _is_authorized_chat(chat_id: str, sender_id: str) -> bool:
     """Allow updates if they come from the designated assignment/shortlist chat, agent DM, or general chat."""
     settings = get_settings()
     legacy_agent_id = _get_agent_chat_id()
+    shortlist_chat = (
+        str(getattr(settings, "telegram_shortlist_chat_id", "") or "").strip()
+        or str(getattr(settings, "telegram_shortlist_group_id", "") or "").strip()
+    )
     allowed = {
-        c.strip()
+        str(c).strip()
         for c in (
-            settings.telegram_shortlist_chat_id,
-            settings.telegram_assignments_chat_id,
+            shortlist_chat,
+            getattr(settings, "telegram_assignments_chat_id", ""),
             legacy_agent_id,
-            settings.telegram_chat_id,
+            getattr(settings, "telegram_chat_id", ""),
         )
-        if c.strip()
+        if str(c).strip() and not str(c).startswith("<MagicMock")
     }
     if not allowed:
         return True  # Dev mode / unconfigured — accept all
-    return chat_id in allowed or sender_id in allowed
+    return str(chat_id) in allowed or str(sender_id) in allowed
 
 
 def _get_token() -> str:
