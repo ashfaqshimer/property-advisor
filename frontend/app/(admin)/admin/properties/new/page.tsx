@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2, Copy, Check } from 'lucide-react';
 import {
 	createProperty,
 	createPropertyContact,
@@ -91,6 +91,16 @@ export default function NewPropertyPage() {
 	const [errors, setErrors] = useState<Record<string, string>>({});
 	const [saving, setSaving] = useState(false);
 	const [success, setSuccess] = useState(false);
+	const [savedPropertyCode, setSavedPropertyCode] = useState<string | null>(null);
+	const [savedPropertyId, setSavedPropertyId] = useState<string | null>(null);
+	const [copiedCode, setCopiedCode] = useState(false);
+
+	function copyPropertyCode(code: string) {
+		navigator.clipboard.writeText(code);
+		setCopiedCode(true);
+		toast.success(`Copied ${code} to clipboard`);
+		setTimeout(() => setCopiedCode(false), 2000);
+	}
 	const [contacts, setContacts] = useState<PropertyContact[]>([]);
 	const [showContactForm, setShowContactForm] = useState(false);
 	const [creatingContact, setCreatingContact] = useState(false);
@@ -337,6 +347,8 @@ export default function NewPropertyPage() {
 				status: form.status as 'available' | 'under_offer' | 'sold',
 				property_contact_id: form.propertyContactId || null,
 			});
+			setSavedPropertyCode(created.property_code);
+			setSavedPropertyId(created.id);
 			setSuccess(true);
 		} catch (error) {
 			setErrors({
@@ -361,9 +373,39 @@ export default function NewPropertyPage() {
 					<p className='mt-2 text-sm text-muted-foreground'>
 						Your listing and images have been added to the catalog.
 					</p>
-					<Button asChild className='mt-7'>
-						<Link href='/admin'>Return to properties</Link>
-					</Button>
+					{savedPropertyCode && (
+						<div className='mt-5 flex items-center justify-center gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3'>
+							<span className='text-xs font-medium text-muted-foreground'>Assigned Code:</span>
+							<span className='font-mono text-sm font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-300/60 dark:border-emerald-800/60'>
+								{savedPropertyCode}
+							</span>
+							<Button
+								type='button'
+								variant='ghost'
+								size='sm'
+								onClick={() => copyPropertyCode(savedPropertyCode)}
+								title='Copy property code'
+								aria-label={`Copy property code ${savedPropertyCode}`}
+								className='h-8 w-8 p-0 text-muted-foreground hover:text-foreground'
+							>
+								{copiedCode ? (
+									<Check className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
+								) : (
+									<Copy className='h-4 w-4' />
+								)}
+							</Button>
+						</div>
+					)}
+					<div className='mt-7 flex flex-wrap items-center justify-center gap-3'>
+						{savedPropertyId && (
+							<Button asChild variant='outline'>
+								<Link href={`/admin/properties/${savedPropertyId}/edit`}>Edit this listing</Link>
+							</Button>
+						)}
+						<Button asChild>
+							<Link href='/admin'>Return to properties</Link>
+						</Button>
+					</div>
 				</CardContent>
 			</Card>
 		);
@@ -512,6 +554,21 @@ export default function NewPropertyPage() {
 					</CardHeader>
 					<CardContent>
 						<div className='grid gap-5 sm:grid-cols-2'>
+							<div className='space-y-2 sm:col-span-2'>
+								<Label htmlFor='propertyCodePreview'>Property Code</Label>
+								<div className='max-w-sm'>
+									<Input
+										id='propertyCodePreview'
+										value='Auto-assigned upon save (e.g. PA-1009)'
+										disabled
+										className='bg-muted/50 font-mono text-xs text-muted-foreground'
+									/>
+								</div>
+								<p className='text-[11px] text-muted-foreground'>
+									A unique catalog reference code will automatically be assigned when you save this property.
+								</p>
+							</div>
+
 							<div className='space-y-2 sm:col-span-2'>
 								<Label htmlFor='title'>Title</Label>
 								<Input

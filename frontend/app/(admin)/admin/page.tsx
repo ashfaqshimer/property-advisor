@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Trash2, Plus, Image as ImageIcon, Search } from 'lucide-react';
+import { Pencil, Trash2, Plus, Image as ImageIcon, Search, Copy, Check } from 'lucide-react';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
@@ -66,6 +66,16 @@ export default function AdminPropertiesPage() {
 	const [selectingPhotoProperty, setSelectingPhotoProperty] = useState<Property | null>(null);
 	const [savingPhotoId, setSavingPhotoId] = useState<string | null>(null);
 	const [savingPhotoUrl, setSavingPhotoUrl] = useState<string | null>(null);
+	const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+	function copyPropertyCode(code: string) {
+		navigator.clipboard.writeText(code);
+		setCopiedCode(code);
+		toast.success(`Copied ${code} to clipboard`);
+		setTimeout(() => {
+			setCopiedCode((current) => (current === code ? null : current));
+		}, 2000);
+	}
 
 	// Filters
 	const [searchQuery, setSearchQuery] = useState('');
@@ -253,7 +263,7 @@ export default function AdminPropertiesPage() {
 						<Input
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
-							placeholder='Search title or location...'
+							placeholder='Search by code, title or location...'
 							className='h-8 pl-8 text-xs'
 						/>
 					</div>
@@ -296,6 +306,7 @@ export default function AdminPropertiesPage() {
 					<Table className='min-w-[900px]'>
 						<TableHeader className='bg-muted/50'>
 							<TableRow>
+								<TableHead className='px-4 py-4 font-semibold w-[120px]'>Code</TableHead>
 								<TableHead className='px-5 py-4 font-semibold'>Property</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Type</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Location</TableHead>
@@ -309,28 +320,50 @@ export default function AdminPropertiesPage() {
 						<TableBody className='divide-y divide-border'>
 							{loading ? (
 								<TableRow>
-									<TableCell className='px-5 py-12 text-center' colSpan={8}>
+									<TableCell className='px-5 py-12 text-center' colSpan={9}>
 										<Spinner className='mx-auto h-5 w-5 text-primary' />
 										<span className='sr-only'>Loading properties</span>
 									</TableCell>
 								</TableRow>
 							) : filteredProperties.length === 0 ? (
 								<TableRow>
-									<TableCell className='px-5 py-12 text-center text-sm text-muted-foreground' colSpan={8}>
+									<TableCell className='px-5 py-12 text-center text-sm text-muted-foreground' colSpan={9}>
 										No properties match the selected filters.
 									</TableCell>
 								</TableRow>
 							) : filteredProperties.map((property) => (
 								<TableRow key={property.id} className='transition hover:bg-muted/50'>
-									<TableCell className='px-5 py-4 font-semibold text-foreground'>
-										<div className='flex flex-col gap-1'>
-											{property.propertyCode && (
-												<span className='font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 rounded w-fit border border-emerald-200/60 dark:border-emerald-800/60'>
+									<TableCell className='px-4 py-4'>
+										{property.propertyCode ? (
+											<div className='flex items-center gap-1.5'>
+												<span className='font-mono text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60'>
 													{property.propertyCode}
 												</span>
-											)}
-											<span>{property.title}</span>
-										</div>
+												<button
+													type='button'
+													onClick={() => copyPropertyCode(property.propertyCode)}
+													title='Copy property code'
+													aria-label={`Copy property code ${property.propertyCode}`}
+													className='rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer'
+												>
+													{copiedCode === property.propertyCode ? (
+														<Check className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
+													) : (
+														<Copy className='h-3.5 w-3.5' />
+													)}
+												</button>
+											</div>
+										) : (
+											<span className='text-xs text-muted-foreground'>—</span>
+										)}
+									</TableCell>
+									<TableCell className='px-5 py-4 font-semibold text-foreground'>
+										<Link
+											href={`/admin/properties/${property.id}/edit`}
+											className='hover:underline hover:text-primary transition-colors'
+										>
+											{property.title}
+										</Link>
 									</TableCell>
 									<TableCell className='px-4 py-4 text-muted-foreground capitalize'>{property.type}</TableCell>
 									<TableCell className='px-4 py-4 text-muted-foreground'>
@@ -462,10 +495,35 @@ export default function AdminPropertiesPage() {
 						</div>
 					) : filteredProperties.map((property) => (
 						<div key={property.id} className='flex flex-col gap-3 p-5'>
-							<div className='flex items-start justify-between gap-4'>
-								<span className='font-semibold text-foreground leading-tight'>
-									{property.title}
-								</span>
+							<div className='flex items-start justify-between gap-3'>
+								<div className='flex flex-col gap-1.5 min-w-0'>
+									{property.propertyCode && (
+										<div className='flex items-center gap-1.5'>
+											<span className='font-mono text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60 w-fit'>
+												{property.propertyCode}
+											</span>
+											<button
+												type='button'
+												onClick={() => copyPropertyCode(property.propertyCode)}
+												title='Copy property code'
+												aria-label={`Copy property code ${property.propertyCode}`}
+												className='rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer'
+											>
+												{copiedCode === property.propertyCode ? (
+													<Check className='h-3 w-3 text-emerald-600 dark:text-emerald-400' />
+												) : (
+													<Copy className='h-3 w-3' />
+												)}
+											</button>
+										</div>
+									)}
+									<Link
+										href={`/admin/properties/${property.id}/edit`}
+										className='font-semibold text-foreground leading-tight hover:underline hover:text-primary transition-colors'
+									>
+										{property.title}
+									</Link>
+								</div>
 								<Badge variant={statusVariant[property.status]} className='shrink-0 capitalize'>
 									{property.status.replace('_', ' ')}
 								</Badge>

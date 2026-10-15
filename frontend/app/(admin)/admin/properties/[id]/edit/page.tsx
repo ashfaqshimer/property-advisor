@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, use, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2, ArrowLeft, Copy, Check } from 'lucide-react';
 import {
 	getAdminProperty,
 	updateAdminProperty,
@@ -96,6 +96,14 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 	const [loading, setLoading] = useState(true);
 	const [notFound, setNotFound] = useState(false);
 	const [propertyCode, setPropertyCode] = useState<string | null>(null);
+	const [copiedCode, setCopiedCode] = useState(false);
+
+	function copyPropertyCode(code: string) {
+		navigator.clipboard.writeText(code);
+		setCopiedCode(true);
+		toast.success(`Copied ${code} to clipboard`);
+		setTimeout(() => setCopiedCode(false), 2000);
+	}
 	const [form, setForm] = useState(emptyForm);
 	const [existingImages, setExistingImages] = useState<string[]>([]);
 	const [newImages, setNewImages] = useState<ImagePreview[]>([]);
@@ -530,14 +538,31 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 				>
 					<ArrowLeft className='h-4 w-4' /> Back to properties
 				</Link>
-				<div className='mt-5 flex items-center gap-3'>
+				<div className='mt-5 flex flex-wrap items-center gap-3'>
 					<h2 className='text-3xl font-semibold tracking-tight text-foreground'>
 						Edit property
 					</h2>
 					{propertyCode && (
-						<span className='font-mono text-sm font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-300/60 dark:border-emerald-800/60'>
-							{propertyCode}
-						</span>
+						<div className='flex items-center gap-1.5'>
+							<span className='font-mono text-sm font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-300/60 dark:border-emerald-800/60'>
+								{propertyCode}
+							</span>
+							<Button
+								type='button'
+								variant='ghost'
+								size='sm'
+								onClick={() => copyPropertyCode(propertyCode)}
+								title='Copy property code'
+								aria-label={`Copy property code ${propertyCode}`}
+								className='h-8 w-8 p-0 text-muted-foreground hover:text-foreground'
+							>
+								{copiedCode ? (
+									<Check className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
+								) : (
+									<Copy className='h-4 w-4' />
+								)}
+							</Button>
+						</div>
 					)}
 				</div>
 				<p className='mt-2 text-sm text-muted-foreground'>
@@ -666,6 +691,43 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 					</CardHeader>
 					<CardContent>
 						<div className='grid gap-5 sm:grid-cols-2'>
+							<div className='space-y-2 sm:col-span-2'>
+								<Label htmlFor='propertyCode'>Property Code</Label>
+								<div className='flex items-center gap-2 max-w-sm'>
+									<Input
+										id='propertyCode'
+										value={propertyCode || '—'}
+										readOnly
+										className='bg-muted/50 font-mono font-bold tracking-wider text-emerald-700 dark:text-emerald-400'
+									/>
+									{propertyCode && (
+										<Button
+											type='button'
+											variant='outline'
+											size='sm'
+											onClick={() => copyPropertyCode(propertyCode)}
+											title='Copy Property Code'
+											className='h-9 px-3 gap-1.5 shrink-0 text-xs'
+										>
+											{copiedCode ? (
+												<>
+													<Check className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
+													<span>Copied</span>
+												</>
+											) : (
+												<>
+													<Copy className='h-3.5 w-3.5' />
+													<span>Copy</span>
+												</>
+											)}
+										</Button>
+									)}
+								</div>
+								<p className='text-[11px] text-muted-foreground'>
+									Unique catalog reference code (e.g. {propertyCode || 'PA-1001'}) used by customers and Amaya in chat inquiries.
+								</p>
+							</div>
+
 							<div className='space-y-2 sm:col-span-2'>
 								<Label htmlFor='title'>Title</Label>
 								<Input
