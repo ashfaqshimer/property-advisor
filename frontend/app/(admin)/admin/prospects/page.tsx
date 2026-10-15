@@ -1229,12 +1229,12 @@ export default function ProspectsPage() {
                   {/* Card Header: Selection, Date, Source, AI Classification, Status Badge */}
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {isAdminOrRoot && telegramAgentConfigured && (
+                      {isAdminOrRoot && (
                         <button
                           type="button"
                           onClick={() => toggleSelectProspect(prospect.id)}
                           className="p-1 -ml-1 text-muted-foreground hover:text-foreground cursor-pointer"
-                          title={isSelected ? "Deselect" : "Select for agent assignment"}
+                          title={isSelected ? "Deselect" : "Select prospect"}
                         >
                           {isSelected ? (
                             <CheckSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -1550,7 +1550,7 @@ export default function ProspectsPage() {
           <Table className="w-full whitespace-nowrap text-left text-sm">
             <TableHeader className="bg-muted/50">
               <TableRow>
-                {isAdminOrRoot && telegramAgentConfigured && (
+                {isAdminOrRoot && (
                   <TableHead className="w-10 px-4 py-4">
                     <button
                       type="button"
@@ -1577,11 +1577,11 @@ export default function ProspectsPage() {
             <TableBody className="divide-y divide-border">
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={isAdminOrRoot && telegramAgentConfigured ? 7 : 6} className="px-6 py-8 text-center text-muted-foreground">Loading prospects...</TableCell>
+                  <TableCell colSpan={isAdminOrRoot ? 7 : 6} className="px-6 py-8 text-center text-muted-foreground">Loading prospects...</TableCell>
                 </TableRow>
               ) : prospects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isAdminOrRoot && telegramAgentConfigured ? 7 : 6} className="px-6 py-8 text-center text-muted-foreground">No prospects found.</TableCell>
+                  <TableCell colSpan={isAdminOrRoot ? 7 : 6} className="px-6 py-8 text-center text-muted-foreground">No prospects found.</TableCell>
                 </TableRow>
               ) : (
                 prospects
@@ -1603,7 +1603,7 @@ export default function ProspectsPage() {
                           : "hover:bg-muted/50"
                       }`}
                     >
-                      {isAdminOrRoot && telegramAgentConfigured && (
+                      {isAdminOrRoot && (
                         <TableCell className="w-10 px-4 py-4">
                           <button
                             type="button"
@@ -1965,8 +1965,8 @@ export default function ProspectsPage() {
       </div>
 
       {/* Floating Bulk Action Bar */}
-      {selectedProspectIds.size > 0 && isAdminOrRoot && telegramAgentConfigured && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 sm:gap-4 rounded-2xl bg-[#19352b] dark:bg-emerald-950 border border-emerald-600/40 text-white px-4 sm:px-6 py-3 shadow-2xl backdrop-blur-md max-w-[92vw]">
+      {selectedProspectIds.size > 0 && isAdminOrRoot && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 rounded-2xl bg-[#19352b] dark:bg-emerald-950 border border-emerald-600/40 text-white px-3 sm:px-5 py-2.5 shadow-2xl backdrop-blur-md max-w-[95vw] flex-wrap justify-center sm:justify-start">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-zinc-950">
               {selectedProspectIds.size}
@@ -1975,22 +1975,63 @@ export default function ProspectsPage() {
               selected
             </span>
           </div>
-          <div className="h-4 w-px bg-white/20" />
+
+          <div className="h-4 w-px bg-white/20 hidden sm:block" />
+
+          {telegramAgentConfigured && (
+            <button
+              type="button"
+              onClick={handleBulkAssign}
+              disabled={isAssigning || isBulkUpdating || isBulkFetchingPhones}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold px-3 py-1.5 text-xs shadow transition disabled:opacity-50 cursor-pointer"
+              title="Dispatch selected prospects to Telegram field agent"
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>{isAssigning ? "Dispatching..." : "Dispatch to Agent"}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleBulkMarkContacted}
+            disabled={isAssigning || isBulkUpdating || isBulkFetchingPhones}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold px-3 py-1.5 text-xs transition disabled:opacity-50 cursor-pointer border border-white/15"
+            title="Mark all selected prospects as contacted"
+          >
+            <PhoneCall className="h-3.5 w-3.5 text-blue-400" />
+            <span>Mark Contacted</span>
+          </button>
+
+          {prospects.some((p) => selectedProspectIds.has(p.id) && !p.phone_number) && (
+            <button
+              type="button"
+              onClick={handleBulkFetchPhones}
+              disabled={isAssigning || isBulkUpdating || isBulkFetchingPhones}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold px-3 py-1.5 text-xs transition disabled:opacity-50 cursor-pointer border border-white/15"
+              title="Fetch missing phone numbers from portal"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-emerald-400 ${isBulkFetchingPhones ? "animate-spin" : ""}`} />
+              <span>{isBulkFetchingPhones ? "Fetching..." : "Fetch Phones"}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsBulkDiscardOpen(true)}
+            disabled={isAssigning || isBulkUpdating || isBulkFetchingPhones}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 font-semibold px-3 py-1.5 text-xs transition disabled:opacity-50 cursor-pointer"
+            title="Discard selected prospects with reason"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Discard...</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setSelectedProspectIds(new Set())}
-            className="text-xs text-white/70 hover:text-white transition cursor-pointer"
+            className="text-xs text-white/70 hover:text-white transition cursor-pointer px-1 py-1"
           >
             Clear
-          </button>
-          <button
-            type="button"
-            onClick={handleBulkAssign}
-            disabled={isAssigning}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold px-3 sm:px-4 py-1.5 text-xs shadow transition disabled:opacity-50 cursor-pointer"
-          >
-            <Send className="h-3.5 w-3.5" />
-            <span>{isAssigning ? "Sending..." : "Dispatch to Agent"}</span>
           </button>
         </div>
       )}
@@ -2118,6 +2159,17 @@ export default function ProspectsPage() {
         onClose={() => setDiscardModalProspect(null)}
         onConfirm={handleConfirmDiscard}
         loading={isDiscarding}
+      />
+
+      {/* Bulk Discard Reason Modal */}
+      <DiscardProspectModal
+        isOpen={isBulkDiscardOpen}
+        prospect={null}
+        bulkCount={selectedProspectIds.size}
+        onClose={() => setIsBulkDiscardOpen(false)}
+        onConfirm={() => {}}
+        onBulkConfirm={handleBulkConfirmDiscard}
+        loading={isBulkUpdating}
       />
 
       {/* Edit Assignment Outcome Modal */}

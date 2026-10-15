@@ -292,3 +292,96 @@ def test_save_prospects_with_native_location(db_session: Session, monkeypatch: p
     assert prospect2.discard_reason == "location_mismatch"
 
 
+def test_prospect_metrics_and_bulk_update(authenticated_client: TestClient, db_session: Session) -> None:
+    from app.models.prospect import Prospect
+    from datetime import datetime, timezone
+    import uuid
+
+    # Create test prospects
+    p1 = Prospect(
+        id=uuid.uuid4(),
+        title="House in Nugegoda",
+        price="Rs 35M",
+        location="Nugegoda",
+        suburb="Nugegoda",
+        property_type="house",
+        listing_type="sale",
+        classification="owner",
+        confidence=90,
+        classification_method="heuristics",
+        status="new",
+        first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    p2 = Prospect(
+        id=uuid.uuid4(),
+        title="Apartment in Colombo 3",
+        price="Rs 60M",
+        location="Colombo 3",
+        suburb="Colombo 3",
+        property_type="apartment",
+        listing_type="sale",
+        classification="broker",
+        confidence=80,
+        classification_method="heuristics",
+        status="contacted",
+        first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    p3 = Prospect(
+        id=uuid.uuid4(),
+        title="Land in Kottawa",
+        price="Rs 10M",
+        location="Kottawa",
+        suburb="Kottawa",
+        property_type="land",
+        listing_type="sale",
+        classification="owner",
+        confidence=85,
+        classification_method="heuristics",
+        status="discarded",
+        discard_reason="already_sold",
+        first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([p1, p2, p3])
+    db_session.commit()
+
+    # 1. Test /admin/prospects/metrics
+    resp = authenticated_client.get("/admin/prospects/metrics")
+    assert resp.status_code == 200
+    metrics = resp.json()
+    assert metrics["total_active"] >= 2
+    assert metrics["new_count"] >= 1
+    assert metrics["contacted_count"] >= 1
+    assert metrics["discarded_count"] >= 1
+    assert metrics["direct_owners_count"] >= 1
+
+    # 2. Test /admin/prospects/bulk-update to contacted
+    bulk_resp = authenticated_client.post(
+        "/admin/prospects/bulk-update",
+        json={"ids": [str(p1.id)], "status": "contacted"},
+    )
+    assert bulk_resp.status_code == 200
+    assert bulk_resp.json()["updated_count"] == 1
+
+    db_session.refresh(p1)
+    assert p1.status == "contacted"
+
+    # 3. Test /admin/prospects/bulk-update to discarded with reason
+    bulk_resp2 = authenticated_client.post(
+        "/admin/prospects/bulk-update",
+        json={"ids": [str(p1.id), str(p2.id)], "status": "discarded", "discard_reason": "broker_signal"},
+    )
+    assert bulk_resp2.status_code == 200
+    assert bulk_resp2.json()["updated_count"] == 2
+
+    db_session.refresh(p1)
+    db_session.refresh(p2)
+    assert p1.status == "discarded"
+    assert p1.discard_reason == "broker_signal"
+    assert p2.status == "discarded"
+    assert p2.discard_reason == "broker_signal"
+
+
+

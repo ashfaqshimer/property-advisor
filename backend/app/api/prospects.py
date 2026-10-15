@@ -6,7 +6,7 @@ from typing import Annotated, Any
 import csv
 import io
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
-from sqlalchemy import delete, select, func
+from sqlalchemy import delete, select, func, case, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -24,6 +24,8 @@ from app.schemas.site_configuration import DEFAULT_SCAN_PRESETS, ScanPresetConfi
 from app.schemas.prospect import (
     ProspectRead,
     ProspectUpdate,
+    ProspectBulkUpdate,
+    ProspectMetrics,
     ScanRequest,
     ProspectList,
     ScanJobRead,
@@ -1236,6 +1238,88 @@ def export_scan_prospects_csv(
             "Cache-Control": "no-cache",
         }
     )
+
+
+@admin_router.get("/metrics", response_model=ProspectMetrics)
+def get_prospect_metrics(
+    db: DbSession,
+    _admin: CurrentStaffUser,
+    property_type: str | None = None,
+    listing_type: str | None = None,
+) -> Any:
+    TERMINAL_STATUSES = ("discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke")
+
+    metrics_stmt = select(
+        func.count(case((Prospect.status.notin_(TERMINAL_STATUSES), 1))).label("total_active"),
+        func.count(case((Prospect.status == "new", 1))).label("new_count"),
+        func.count(case((Prospect.status == "contacted", 1))).label("contacted_count"),
+        func.count(case((Prospect.status == "converted", 1))).label("converted_count"),
+        func.count(case((Prospect.status == "discarded", 1))).label("discarded_count"),
+        func.count(case((and_(Prospect.classification == "owner", Prospect.status.notin_(TERMINAL_STATUSES)), 1))).label("direct_owners_count"),
+    )
+
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        assigned_subq = select(FieldAssignment.prospect_id).where(FieldAssignment.prospect_id.is_not(None))
+        metrics_stmt = metrics_stmt.where(Prospect.id.in_(assigned_subq))
+
+    if property_type and property_type != "all":
+        metrics_stmt = metrics_stmt.where(Prospect.property_type == property_type)
+    if listing_type and listing_type != "all":
+        metrics_stmt = metrics_stmt.where(Prospect.listing_type == listing_type)
+
+    row = db.execute(metrics_stmt).one()
+    return {
+        "total_active": row.total_active or 0,
+        "new_count": row.new_count or 0,
+        "contacted_count": row.contacted_count or 0,
+        "converted_count": row.converted_count or 0,
+        "discarded_count": row.discarded_count or 0,
+        "direct_owners_count": row.direct_owners_count or 0,
+    }
+
+
+@admin_router.post("/bulk-update")
+def bulk_update_prospects(
+    payload: ProspectBulkUpdate,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> dict[str, Any]:
+    if not payload.ids:
+        return {"updated_count": 0}
+
+    stmt = select(Prospect).where(Prospect.id.in_(payload.ids))
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        assigned_subq = select(FieldAssignment.prospect_id).where(FieldAssignment.prospect_id.is_not(None))
+        stmt = stmt.where(Prospect.id.in_(assigned_subq))
+
+    prospects = db.execute(stmt).scalars().all()
+    updated_count = 0
+
+    for prospect in prospects:
+        old_status = prospect.status
+        if payload.status is not None:
+            prospect.status = payload.status
+            if old_status == "discarded" and payload.status != "discarded":
+                prospect.discard_reason = None
+                if prospect.first_scan_job_id:
+                    scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                    if scan_job:
+                        scan_job.new_count = (scan_job.new_count or 0) + 1
+                        scan_job.filtered_count = max(0, (scan_job.filtered_count or 0) - 1)
+            elif old_status != "discarded" and payload.status == "discarded":
+                if prospect.first_scan_job_id:
+                    scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                    if scan_job:
+                        scan_job.new_count = max(0, (scan_job.new_count or 0) - 1)
+                        scan_job.filtered_count = (scan_job.filtered_count or 0) + 1
+
+        if payload.discard_reason is not None:
+            prospect.discard_reason = payload.discard_reason
+
+        updated_count += 1
+
+    db.commit()
+    return {"updated_count": updated_count}
 
 
 @admin_router.post("/{id}/fetch-phone", response_model=ProspectRead)

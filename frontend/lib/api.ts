@@ -1344,6 +1344,48 @@ export async function updateProspect(
   return (await response.json()) as Prospect;
 }
 
+export interface ProspectMetrics {
+  total_active: number;
+  new_count: number;
+  contacted_count: number;
+  converted_count: number;
+  discarded_count: number;
+  direct_owners_count: number;
+}
+
+export async function getProspectMetrics(filters?: {
+  property_type?: string;
+  listing_type?: string;
+}): Promise<ProspectMetrics> {
+  const params = new URLSearchParams();
+  if (filters?.property_type && filters.property_type !== "all") params.append("property_type", filters.property_type);
+  if (filters?.listing_type && filters.listing_type !== "all") params.append("listing_type", filters.listing_type);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`${baseUrl()}/admin/prospects/metrics${qs}`, {
+    method: "GET",
+    credentials: "include",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Prospect metrics failed (${response.status}).`, response.status);
+  return (await response.json()) as ProspectMetrics;
+}
+
+export async function bulkUpdateProspects(payload: {
+  ids: string[];
+  status?: string;
+  discard_reason?: string | null;
+}): Promise<{ updated_count: number }> {
+  const response = await fetch(`${baseUrl()}/admin/prospects/bulk-update`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new ChatError("unexpected", `Bulk prospect update failed (${response.status}).`, response.status);
+  return (await response.json()) as { updated_count: number };
+}
+
 export interface ProspectScanPayload {
   source?: string;
   categories?: string[];

@@ -73,6 +73,21 @@ class ProspectUpdate(BaseModel):
     discard_reason: str | None = None
 
 
+class ProspectBulkUpdate(BaseModel):
+    ids: list[UUID]
+    status: str | None = None
+    discard_reason: str | None = None
+
+
+class ProspectMetrics(BaseModel):
+    total_active: int
+    new_count: int
+    contacted_count: int
+    converted_count: int
+    discarded_count: int
+    direct_owners_count: int
+
+
 class ProspectRead(ProspectBase):
     id: UUID
     first_seen_at: datetime

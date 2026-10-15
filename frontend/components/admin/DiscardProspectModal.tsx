@@ -75,25 +75,35 @@ export function isBrokerSignalReason(reason?: string | null): boolean {
 export interface DiscardProspectModalProps {
   isOpen: boolean;
   prospect: Prospect | null;
+  bulkCount?: number;
   onClose: () => void;
   onConfirm: (prospectId: string, discardReason: string) => Promise<void> | void;
+  onBulkConfirm?: (discardReason: string) => Promise<void> | void;
   loading?: boolean;
 }
 
 export default function DiscardProspectModal({
   isOpen,
   prospect,
+  bulkCount,
   onClose,
   onConfirm,
+  onBulkConfirm,
   loading = false,
 }: DiscardProspectModalProps) {
   const [selectedReason, setSelectedReason] = useState<string>("misclassified_broker");
 
-  if (!prospect) return null;
+  if (!prospect && (!bulkCount || bulkCount <= 0)) return null;
+
+  const isBulk = Boolean(bulkCount && bulkCount > 0);
 
   const handleConfirm = async () => {
     if (!selectedReason) return;
-    await onConfirm(prospect.id, selectedReason);
+    if (isBulk && onBulkConfirm) {
+      await onBulkConfirm(selectedReason);
+    } else if (prospect) {
+      await onConfirm(prospect.id, selectedReason);
+    }
     onClose();
   };
 
@@ -103,10 +113,10 @@ export default function DiscardProspectModal({
         {/* Header */}
         <DialogHeader className="pb-3 border-b border-border text-left">
           <DialogTitle className="text-lg font-bold text-foreground">
-            Discard Prospect
+            {isBulk ? `Discard ${bulkCount} Prospects` : "Discard Prospect"}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-            {prospect.title}
+            {isBulk ? `Choose a discard reason to apply to all ${bulkCount} selected prospects.` : prospect?.title}
           </DialogDescription>
         </DialogHeader>
 
@@ -187,7 +197,7 @@ export default function DiscardProspectModal({
             disabled={loading || !selectedReason}
             className="min-h-[44px]"
           >
-            {loading ? "Discarding..." : "Confirm Discard"}
+            {loading ? "Discarding..." : isBulk ? `Discard ${bulkCount} Prospects` : "Confirm Discard"}
           </Button>
         </DialogFooter>
       </DialogContent>
