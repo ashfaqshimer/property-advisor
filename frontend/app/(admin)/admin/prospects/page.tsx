@@ -1305,7 +1305,27 @@ export default function ProspectsPage() {
                       <SourceBadge source={prospect.source} url={prospect.ikman_url} />
                       {renderClassificationBadge(prospect, true)}
                     </div>
-                    <div>{renderStatusBadge(prospect)}</div>
+                    <div className="flex items-center gap-1.5">
+                      {isAdminOrRoot && telegramShortlistConfigured && !isTerminal && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSingleShortlistDispatch(prospect.id);
+                          }}
+                          disabled={isShortlisting}
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            prospect.status === "shortlisted"
+                              ? "text-amber-500 bg-amber-500/15"
+                              : "text-muted-foreground hover:text-amber-500 hover:bg-muted"
+                          }`}
+                          title={prospect.status === "shortlisted" ? "Already Shortlisted" : "Send to Telegram Shortlist"}
+                        >
+                          <Star className={`h-4 w-4 ${prospect.status === "shortlisted" ? "fill-amber-500 text-amber-500" : ""}`} />
+                        </button>
+                      )}
+                      <div>{renderStatusBadge(prospect)}</div>
+                    </div>
                   </div>
 
                   {/* Title & Location */}
@@ -1497,7 +1517,18 @@ export default function ProspectsPage() {
                           <span>Mark Contacted</span>
                         </Button>
                       ) : prospect.status === "new" ? (
-                        prospect.phone_number ? (
+                        isAdminOrRoot && telegramShortlistConfigured ? (
+                          <Button
+                            type="button"
+                            variant="default"
+                            onClick={() => handleSingleShortlistDispatch(prospect.id)}
+                            disabled={isShortlisting}
+                            className="w-full min-h-[38px] text-xs font-semibold gap-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-xs cursor-pointer"
+                          >
+                            <Star className="h-3.5 w-3.5 fill-zinc-950" />
+                            <span>Shortlist on Telegram</span>
+                          </Button>
+                        ) : prospect.phone_number ? (
                           isAdminOrRoot && telegramAgentConfigured ? (
                             prospect.assignment_status === "pending" ? (
                               <Button
@@ -1960,7 +1991,19 @@ export default function ProspectsPage() {
                               <span>Contacted</span>
                             </Button>
                           ) : prospect.status === "new" ? (
-                            prospect.phone_number ? (
+                            isAdminOrRoot && telegramShortlistConfigured ? (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleSingleShortlistDispatch(prospect.id)}
+                                disabled={isShortlisting}
+                                className="h-7 gap-1 px-2.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 cursor-pointer shadow-xs"
+                                title="Send to personal Telegram shortlist topic"
+                              >
+                                <Star className="h-3 w-3 fill-zinc-950" />
+                                <span>Shortlist</span>
+                              </Button>
+                            ) : prospect.phone_number ? (
                               isAdminOrRoot && telegramAgentConfigured ? (
                                 prospect.assignment_status === "pending" ? (
                                   <Badge variant="warning" className="h-7 gap-1 px-2 text-[11px] font-medium" title="Dispatched to field agent">
@@ -2015,6 +2058,25 @@ export default function ProspectsPage() {
                               </Button>
                             )
                           ) : null}
+
+                          {isAdminOrRoot && telegramShortlistConfigured && !isTerminal && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSingleShortlistDispatch(prospect.id);
+                              }}
+                              disabled={isShortlisting}
+                              className={`h-7 w-7 rounded-md inline-flex items-center justify-center transition-colors cursor-pointer ${
+                                prospect.status === "shortlisted"
+                                  ? "text-amber-500 bg-amber-500/15"
+                                  : "text-muted-foreground hover:text-amber-500 hover:bg-muted"
+                              }`}
+                              title={prospect.status === "shortlisted" ? "Already Shortlisted" : "Quick Shortlist to Telegram"}
+                            >
+                              <Star className={`h-3.5 w-3.5 ${prospect.status === "shortlisted" ? "fill-amber-500 text-amber-500" : ""}`} />
+                            </button>
+                          )}
 
                           {/* Secondary Actions Overflow Dropdown */}
                           <DropdownMenu>
@@ -2172,19 +2234,6 @@ export default function ProspectsPage() {
 
           <div className="h-4 w-px bg-white/20 hidden sm:block" />
 
-          {telegramAgentConfigured && (
-            <button
-              type="button"
-              onClick={handleBulkAssign}
-              disabled={isAssigning || isShortlisting || isBulkUpdating || isBulkFetchingPhones}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold px-3 py-1.5 text-xs shadow transition disabled:opacity-50 cursor-pointer"
-              title="Dispatch selected prospects to Telegram field agent"
-            >
-              <Send className="h-3.5 w-3.5" />
-              <span>{isAssigning ? "Dispatching..." : "Dispatch to Agent"}</span>
-            </button>
-          )}
-
           {telegramShortlistConfigured && (
             <button
               type="button"
@@ -2201,13 +2250,26 @@ export default function ProspectsPage() {
           <button
             type="button"
             onClick={handleBulkMarkContacted}
-            disabled={isAssigning || isBulkUpdating || isBulkFetchingPhones}
+            disabled={isAssigning || isShortlisting || isBulkUpdating || isBulkFetchingPhones}
             className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold px-3 py-1.5 text-xs transition disabled:opacity-50 cursor-pointer border border-white/15"
             title="Mark all selected prospects as contacted"
           >
             <PhoneCall className="h-3.5 w-3.5 text-blue-400" />
             <span>Mark Contacted</span>
           </button>
+
+          {telegramAgentConfigured && (
+            <button
+              type="button"
+              onClick={handleBulkAssign}
+              disabled={isAssigning || isShortlisting || isBulkUpdating || isBulkFetchingPhones}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-emerald-300 border border-emerald-500/30 font-semibold px-3 py-1.5 text-xs shadow transition disabled:opacity-50 cursor-pointer"
+              title="Dispatch selected prospects to Telegram field agent"
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>{isAssigning ? "Dispatching..." : "Dispatch to Agent"}</span>
+            </button>
+          )}
 
           {prospects.some((p) => selectedProspectIds.has(p.id) && !p.phone_number) && (
             <button

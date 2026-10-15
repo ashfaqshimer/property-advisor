@@ -97,4 +97,42 @@ describe("ProspectQuickViewDrawer", () => {
     fireEvent.click(discardBtn);
     expect(handleDiscard).toHaveBeenCalledWith(mockProspect);
   });
+
+  it("calls onShortlistOnTelegram when Shortlist on TG button is clicked", () => {
+    const handleShortlist = vi.fn();
+    render(
+      <ProspectQuickViewDrawer
+        prospect={mockProspect}
+        isOpen={true}
+        onClose={vi.fn()}
+        onConvert={vi.fn()}
+        onUpdateStatus={vi.fn()}
+        onDiscard={vi.fn()}
+        onFetchPhone={vi.fn()}
+        onShortlistOnTelegram={handleShortlist}
+        telegramShortlistConfigured={true}
+      />
+    );
+
+    const shortlistButtons = screen.getAllByRole("button", { name: /shortlist on telegram|shortlist on tg/i });
+    expect(shortlistButtons.length).toBeGreaterThan(0);
+    fireEvent.click(shortlistButtons[0]);
+    expect(handleShortlist).toHaveBeenCalledWith("prospect-123");
+  });
+
+  it("renders Shortlisted badge when prospect status is shortlisted", () => {
+    render(
+      <ProspectQuickViewDrawer
+        prospect={{ ...mockProspect, status: "shortlisted" }}
+        isOpen={true}
+        onClose={vi.fn()}
+        onConvert={vi.fn()}
+        onUpdateStatus={vi.fn()}
+        onDiscard={vi.fn()}
+        onFetchPhone={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Shortlisted")).toBeInTheDocument();
+  });
 });

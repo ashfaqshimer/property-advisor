@@ -155,6 +155,12 @@ export function ProspectQuickViewDrawer({
                 New Lead
               </Badge>
             )}
+            {prospect.status === "shortlisted" && (
+              <Badge variant="warning" className="border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 font-semibold text-[11px]">
+                <Star className="h-3 w-3 fill-amber-500" />
+                Shortlisted
+              </Badge>
+            )}
             {prospect.status === "contacted" && (
               <Badge variant="success" className="gap-1 text-[11px] font-semibold">
                 <CheckCircle2 className="h-3 w-3" />
@@ -538,8 +544,8 @@ export function ProspectQuickViewDrawer({
         </div>
 
         {/* Drawer Sticky Footer with Core Actions */}
-        <div className="p-4 border-t border-border bg-card shrink-0 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="p-3 sm:p-4 border-t border-border bg-card shrink-0 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {isDiscarded ? (
               <Button
                 type="button"
@@ -567,6 +573,23 @@ export function ProspectQuickViewDrawer({
                   <span>Discard...</span>
                 </Button>
               )
+            )}
+
+            {!isTerminal && onShortlistOnTelegram && telegramShortlistConfigured && (
+              <Button
+                type="button"
+                variant={prospect.status === "shortlisted" ? "outline" : "default"}
+                onClick={() => onShortlistOnTelegram(prospect.id)}
+                className={`gap-1.5 text-xs font-semibold cursor-pointer ${
+                  prospect.status === "shortlisted"
+                    ? "border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                    : "bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-xs"
+                }`}
+                title="Send prospect to Telegram shortlist topic for review"
+              >
+                <Star className={`h-3.5 w-3.5 ${prospect.status === "shortlisted" ? "fill-amber-500 text-amber-500" : "fill-zinc-950 text-zinc-950"}`} />
+                <span>{prospect.status === "shortlisted" ? "Shortlisted" : "Shortlist on TG"}</span>
+              </Button>
             )}
 
             {prospect.status === "new" && (
