@@ -242,34 +242,109 @@ class LankaPropertyWebClient:
             price_tag = soup.find(class_=re.compile(r"price|listing-price"))
             price = price_tag.get_text(separator=" ", strip=True) if price_tag else None
 
-            # Phone number (from <a href="tel:..."> or phone-info)
-            phone_number = None
-            tel_link = soup.find("a", href=re.compile(r"^tel:"))
-            if tel_link and tel_link.get("href"):
-                phone_number = tel_link["href"].replace("tel:", "").strip()
-
-            if not phone_number:
-                phone_elem = soup.find(class_=re.compile(r"phone-info|contact-number"))
-                if phone_elem:
-                    phone_match = re.search(r"(\+?\d[\d\s-]{7,15})", phone_elem.get_text())
-                    if phone_match:
-                        phone_number = phone_match.group(1).strip()
-
             # Explicit Agent Type ("Owner", "Agent", "Developer")
             agent_type = None
             agent_label_tag = soup.find(class_=re.compile(r"agent-type-label|advertiser-type"))
             if agent_label_tag:
-                agent_type = agent_label_tag.get_text(strip=True)
+                raw_type = agent_label_tag.get_text(strip=True)
+                if raw_type:
+                    agent_type = raw_type
 
-            # Poster Name
+            # Check agent-head for type if not yet found
+            agent_head = soup.find(class_=re.compile(r"agent-head"))
+            if not agent_type and agent_head:
+                head_name = agent_head.find(class_=re.compile(r"agent-name"))
+                if head_name:
+                    head_text = head_name.get_text(strip=True)
+                    if head_text.lower() in ("owner", "agent", "developer"):
+                        agent_type = head_text.capitalize()
+
+            # Check presence of private seller section container
+            if not agent_type and soup.find(class_=re.compile(r"pvt-seller")):
+                agent_type = "Owner"
+
+            # Poster Name & Phone Number
             poster_name = None
-            seller_tag = soup.find(class_=re.compile(r"phone-info|agent-name|advertiser-name"))
-            if seller_tag:
-                text = seller_tag.get_text(strip=True)
-                if ":" in text:
-                    poster_name = text.split(":")[0].strip()
-                elif text and len(text) < 50:
-                    poster_name = text
+            phone_number = None
+
+            # 1. Structured contact rows in .agent-contacts
+            agent_contacts = soup.find(class_=re.compile(r"agent-contacts"))
+            if agent_contacts:
+                contact_rows = agent_contacts.find_all(class_=re.compile(r"agent-row"))
+                for row in contact_rows:
+                    # Skip the table header (which contains 'Agent' / 'Owner' / 'Developer' as column titles)
+                    row_classes = row.get("class", [])
+                    if any("agent-head" in c for c in row_classes):
+                        continue
+
+                    # Extract person / agency name
+                    name_el = row.find(class_=re.compile(r"agent-name"))
+                    if name_el and not poster_name:
+                        candidate_name = name_el.get_text(strip=True)
+                        if candidate_name and candidate_name.lower() not in (
+                            "owner",
+                            "agent",
+                            "developer",
+                            "number",
+                            "name",
+                        ):
+                            poster_name = candidate_name
+
+                    # Extract phone number
+                    if not phone_number:
+                        tel_tag = row.find("a", href=re.compile(r"^tel:"))
+                        if tel_tag and tel_tag.get("href"):
+                            phone_number = tel_tag["href"].replace("tel:", "").strip()
+                        else:
+                            num_el = row.find(class_=re.compile(r"agent-number|contact-number"))
+                            if num_el:
+                                phone_match = re.search(r"(\+?\d[\d\s-]{7,15})", num_el.get_text())
+                                if phone_match:
+                                    phone_number = phone_match.group(1).strip()
+
+                    if poster_name and phone_number:
+                        break
+
+            # 2. Fallback poster name from private seller section title
+            if not poster_name:
+                pvt_seller = soup.find(class_=re.compile(r"bottom-sec-pvt-seller"))
+                if pvt_seller:
+                    title_div = pvt_seller.find(class_=re.compile(r"^title$|\btitle\b"))
+                    if title_div:
+                        temp_soup = BeautifulSoup(str(title_div), "html.parser")
+                        for sub in temp_soup.find_all(class_=re.compile(r"agent-type-label")):
+                            sub.decompose()
+                        candidate = temp_soup.get_text(strip=True)
+                        if candidate and candidate.lower() not in ("owner", "agent", "developer", "contact"):
+                            poster_name = candidate
+
+            # 3. Fallback poster name from phone-info or advertiser-name
+            if not poster_name:
+                seller_tag = soup.find(class_=re.compile(r"phone-info|advertiser-name"))
+                if seller_tag:
+                    text = seller_tag.get_text(strip=True)
+                    if ":" in text:
+                        candidate = text.split(":")[0].strip()
+                        if candidate.lower() not in ("owner", "agent", "developer"):
+                            poster_name = candidate
+                    elif text and len(text) < 50 and text.lower() not in ("owner", "agent", "developer"):
+                        poster_name = text
+
+            # 4. Fallback phone number
+            if not phone_number:
+                tel_link = soup.find("a", href=re.compile(r"^tel:"))
+                if tel_link and tel_link.get("href"):
+                    phone_number = tel_link["href"].replace("tel:", "").strip()
+                else:
+                    phone_elem = soup.find(class_=re.compile(r"phone-info|contact-number"))
+                    if phone_elem:
+                        phone_match = re.search(r"(\+?\d[\d\s-]{7,15})", phone_elem.get_text())
+                        if phone_match:
+                            phone_number = phone_match.group(1).strip()
+
+            # Guard against saving placeholder names
+            if poster_name and poster_name.strip().lower() in ("owner", "agent", "developer", "none", "null"):
+                poster_name = None
 
             # Specifications from Overview Table
             bathrooms = None

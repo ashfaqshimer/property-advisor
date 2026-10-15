@@ -186,6 +186,105 @@ def test_lpw_fetch_ad_detail_parsing():
     asyncio.run(_run())
 
 
+SAMPLE_LPW_DETAIL_AGENT_CONTACTS_HTML = """
+<!DOCTYPE html>
+<html>
+<head><title>Apartment for Sale in Colombo</title></head>
+<body>
+  <h1>Apartment for Sale</h1>
+  <span class="agent-type-label">Agent</span>
+  <div class="agent-contacts">
+    <div class="agent-row agent-head">
+      <div class="agent-name">Agent</div>
+      <div class="agent-number">Number</div>
+    </div>
+    <div class="agent-row">
+      <div class="agent-name">Salinga Dissanayake</div>
+      <div class="agent-number">0777557747</div>
+      <a class="agent-btn" href="tel:+94777557747">Call</a>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+SAMPLE_LPW_DETAIL_PRIVATE_SELLER_HTML = """
+<!DOCTYPE html>
+<html>
+<head><title>House for Sale in Colombo 7</title></head>
+<body>
+  <h1>House for Sale in Colombo 7</h1>
+  <div class="col bottom-sec-pvt-seller">
+    <div class="title mb-3">
+      Kusum Wijetilleke <span class="agent-type-label">Owner</span>
+    </div>
+  </div>
+  <div class="agent-contacts">
+    <div class="agent-row agent-head">
+      <div class="agent-name">Owner</div>
+      <div class="agent-number">Number</div>
+    </div>
+    <div class="agent-row">
+      <div class="agent-name">Kusum Wijetilleke</div>
+      <div class="agent-number">0772222244</div>
+      <a class="agent-btn" href="tel:+94772222244">Call</a>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+def test_lpw_fetch_ad_detail_agent_contacts_parsing():
+    async def _run():
+        client = LankaPropertyWebClient(delay=0)
+        mock_response = httpx.Response(
+            status_code=200,
+            text=SAMPLE_LPW_DETAIL_AGENT_CONTACTS_HTML,
+            request=httpx.Request("GET", "https://www.lankapropertyweb.com/sale/property_details-5966897.html"),
+        )
+        try:
+            with patch.object(client.client, "get", new_callable=AsyncMock) as mock_get:
+                mock_get.return_value = mock_response
+                detail = await client.fetch_ad_detail("https://www.lankapropertyweb.com/sale/property_details-5966897.html")
+
+                assert detail is not None
+                assert detail.id == "5966897"
+                # Poster name must be the real person, NOT "Agent" from table header
+                assert detail.poster_name == "Salinga Dissanayake"
+                assert detail.phone_number == "+94777557747"
+                assert detail.agent_type == "Agent"
+        finally:
+            await client.close()
+
+    asyncio.run(_run())
+
+
+def test_lpw_fetch_ad_detail_private_seller_parsing():
+    async def _run():
+        client = LankaPropertyWebClient(delay=0)
+        mock_response = httpx.Response(
+            status_code=200,
+            text=SAMPLE_LPW_DETAIL_PRIVATE_SELLER_HTML,
+            request=httpx.Request("GET", "https://www.lankapropertyweb.com/sale/property_details-5825030.html"),
+        )
+        try:
+            with patch.object(client.client, "get", new_callable=AsyncMock) as mock_get:
+                mock_get.return_value = mock_response
+                detail = await client.fetch_ad_detail("https://www.lankapropertyweb.com/sale/property_details-5825030.html")
+
+                assert detail is not None
+                assert detail.id == "5825030"
+                # Poster name must be Kusum Wijetilleke, NOT "Owner"
+                assert detail.poster_name == "Kusum Wijetilleke"
+                assert detail.phone_number == "+94772222244"
+                assert detail.agent_type == "Owner"
+        finally:
+            await client.close()
+
+    asyncio.run(_run())
+
+
 def test_lpw_classification_heuristics():
     ad_private = LpwAd(
         id="101",
