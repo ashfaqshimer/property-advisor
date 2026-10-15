@@ -32,6 +32,8 @@ import {
   RotateCcw,
   Check,
   Eye,
+  User,
+  Building2,
 } from "lucide-react";
 
 import {
@@ -86,7 +88,7 @@ export default function ProspectsPage() {
   const [loading, setLoading] = useState(true);
   
   // Filters & Pagination
-  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("new");
   const [filterSource, setFilterSource] = useState<string>("");
   const [filterClassification, setFilterClassification] = useState<string>("owner");
   const [transactionType, setTransactionType] = useState<"sale" | "rent">("sale");
@@ -741,16 +743,20 @@ export default function ProspectsPage() {
     );
   };
 
-  const renderClassificationBadge = (prospect: Prospect) => {
+  const renderClassificationBadge = (prospect: Prospect, compact: boolean = false) => {
     const isOwner = prospect.classification === "owner";
     const isBroker = prospect.classification === "broker";
     if (!isOwner && !isBroker) return null;
 
+    const pct = prospect.confidence !== null && prospect.confidence !== undefined
+      ? prospect.confidence <= 1 ? Math.round(prospect.confidence * 100) : Math.round(prospect.confidence)
+      : null;
+
     const tooltip = prospect.classification_reasons?.length
-      ? prospect.classification_reasons.join(", ")
+      ? `${isOwner ? "Direct Owner" : "Broker"} (${pct ? `${pct}%` : ""}): ${prospect.classification_reasons.join(", ")}`
       : isOwner
-      ? "AI classified as direct owner"
-      : "AI classified as broker / agency";
+      ? `AI classified as Direct Owner${pct ? ` (${pct}%)` : ""}`
+      : `AI classified as Broker${pct ? ` (${pct}%)` : ""}`;
 
     if (isOwner) {
       return (
@@ -759,7 +765,7 @@ export default function ProspectsPage() {
           className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shrink-0 cursor-help"
         >
           <UserCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span>Direct Owner {prospect.confidence ? `${prospect.confidence}%` : ""}</span>
+          <span>{compact ? "Owner" : "Direct Owner"}{pct ? ` ${pct}%` : ""}</span>
         </span>
       );
     }
@@ -770,7 +776,7 @@ export default function ProspectsPage() {
         className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground border border-border shrink-0 cursor-help"
       >
         <Bot className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
-        <span>Broker {prospect.confidence ? `${prospect.confidence}%` : ""}</span>
+        <span>Broker{pct ? ` ${pct}%` : ""}</span>
       </span>
     );
   };
@@ -1030,7 +1036,6 @@ export default function ProspectsPage() {
           {/* Status Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
             {[
-              { id: "", label: "Active Pipeline", count: metrics?.total_active },
               { id: "new", label: "New Leads", count: metrics?.new_count },
               { id: "contacted", label: "Contacted", count: metrics?.contacted_count },
               { id: "converted", label: "Converted", count: metrics?.converted_count },
@@ -1247,7 +1252,7 @@ export default function ProspectsPage() {
                         {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
                       </span>
                       <SourceBadge source={prospect.source} url={prospect.ikman_url} />
-                      {renderClassificationBadge(prospect)}
+                      {renderClassificationBadge(prospect, true)}
                     </div>
                     <div>{renderStatusBadge(prospect)}</div>
                   </div>
@@ -1318,14 +1323,61 @@ export default function ProspectsPage() {
 
                   {/* Contact Summary Box */}
                   <div className="rounded-lg bg-muted/40 p-2.5 text-xs flex items-center justify-between gap-2">
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-muted-foreground truncate">{prospect.poster_name || "Unknown poster"}</span>
-                      {prospect.phone_number ? (
-                        <span className="font-mono font-medium text-foreground">{prospect.phone_number}</span>
-                      ) : (
-                        <span className="italic text-muted-foreground text-[11px]">No phone number</span>
-                      )}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${
+                          prospect.classification === "owner"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-500/25"
+                            : prospect.classification === "broker"
+                            ? "bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 ring-1 ring-purple-500/25"
+                            : "bg-muted text-muted-foreground ring-1 ring-border"
+                        }`}
+                      >
+                        {prospect.classification === "owner" ? (
+                          <UserCheck className="h-3.5 w-3.5" />
+                        ) : prospect.classification === "broker" ? (
+                          <Building2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <User className="h-3.5 w-3.5" />
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="font-semibold text-foreground truncate max-w-[140px]">
+                          {prospect.poster_name || "Unknown poster"}
+                        </span>
+                        {prospect.phone_number ? (
+                          <div className="flex items-center gap-1 font-mono text-[11px] text-foreground font-medium">
+                            <span>{prospect.phone_number}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyPhone(prospect.phone_number);
+                              }}
+                              className="p-0.5 text-muted-foreground/60 hover:text-foreground transition cursor-pointer rounded"
+                              title="Copy phone number"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenWhatsApp(prospect.phone_number);
+                              }}
+                              className="p-0.5 text-emerald-600/70 hover:text-emerald-600 transition cursor-pointer rounded"
+                              title="Open WhatsApp chat"
+                            >
+                              <MessageCircle className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="italic text-muted-foreground text-[11px]">No phone number</span>
+                        )}
+                      </div>
                     </div>
+
                     {/* Assignment status indicator if any */}
                     {prospect.assignment_status && (
                       <Badge
@@ -1701,32 +1753,89 @@ export default function ProspectsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-foreground text-xs">{prospect.poster_name || "Unknown"}</span>
-                            {renderClassificationBadge(prospect)}
+                        <div className="flex items-center gap-2.5 max-w-[230px]">
+                          <div
+                            className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                              prospect.classification === "owner"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 ring-1 ring-emerald-500/25"
+                                : prospect.classification === "broker"
+                                ? "bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 ring-1 ring-purple-500/25"
+                                : "bg-muted text-muted-foreground ring-1 ring-border"
+                            }`}
+                            title={
+                              prospect.classification === "owner"
+                                ? `Direct Owner (${prospect.confidence || 0}% confidence)`
+                                : prospect.classification === "broker"
+                                ? `Broker / Agency (${prospect.confidence || 0}% confidence)`
+                                : "Unclassified contact"
+                            }
+                          >
+                            {prospect.classification === "owner" ? (
+                              <UserCheck className="h-4 w-4" />
+                            ) : prospect.classification === "broker" ? (
+                              <Building2 className="h-4 w-4" />
+                            ) : (
+                              <User className="h-4 w-4" />
+                            )}
                           </div>
-                          {prospect.phone_number ? (
-                            <div className="font-mono text-xs text-foreground font-medium">
-                              {prospect.phone_number}
+
+                          <div className="flex flex-col min-w-0">
+                            {/* Line 1: Poster Name + Compact Role Pill */}
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="font-semibold text-foreground text-xs truncate max-w-[125px]"
+                                title={prospect.poster_name || "Unknown Poster"}
+                              >
+                                {prospect.poster_name || "Unknown"}
+                              </span>
+                              {renderClassificationBadge(prospect, true)}
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground italic text-xs">No phone</span>
-                              {prospect.classification === "owner" && (
-                                <Button 
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleFetchSinglePhone(prospect.id)}
-                                  disabled={fetchingPhoneId === prospect.id}
-                                  className="h-6 gap-1 px-2 text-[11px] cursor-pointer"
+
+                            {/* Line 2: Phone with 1-click Copy & WhatsApp micro-actions */}
+                            {prospect.phone_number ? (
+                              <div className="flex items-center gap-1 font-mono text-[11px] text-foreground font-medium mt-0.5">
+                                <span>{prospect.phone_number}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopyPhone(prospect.phone_number);
+                                  }}
+                                  className="p-0.5 text-muted-foreground/60 hover:text-foreground transition cursor-pointer rounded"
+                                  title="Copy phone number"
                                 >
-                                  {fetchingPhoneId === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <PhoneCall className="h-3 w-3 text-emerald-600" />}
-                                  <span>{fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}</span>
-                                </Button>
-                              )}
-                            </div>
-                          )}
+                                  <Copy className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenWhatsApp(prospect.phone_number);
+                                  }}
+                                  className="p-0.5 text-emerald-600/70 hover:text-emerald-600 transition cursor-pointer rounded"
+                                  title="Open WhatsApp chat"
+                                >
+                                  <MessageCircle className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-muted-foreground italic text-[11px]">No phone</span>
+                                {prospect.classification === "owner" && (
+                                  <Button 
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleFetchSinglePhone(prospect.id)}
+                                    disabled={fetchingPhoneId === prospect.id}
+                                    className="h-5 gap-1 px-1.5 text-[10px] cursor-pointer"
+                                  >
+                                    {fetchingPhoneId === prospect.id ? <RefreshCw className="h-2.5 w-2.5 animate-spin" /> : <PhoneCall className="h-2.5 w-2.5 text-emerald-600" />}
+                                    <span>{fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}</span>
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="px-6 py-4">
