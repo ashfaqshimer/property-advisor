@@ -72,6 +72,9 @@ import {
   deleteFieldAssignment,
   deleteFieldAssignmentByProspect,
   updateFieldAssignment,
+  getProspectMetrics,
+  bulkUpdateProspects,
+  ProspectMetrics,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
@@ -85,7 +88,7 @@ export default function ProspectsPage() {
   // Filters & Pagination
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterSource, setFilterSource] = useState<string>("");
-  const [filterClassification, setFilterClassification] = useState<string>("all");
+  const [filterClassification, setFilterClassification] = useState<string>("owner");
   const [transactionType, setTransactionType] = useState<"sale" | "rent">("sale");
   const [propertyType, setPropertyType] = useState<string>("all");
   const [filterPriceGrade, setFilterPriceGrade] = useState<string>("all");
@@ -139,6 +142,10 @@ export default function ProspectsPage() {
   const [telegramAgentConfigured, setTelegramAgentConfigured] = useState(false);
   const [selectedProspectIds, setSelectedProspectIds] = useState<Set<string>>(new Set());
   const [isAssigning, setIsAssigning] = useState(false);
+  const [metrics, setMetrics] = useState<ProspectMetrics | null>(null);
+  const [isBulkDiscardOpen, setIsBulkDiscardOpen] = useState(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [isBulkFetchingPhones, setIsBulkFetchingPhones] = useState(false);
 
   const toggleSelectProspect = (id: string) => {
     setSelectedProspectIds((prev) => {
@@ -187,6 +194,71 @@ export default function ProspectsPage() {
       toast.error(err.message || "Failed to dispatch assignments to agent.");
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  const handleBulkMarkContacted = async () => {
+    if (selectedProspectIds.size === 0) return;
+    setIsBulkUpdating(true);
+    const ids = Array.from(selectedProspectIds);
+    try {
+      await bulkUpdateProspects({ ids, status: "contacted" });
+      toast.success(`Marked ${ids.length} prospect(s) as contacted`);
+      setProspects((prev) =>
+        prev.map((p) => (selectedProspectIds.has(p.id) ? { ...p, status: "contacted" } : p))
+      );
+      setSelectedProspectIds(new Set());
+      fetchMetrics();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update prospects");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleBulkConfirmDiscard = async (discardReason: string) => {
+    if (selectedProspectIds.size === 0) return;
+    setIsBulkUpdating(true);
+    const ids = Array.from(selectedProspectIds);
+    try {
+      await bulkUpdateProspects({ ids, status: "discarded", discard_reason: discardReason });
+      toast.info(`Moved ${ids.length} prospect(s) to discarded`);
+      setProspects((prev) =>
+        prev.map((p) =>
+          selectedProspectIds.has(p.id) ? { ...p, status: "discarded", discard_reason: discardReason } : p
+        )
+      );
+      setSelectedProspectIds(new Set());
+      fetchMetrics();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to discard prospects");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleBulkFetchPhones = async () => {
+    const selectedList = prospects.filter((p) => selectedProspectIds.has(p.id) && !p.phone_number);
+    if (selectedList.length === 0) {
+      toast.info("All selected prospects already have phone numbers.");
+      return;
+    }
+    setIsBulkFetchingPhones(true);
+    toast.info(`Fetching phone numbers for ${selectedList.length} prospect(s)...`);
+    let fetched = 0;
+    try {
+      for (const p of selectedList) {
+        try {
+          const updated = await fetchProspectPhone(p.id);
+          setProspects((prev) => prev.map((item) => (item.id === p.id ? updated : item)));
+          fetched++;
+        } catch {
+          // ignore individual phone fetch failures
+        }
+      }
+      toast.success(`Successfully fetched ${fetched} phone number(s).`);
+    } finally {
+      setIsBulkFetchingPhones(false);
     }
   };
 
@@ -368,10 +440,22 @@ export default function ProspectsPage() {
       setDraftModalData(null);
       setDraftProspectId(null);
       fetchProspects();
+      fetchMetrics();
     } catch (err: any) {
       toast.error(err.message || "Failed to create property");
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const fetchMetrics = async () => {
+    try {
+      const property_type = propertyType === "all" ? undefined : propertyType;
+      const listing_type = transactionType;
+      const data = await getProspectMetrics({ property_type, listing_type });
+      setMetrics(data);
+    } catch (err) {
+      // ignore
     }
   };
 
@@ -407,6 +491,7 @@ export default function ProspectsPage() {
 
   useEffect(() => {
     fetchProspects();
+    fetchMetrics();
   }, [filterStatus, transactionType, propertyType, filterClassification, filterPriceGrade, sortBy, page, debouncedSearch]);
 
   const refreshActiveJobs = async () => {
@@ -508,6 +593,7 @@ export default function ProspectsPage() {
       const oldStatus = oldProspect?.status;
       const updated = await updateProspect(id, newStatus, discardReason);
       setProspects(prev => prev.map(p => p.id === id ? updated : p));
+      fetchMetrics();
       if (oldStatus === "discarded" && newStatus !== "discarded") {
         toast.success(`Prospect restored to active! Status: ${newStatus}`);
       } else if (oldStatus !== "discarded" && newStatus === "discarded") {
@@ -586,13 +672,13 @@ export default function ProspectsPage() {
     (filterPriceGrade !== "all" ? 1 : 0) +
     (filterSource ? 1 : 0) +
     (sortBy !== "default" ? 1 : 0) +
-    (filterClassification !== "all" ? 1 : 0);
+    (filterClassification !== "owner" ? 1 : 0);
 
   const resetSecondaryFilters = () => {
     setFilterPriceGrade("all");
     setFilterSource("");
     setSortBy("default");
-    setFilterClassification("all");
+    setFilterClassification("owner");
     setPage(1);
   };
 
@@ -944,11 +1030,11 @@ export default function ProspectsPage() {
           {/* Status Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
             {[
-              { id: "", label: "Active Pipeline" },
-              { id: "new", label: "New Leads" },
-              { id: "contacted", label: "Contacted" },
-              { id: "converted", label: "Converted" },
-              { id: "discarded", label: "Discarded" },
+              { id: "", label: "Active Pipeline", count: metrics?.total_active },
+              { id: "new", label: "New Leads", count: metrics?.new_count },
+              { id: "contacted", label: "Contacted", count: metrics?.contacted_count },
+              { id: "converted", label: "Converted", count: metrics?.converted_count },
+              { id: "discarded", label: "Discarded", count: metrics?.discarded_count },
             ].map((tab) => {
               const isActive = filterStatus === tab.id;
               return (
@@ -956,7 +1042,7 @@ export default function ProspectsPage() {
                   key={tab.id}
                   type="button"
                   onClick={() => { setFilterStatus(tab.id); setPage(1); }}
-                  className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                  className={`inline-flex items-center gap-1.5 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isActive
                       ? tab.id === "discarded"
                         ? "bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800 shadow-xs"
@@ -966,7 +1052,22 @@ export default function ProspectsPage() {
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                   }`}
                 >
-                  {tab.label}
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && tab.count !== null && (
+                    <span
+                      className={`inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                        isActive
+                          ? tab.id === "discarded"
+                            ? "bg-amber-200 text-amber-950 dark:bg-amber-800 dark:text-amber-100"
+                            : tab.id === "converted"
+                            ? "bg-emerald-200 text-emerald-950 dark:bg-emerald-800 dark:text-emerald-100"
+                            : "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -990,6 +1091,17 @@ export default function ProspectsPage() {
             >
               <UserCheck className={`h-3.5 w-3.5 ${filterClassification === "owner" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`} />
               <span>Direct Owners</span>
+              {metrics?.direct_owners_count !== undefined && (
+                <span
+                  className={`inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                    filterClassification === "owner"
+                      ? "bg-emerald-200 text-emerald-950 dark:bg-emerald-800 dark:text-emerald-100"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {metrics.direct_owners_count}
+                </span>
+              )}
               {filterClassification === "owner" && (
                 <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
               )}
