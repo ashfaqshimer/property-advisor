@@ -31,6 +31,7 @@ import {
   MessageCircle,
   RotateCcw,
   Check,
+  Eye,
 } from "lucide-react";
 
 import {
@@ -75,6 +76,7 @@ import {
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
 import DiscardProspectModal, { getDiscardReasonLabel, isBrokerSignalReason } from "../../../../components/admin/DiscardProspectModal";
+import { ProspectQuickViewDrawer } from "../../../../components/admin/ProspectQuickViewDrawer";
 
 export default function ProspectsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -303,6 +305,17 @@ export default function ProspectsPage() {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [discardModalProspect, setDiscardModalProspect] = useState<Prospect | null>(null);
   const [isDiscarding, setIsDiscarding] = useState(false);
+  const [quickViewProspect, setQuickViewProspect] = useState<Prospect | null>(null);
+
+  // Keep quickViewProspect synchronized if prospects list updates in place
+  useEffect(() => {
+    if (quickViewProspect) {
+      const refreshed = prospects.find((p) => p.id === quickViewProspect.id);
+      if (refreshed) {
+        setQuickViewProspect(refreshed);
+      }
+    }
+  }, [prospects]);
 
   const handleGenerateDraft = async (prospect: Prospect) => {
     setDraftLoading(prospect.id);
@@ -1130,7 +1143,13 @@ export default function ProspectsPage() {
                   {/* Title & Location */}
                   <div>
                     <div className="flex items-start gap-1.5">
-                      <span className="font-semibold text-foreground text-sm line-clamp-2">{prospect.title}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuickViewProspect(prospect)}
+                        className="text-left font-semibold text-foreground text-sm line-clamp-2 hover:text-primary transition-colors cursor-pointer group"
+                      >
+                        <span className="group-hover:underline">{prospect.title}</span>
+                      </button>
                       {prospect.ikman_url && (
                         <a href={prospect.ikman_url} target="_blank" rel="noopener noreferrer" className="shrink-0 mt-0.5 text-blue-600 hover:text-blue-800">
                           <ExternalLink className="h-3.5 w-3.5" />
@@ -1332,6 +1351,11 @@ export default function ProspectsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={() => setQuickViewProspect(prospect)} className="cursor-pointer font-medium">
+                          <Eye className="h-3.5 w-3.5 mr-2 text-primary" />
+                          <span>Quick View Details</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         {prospect.phone_number && (
                           <>
                             <DropdownMenuItem onClick={() => handleCopyPhone(prospect.phone_number)}>
@@ -1490,7 +1514,14 @@ export default function ProspectsPage() {
                       </TableCell>
                       <TableCell className="px-6 py-4">
                         <div className="flex max-w-[250px] items-center gap-2">
-                          <span className="truncate font-medium text-foreground">{prospect.title}</span>
+                          <button
+                            type="button"
+                            onClick={() => setQuickViewProspect(prospect)}
+                            className="truncate font-medium text-foreground text-left hover:text-primary transition-colors cursor-pointer group"
+                            title="Click to view details"
+                          >
+                            <span className="group-hover:underline">{prospect.title}</span>
+                          </button>
                           {prospect.ikman_url && (
                             <a href={prospect.ikman_url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-blue-600 hover:text-blue-800">
                               <ExternalLink className="h-3 w-3" />
@@ -1699,6 +1730,11 @@ export default function ProspectsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-52">
+                              <DropdownMenuItem onClick={() => setQuickViewProspect(prospect)} className="cursor-pointer font-medium">
+                                <Eye className="h-3.5 w-3.5 mr-2 text-primary" />
+                                <span>Quick View Details</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               {prospect.phone_number && (
                                 <>
                                   <DropdownMenuItem onClick={() => handleCopyPhone(prospect.phone_number)} className="cursor-pointer">
@@ -2074,6 +2110,25 @@ export default function ProspectsPage() {
           </div>
         </div>
       )}
+
+      {/* Prospect Quick View Slide-Over Drawer */}
+      <ProspectQuickViewDrawer
+        prospect={quickViewProspect}
+        isOpen={!!quickViewProspect}
+        onClose={() => setQuickViewProspect(null)}
+        onConvert={(p) => {
+          handleGenerateDraft(p);
+        }}
+        onUpdateStatus={handleUpdateStatus}
+        onDiscard={(p) => setDiscardModalProspect(p)}
+        onFetchPhone={handleFetchSinglePhone}
+        onAssignToAgent={isAdminOrRoot && telegramAgentConfigured ? handleSingleAssign : undefined}
+        onEditAssignment={handleOpenEditAssignment}
+        isFetchingPhone={fetchingPhoneId === quickViewProspect?.id}
+        isConverting={draftLoading === quickViewProspect?.id}
+        isAdminOrRoot={isAdminOrRoot}
+        telegramAgentConfigured={telegramAgentConfigured}
+      />
     </div>
   );
 }
