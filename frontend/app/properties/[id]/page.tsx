@@ -173,6 +173,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 <Badge variant={property.listing_type === "rent" ? "rent" : "sale"}>
                   {property.listing_type === "rent" ? "For Rent" : "For Sale"}
                 </Badge>
+                {property.property_code && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-800 border border-neutral-200/80 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-500">Ref</span>
+                    <span className="font-mono text-xs">{property.property_code}</span>
+                  </span>
+                )}
                 {property.price_grade_label && (
                   <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">
                     {property.price_grade_label}
@@ -361,6 +367,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           {/* Interactive AI Advisor CTA */}
           <PropertyInquiryCta
             propertyId={property.id}
+            propertyCode={property.property_code}
             title={property.title}
             location={property.location}
             price={priceFormatted}

@@ -90,6 +90,7 @@ describe("PropertyCard", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(sample.description)).toBeInTheDocument();
     expect(screen.getByText(sample.location)).toBeInTheDocument();
+    expect(screen.getByText(sample.propertyCode)).toBeInTheDocument();
   });
 
   it("gives the photo alt text describing the image, not the title", () => {

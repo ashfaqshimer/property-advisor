@@ -29,6 +29,7 @@ import { Select } from '@/components/ui/select';
 type PropertyStatus = 'available' | 'under_offer' | 'sold';
 type Property = {
 	id: string;
+	propertyCode: string;
 	title: string;
 	type: string;
 	location: string;
@@ -84,6 +85,7 @@ export default function AdminPropertiesPage() {
 				setProperties(
 					records.map((record) => ({
 						id: record.id,
+						propertyCode: record.property_code,
 						title: record.title,
 						type: record.property_type,
 						location: record.location,
@@ -207,7 +209,8 @@ export default function AdminPropertiesPage() {
 			const q = searchQuery.toLowerCase();
 			const matchTitle = property.title.toLowerCase().includes(q);
 			const matchLoc = property.location.toLowerCase().includes(q);
-			if (!matchTitle && !matchLoc) return false;
+			const matchCode = property.propertyCode?.toLowerCase().includes(q);
+			if (!matchTitle && !matchLoc && !matchCode) return false;
 		}
 		return true;
 	});
@@ -320,7 +323,14 @@ export default function AdminPropertiesPage() {
 							) : filteredProperties.map((property) => (
 								<TableRow key={property.id} className='transition hover:bg-muted/50'>
 									<TableCell className='px-5 py-4 font-semibold text-foreground'>
-										{property.title}
+										<div className='flex flex-col gap-1'>
+											{property.propertyCode && (
+												<span className='font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 rounded w-fit border border-emerald-200/60 dark:border-emerald-800/60'>
+													{property.propertyCode}
+												</span>
+											)}
+											<span>{property.title}</span>
+										</div>
 									</TableCell>
 									<TableCell className='px-4 py-4 text-muted-foreground capitalize'>{property.type}</TableCell>
 									<TableCell className='px-4 py-4 text-muted-foreground'>

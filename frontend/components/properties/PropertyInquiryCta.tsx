@@ -4,19 +4,22 @@ import { openChat } from "@/lib/chat-dialog";
 
 export default function PropertyInquiryCta({
   propertyId,
+  propertyCode,
   title,
   location,
   price,
 }: {
   propertyId: string;
+  propertyCode?: string;
   title: string;
   location: string;
   price: string;
 }) {
+  const codePrefix = propertyCode ? `property ${propertyCode} (${title})` : `"${title}"`;
   const handleInquire = (customPrompt?: string) => {
     const prompt =
       customPrompt ||
-      `I'm interested in "${title}" in ${location} (${price}). Can you tell me more about it and arrange a viewing?`;
+      `I'm interested in ${codePrefix} in ${location} (${price}). Can you tell me more about it and arrange a viewing?`;
     openChat(prompt);
   };
 

@@ -16,6 +16,7 @@ import type { PropertyApiRecord } from "@/lib/api";
 
 export type Property = {
   id: string;
+  propertyCode: string;
   title: string;
   /** Neighbourhood or city, as shown in the pill over the photo. */
   location: string;
@@ -44,6 +45,7 @@ export function formatPrice(price: number | null, currency: "LKR"): string {
 export function mapProperty(record: PropertyApiRecord): Property {
   return {
     id: record.id,
+    propertyCode: record.property_code,
     title: record.title,
     location: record.location,
     priceLkr: formatPrice(record.price, record.currency),
@@ -64,6 +66,7 @@ const photo = (id: string) =>
 export const FEATURED_PROPERTIES: Property[] = [
   {
     id: "garden-villa-ward-place",
+    propertyCode: "PA-1001",
     title: "Garden Villa on Ward Place",
     location: "Colombo 7",
     priceLkr: "LKR 185M",
@@ -79,6 +82,7 @@ export const FEATURED_PROPERTIES: Property[] = [
   },
   {
     id: "havelock-residences",
+    propertyCode: "PA-1002",
     title: "Havelock Residences",
     location: "Colombo 5",
     priceLkr: "LKR 48M",
@@ -94,6 +98,7 @@ export const FEATURED_PROPERTIES: Property[] = [
   },
   {
     id: "courtyard-townhouse",
+    propertyCode: "PA-1003",
     title: "Courtyard Townhouse",
     location: "Rajagiriya",
     priceLkr: "LKR 72M",
@@ -109,6 +114,7 @@ export const FEATURED_PROPERTIES: Property[] = [
   },
   {
     id: "skyline-penthouse",
+    propertyCode: "PA-1004",
     title: "Skyline Penthouse",
     location: "Colombo 3",
     priceLkr: "LKR 240M",
@@ -124,6 +130,7 @@ export const FEATURED_PROPERTIES: Property[] = [
   },
   {
     id: "restored-colonial-retreat",
+    propertyCode: "PA-1005",
     title: "Restored Colonial Retreat",
     location: "Galle",
     priceLkr: "LKR 130M",
@@ -139,6 +146,7 @@ export const FEATURED_PROPERTIES: Property[] = [
   },
   {
     id: "hillside-bungalow",
+    propertyCode: "PA-1006",
     title: "Hillside Bungalow",
     location: "Kandy",
     priceLkr: "LKR 95M",
@@ -153,6 +161,7 @@ export const FEATURED_PROPERTIES: Property[] = [
   },
   {
     id: "poolside-garden-house",
+    propertyCode: "PA-1007",
     title: "Poolside Garden House",
     location: "Colombo 7",
     priceLkr: "LKR 160M",
@@ -167,6 +176,7 @@ export const FEATURED_PROPERTIES: Property[] = [
   },
   {
     id: "beachside-terrace-house",
+    propertyCode: "PA-1008",
     title: "Beachside Terrace House",
     location: "Mount Lavinia",
     priceLkr: "LKR 88M",

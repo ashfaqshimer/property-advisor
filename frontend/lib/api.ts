@@ -104,6 +104,7 @@ export type PropertyContact = {
 
 export type PropertyApiRecord = {
   id: string;
+  property_code: string;
   title: string;
   description: string;
   price: number | null;
@@ -141,6 +142,7 @@ export type PropertyApiRecord = {
 };
 
 export type CreatePropertyPayload = {
+  property_code?: string | null;
   title: string;
   description: string;
   listing_type: "sale" | "rent";
@@ -173,6 +175,7 @@ export type CreatePropertyPayload = {
 };
 
 export type AdminPropertyUpdatePayload = Partial<CreatePropertyPayload> & {
+  property_code?: string | null;
   is_price_per_perch?: boolean;
   land_size_perches?: number | null;
   parking_spaces?: number | null;

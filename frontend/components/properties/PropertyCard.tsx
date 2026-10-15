@@ -88,10 +88,17 @@ export default function PropertyCard({ property }: { property: Property }) {
           <div role="img" aria-label={property.imageAlt} className="size-full" />
         )}
 
-        <p className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-xs font-medium text-ink shadow-xs backdrop-blur-sm">
-          <PinIcon />
-          {property.location}
-        </p>
+        <div className="absolute top-3 inset-x-3 flex items-center justify-between pointer-events-none">
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-xs font-medium text-ink shadow-xs backdrop-blur-sm pointer-events-auto">
+            <PinIcon />
+            {property.location}
+          </p>
+          {property.propertyCode && (
+            <span className="inline-flex items-center rounded-full bg-ink/80 px-2.5 py-1 text-[11px] font-semibold tracking-wider text-white shadow-xs backdrop-blur-sm pointer-events-auto">
+              {property.propertyCode}
+            </span>
+          )}
+        </div>
 
         <p className="absolute bottom-3 left-3 inline-flex items-center rounded-xl bg-ink/80 px-3 py-1 text-xs font-medium text-white shadow-xs backdrop-blur-sm sm:hidden">
           Price on request • Ask Amaya
