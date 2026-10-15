@@ -374,3 +374,49 @@ def test_lpw_save_and_prospect_provenance(db_session, monkeypatch):
     assert p.ikman_ad_id == "lpw-5944600"
     assert p.classification == "owner"
     assert p.suburb == "Colombo 5"
+
+
+def test_fetch_prospect_contact_details_lpw_broker_auto_discard(db_session):
+    from app.services.prospect_contacts import fetch_prospect_contact_details
+
+    prospect = Prospect(
+        source="lpw",
+        source_id="5966897",
+        source_url="https://www.lankapropertyweb.com/sale/property_details-5966897.html",
+        title="Commercial property for sale in Colombo 8",
+        price="Rs. 900M",
+        location="Colombo 8",
+        property_type="commercial",
+        listing_type="sale",
+        classification="owner",
+        classification_method="heuristic",
+        confidence=75,
+        status="new",
+    )
+    db_session.add(prospect)
+    db_session.commit()
+    db_session.refresh(prospect)
+
+    mock_detail = LpwAdDetail(
+        id="5966897",
+        title=prospect.title,
+        url=prospect.source_url,
+        poster_name="Salinga Dissanayake",
+        phone_number="+94777557747",
+        agent_type="Agent",
+    )
+
+    async def _run():
+        with patch("app.services.prospect_contacts.LankaPropertyWebClient.fetch_ad_detail", new_callable=AsyncMock) as mock_fetch:
+            mock_fetch.return_value = mock_detail
+            updated = await fetch_prospect_contact_details(prospect, db_session)
+            assert updated is True
+
+            db_session.refresh(prospect)
+            assert prospect.poster_name == "Salinga Dissanayake"
+            assert prospect.phone_number == "+94777557747"
+            assert prospect.classification == "broker"
+            assert prospect.status == "discarded"
+            assert prospect.discard_reason == "broker_signal"
+
+    asyncio.run(_run())

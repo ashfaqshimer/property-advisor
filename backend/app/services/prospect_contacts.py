@@ -87,29 +87,34 @@ async def fetch_prospect_contact_details(
             if not detail:
                 return False
 
-            updated = False
             if detail.phone_number and prospect.phone_number != detail.phone_number:
                 prospect.phone_number = detail.phone_number
                 updated = True
             if detail.poster_name and prospect.poster_name != detail.poster_name:
                 prospect.poster_name = detail.poster_name
                 updated = True
-            if detail.agent_type:
-                dummy_ad = LpwAd(
-                    id=prospect.source_id or str(prospect.id),
-                    title=prospect.title,
-                    url=target_url,
-                )
-                c_cls, c_conf, c_reas = classify_lpw_listing_heuristics(dummy_ad, detail=detail)
-                if (
-                    prospect.classification != c_cls
-                    or prospect.confidence != c_conf
-                    or prospect.classification_reasons != c_reas
-                ):
-                    prospect.classification = c_cls
-                    prospect.confidence = c_conf
-                    prospect.classification_reasons = c_reas
-                    updated = True
+
+            dummy_ad = LpwAd(
+                id=prospect.source_id or str(prospect.id),
+                title=prospect.title,
+                url=target_url,
+            )
+            c_cls, c_conf, c_reas = classify_lpw_listing_heuristics(dummy_ad, detail=detail)
+            if (
+                prospect.classification != c_cls
+                or prospect.confidence != c_conf
+                or prospect.classification_reasons != c_reas
+            ):
+                prospect.classification = c_cls
+                prospect.confidence = c_conf
+                prospect.classification_reasons = c_reas
+                updated = True
+
+            # If confirmed as broker, automatically discard so it leaves the active outreach list
+            if c_cls == "broker" and prospect.status == "new":
+                prospect.status = "discarded"
+                prospect.discard_reason = "broker_signal"
+                updated = True
 
             if updated:
                 db.commit()
