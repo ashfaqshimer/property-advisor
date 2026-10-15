@@ -1594,6 +1594,20 @@ export default function ProspectsPage() {
                       ) : null}
                     </div>
 
+                    {/* WhatsApp 1-tap micro-action */}
+                    {prospect.phone_number && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenWhatsApp(prospect.phone_number)}
+                        className="min-h-[38px] w-10 p-0 text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-500/30 cursor-pointer shrink-0"
+                        title="Open WhatsApp chat"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+
                     {/* Secondary Actions Overflow Dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -2058,6 +2072,21 @@ export default function ProspectsPage() {
                               </Button>
                             )
                           ) : null}
+
+                          {/* WhatsApp 1-click icon button */}
+                          {prospect.phone_number && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenWhatsApp(prospect.phone_number);
+                              }}
+                              className="h-7 w-7 rounded-md inline-flex items-center justify-center transition-colors cursor-pointer text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/10 border border-emerald-500/20"
+                              title="Open WhatsApp chat"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </button>
+                          )}
 
                           {isAdminOrRoot && telegramShortlistConfigured && !isTerminal && (
                             <button

@@ -135,4 +135,25 @@ describe("ProspectQuickViewDrawer", () => {
 
     expect(screen.getByText("Shortlisted")).toBeInTheDocument();
   });
+
+  it("opens WhatsApp link when WhatsApp button is clicked", () => {
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    render(
+      <ProspectQuickViewDrawer
+        prospect={mockProspect}
+        isOpen={true}
+        onClose={vi.fn()}
+        onConvert={vi.fn()}
+        onUpdateStatus={vi.fn()}
+        onDiscard={vi.fn()}
+        onFetchPhone={vi.fn()}
+      />
+    );
+
+    const waButtons = screen.getAllByRole("button", { name: /whatsapp/i });
+    expect(waButtons.length).toBeGreaterThan(0);
+    fireEvent.click(waButtons[0]);
+    expect(windowOpenSpy).toHaveBeenCalledWith(expect.stringContaining("wa.me/94771234567"), "_blank");
+    windowOpenSpy.mockRestore();
+  });
 });

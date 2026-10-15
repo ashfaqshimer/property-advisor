@@ -592,6 +592,19 @@ export function ProspectQuickViewDrawer({
               </Button>
             )}
 
+            {prospect.phone_number && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOpenWhatsApp}
+                className="gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
+                title="Open WhatsApp chat"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                <span>WhatsApp</span>
+              </Button>
+            )}
+
             {prospect.status === "new" && (
               <Button
                 type="button"
