@@ -93,6 +93,42 @@ def test_send_shortlist_message_with_topic():
         assert sent_payload["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == "sl:uuid-1:keep"
 
 
+def test_send_shortlist_message_uses_telegram_chat_id_and_ignores_assignments_chat_id():
+    """Verify that when shortlist chat_id is omitted, it sends to TELEGRAM_CHAT_ID, NOT assignments_chat_id."""
+    with patch("app.services.telegram_dispatch.get_settings") as mock_settings, \
+         patch("httpx.Client.post") as mock_post:
+        mock_settings.return_value.telegram_bot_token = "123:TOKEN"
+        mock_settings.return_value.telegram_shortlist_chat_id = ""
+        mock_settings.return_value.telegram_shortlist_group_id = ""
+        mock_settings.return_value.telegram_shortlist_thread_id = 99
+        mock_settings.return_value.telegram_assignments_chat_id = "-100999999"  # agents chat group
+        mock_settings.return_value.telegram_chat_id = "-100111111"  # main telegram chat
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"ok": True, "result": {"message_id": 888}}
+        mock_post.return_value = mock_resp
+
+        msg_id = send_shortlist_message(
+            prospect_id="uuid-main",
+            poster_name="Owner",
+            phone_number="0771112233",
+            title="Apartment in Colombo",
+            location="Colombo",
+            price="Rs 35,000,000",
+            property_type="apartment",
+            listing_type="for_sale",
+            classification="owner",
+            confidence=95,
+        )
+
+        assert msg_id == 888
+        mock_post.assert_called_once()
+        sent_payload = mock_post.call_args[1]["json"]
+        # Must send to TELEGRAM_CHAT_ID (-100111111) with thread_id 99, NOT assignments (-100999999)
+        assert sent_payload["chat_id"] == "-100111111"
+        assert sent_payload["message_thread_id"] == 99
+
+
 def test_delete_telegram_message():
     with patch("httpx.Client.post") as mock_post:
         mock_resp = MagicMock()

@@ -431,7 +431,6 @@ def send_shortlist_message(
     chat_id = (
         str(getattr(settings, "telegram_shortlist_chat_id", "") or "").strip()
         or str(getattr(settings, "telegram_shortlist_group_id", "") or "").strip()
-        or str(getattr(settings, "telegram_assignments_chat_id", "") or "").strip()
         or str(getattr(settings, "telegram_chat_id", "") or "").strip()
     )
     raw_thread = getattr(settings, "telegram_shortlist_thread_id", None)

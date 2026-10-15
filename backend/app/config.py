@@ -96,7 +96,6 @@ class Settings(BaseSettings):
         return (
             self.telegram_shortlist_chat_id.strip()
             or self.telegram_shortlist_group_id.strip()
-            or self.telegram_assignments_chat_id.strip()
             or self.telegram_chat_id.strip()
         )
 
@@ -121,10 +120,10 @@ class Settings(BaseSettings):
 
     @property
     def telegram_shortlist_configured(self) -> bool:
-        return bool(
-            self.telegram_bot_token.strip()
-            and self.effective_shortlist_chat_id
-        )
+        has_token = bool(self.telegram_bot_token.strip())
+        has_dedicated_chat = bool(self.telegram_shortlist_chat_id.strip() or self.telegram_shortlist_group_id.strip())
+        has_main_chat_and_topic = bool(self.telegram_chat_id.strip() and self.effective_shortlist_thread_id is not None)
+        return has_token and (has_dedicated_chat or has_main_chat_and_topic)
 
     @property
     def cloudinary_configured(self) -> bool:
