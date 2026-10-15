@@ -314,7 +314,7 @@ export default function NewPropertyPage() {
 				? await uploadPropertyImages(images.map((image) => image.file))
 				: [];
 			const amenityNames = form.amenities.filter(Boolean);
-			await createProperty({
+			const created = await createProperty({
 				title: form.title.trim(),
 				description: form.description.trim(),
 				listing_type: form.listingType,
