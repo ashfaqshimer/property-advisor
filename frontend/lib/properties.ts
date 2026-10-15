@@ -32,12 +32,17 @@ export type Property = {
   listingType: "sale" | "rent";
 };
 
-export function formatPrice(price: number | null, currency: "LKR"): string {
+export function formatPrice(price: number | null, currency: "LKR" = "LKR"): string {
   if (price === null) {
     return "Price on request";
   }
-  if (price >= 1_000_000 && price % 1_000_000 === 0) {
-    return `${currency} ${(price / 1_000_000).toLocaleString("en-US")}M`;
+  if (price >= 1_000_000_000) {
+    const val = price / 1_000_000_000;
+    return `${currency} ${val.toLocaleString("en-US", { maximumFractionDigits: 2 })} Bn`;
+  }
+  if (price >= 1_000_000) {
+    const val = price / 1_000_000;
+    return `${currency} ${val.toLocaleString("en-US", { maximumFractionDigits: 2 })} Mn`;
   }
   return `${currency} ${price.toLocaleString("en-US")}`;
 }

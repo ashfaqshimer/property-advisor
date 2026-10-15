@@ -71,7 +71,7 @@ describe("FeaturedProperties", () => {
     });
 
     expect(screen.getByText("Modern Villa with Pool")).toBeInTheDocument();
-    expect(screen.getByText("LKR 45,000,000")).toBeInTheDocument();
+    expect(screen.getByText("LKR 45 Mn")).toBeInTheDocument();
     expect(screen.getByText("LKR 350,000 / month")).toBeInTheDocument();
     expect(screen.getByText("For Sale")).toBeInTheDocument();
     expect(screen.getByText("For Rent")).toBeInTheDocument();

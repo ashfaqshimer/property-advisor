@@ -45,7 +45,7 @@ const FALLBACK_FEATURED_ITEMS: FeaturedItem[] = [
     badge: "For Sale",
     badgeVariant: "sale",
     specs: ["3 Bed", "2 Bath", "1,800 sq ft"],
-    price: "LKR 38,000,000",
+    price: "LKR 38 Mn",
     imageUrl: "/images/apartment_colombo03.jpg",
     imageAlt: "Modern luxury apartment living room with panoramic glass balcony",
   },
@@ -57,7 +57,7 @@ const FALLBACK_FEATURED_ITEMS: FeaturedItem[] = [
     badge: "For Sale",
     badgeVariant: "sale",
     specs: ["4 Bed", "3 Bath", "3,500 sq ft"],
-    price: "LKR 65,000,000",
+    price: "LKR 65 Mn",
     imageUrl: "/images/house_nugegoda.jpg",
     imageAlt: "Contemporary architect-designed house with warm exterior lighting and garden",
   },
@@ -81,7 +81,7 @@ const FALLBACK_FEATURED_ITEMS: FeaturedItem[] = [
     badge: "For Sale",
     badgeVariant: "sale",
     specs: ["0.5 Acres"],
-    price: "LKR 22,000,000",
+    price: "LKR 22 Mn",
     imageUrl: "/images/galle_land.jpg",
     imageAlt: "Pristine coastal headland and turquoise beach bay in Galle Sri Lanka",
   },
@@ -153,15 +153,22 @@ function formatSpecs(record: PropertyApiRecord): string[] {
 }
 
 function formatPrice(record: PropertyApiRecord): string {
-  if (record.price === null) {
+  if (record.price === null || record.price === undefined) {
     return "Price on request";
   }
   const currency = record.currency || "LKR";
-  const formatted = `${currency} ${record.price.toLocaleString("en-US")}`;
   if (record.listing_type === "rent") {
-    return `${formatted} / month`;
+    return `${currency} ${record.price.toLocaleString("en-US")} / month`;
   }
-  return formatted;
+  if (record.price >= 1_000_000_000) {
+    const val = record.price / 1_000_000_000;
+    return `${currency} ${val.toLocaleString("en-US", { maximumFractionDigits: 2 })} Bn`;
+  }
+  if (record.price >= 1_000_000) {
+    const val = record.price / 1_000_000;
+    return `${currency} ${val.toLocaleString("en-US", { maximumFractionDigits: 2 })} Mn`;
+  }
+  return `${currency} ${record.price.toLocaleString("en-US")}`;
 }
 
 function mapRecordToFeaturedItem(record: PropertyApiRecord): FeaturedItem {
@@ -506,15 +513,19 @@ export default function FeaturedProperties({
                       />
                     </Link>
 
-                    {/* Badge: For Sale / For Rent + Ref Code */}
-                    <div className="absolute bottom-3 left-3 flex items-center gap-1.5 pointer-events-none">
-                      <Badge variant={item.badgeVariant}>{item.badge}</Badge>
-                      {item.propertyCode && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-ink/80 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-2xs font-mono">
+                    {/* Top-left: Property Ref Code */}
+                    {item.propertyCode && (
+                      <div className="absolute top-3 left-3 z-10 pointer-events-none">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-1 text-[11px] font-mono font-medium text-white shadow-2xs">
                           <span className="text-[9px] uppercase tracking-wider text-neutral-300 font-sans">Ref</span>
                           <span>{item.propertyCode}</span>
                         </span>
-                      )}
+                      </div>
+                    )}
+
+                    {/* Badge: For Sale / For Rent */}
+                    <div className="absolute bottom-3 left-3 pointer-events-none">
+                      <Badge variant={item.badgeVariant}>{item.badge}</Badge>
                     </div>
 
                     {/* Heart Favorite Button */}
@@ -541,12 +552,6 @@ export default function FeaturedProperties({
 
                   {/* Details */}
                   <div className="flex flex-1 flex-col p-5">
-                    {item.propertyCode && (
-                      <div className="mb-1 flex items-center gap-1 text-[11px] font-bold font-mono text-emerald-800 dark:text-emerald-400">
-                        <span className="text-[10px] uppercase font-semibold text-neutral-400 font-sans tracking-wider">Ref:</span>
-                        <span>{item.propertyCode}</span>
-                      </div>
-                    )}
                     <h3 className="font-semibold text-base text-ink line-clamp-1 group-hover:text-brand transition-colors">
                       <Link href={`/properties/${item.id}`} className="hover:underline">
                         {item.title}
@@ -583,42 +588,41 @@ export default function FeaturedProperties({
                       ))}
                     </div>
 
-                    {/* Footer: Price + Concept A "Ask Amaya" Action Button */}
-                    <div className="mt-auto pt-4 border-t border-neutral-100 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
-                          Price
-                        </span>
-                        <p className="font-bold text-sm sm:text-base text-ink truncate">
-                          {item.price}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAskAmayaAboutProperty(item);
-                        }}
-                        aria-label={`Ask Amaya about ${item.title}`}
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-brand/20 bg-brand/5 px-2.5 py-1.5 text-xs font-semibold text-brand transition-all hover:border-brand hover:bg-brand hover:text-white active:scale-95 shadow-2xs shrink-0"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="size-3.5"
-                          aria-hidden="true"
-                        >
-                          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1-1.3-1.3Z" />
-                        </svg>
-                        <span>Ask Amaya</span>
-                      </button>
+                    {/* Footer: Price */}
+                    <div className="mt-auto pt-4 border-t border-neutral-100">
+                      <span className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                        Guide Price
+                      </span>
+                      <p className="font-bold text-base sm:text-lg text-ink">
+                        {item.price}
+                      </p>
                     </div>
                   </div>
+
+                  {/* Full-width "Ask Amaya" Action Bar */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAskAmayaAboutProperty(item);
+                    }}
+                    aria-label={`Ask Amaya about ${item.title}`}
+                    className="flex w-full items-center justify-center gap-2 border-t border-neutral-100 bg-neutral-50/80 px-4 py-2.5 text-xs font-semibold text-brand transition-colors hover:bg-brand hover:text-white cursor-pointer group/cta"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="size-3.5 transition-transform group-hover/cta:scale-110"
+                      aria-hidden="true"
+                    >
+                      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1-1.3-1.3Z" />
+                    </svg>
+                    <span>Ask Amaya about this property</span>
+                  </button>
                 </article>
               );
             })}

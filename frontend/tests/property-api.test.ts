@@ -157,7 +157,7 @@ describe("property mapping", () => {
       title: "Garden Villa",
       description: "A bright villa.",
       location: "Colombo 7",
-      priceLkr: "LKR 185M",
+      priceLkr: "LKR 185 Mn",
       beds: 3,
       baths: null,
       sqft: null,
@@ -168,8 +168,8 @@ describe("property mapping", () => {
     });
   });
 
-  it("formats non-million prices without rounding them away", () => {
-    expect(formatPrice(185500000, "LKR")).toBe("LKR 185,500,000");
+  it("formats large prices with Mn suffix", () => {
+    expect(formatPrice(185500000, "LKR")).toBe("LKR 185.5 Mn");
   });
 
   it("formats null price as Price on request", () => {
