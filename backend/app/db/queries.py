@@ -106,14 +106,20 @@ def search_properties(
         geo_match = func.ST_DWithin(property_point, search_point, radius_km * 1000)
         if location:
             term = f"%{location.strip()}%"
-            text_match = Property.title.ilike(term) | Property.location.ilike(term)
+            text_match = (
+                Property.title.ilike(term)
+                | Property.location.ilike(term)
+                | Property.property_code.ilike(term)
+            )
             stmt = stmt.where(geo_match | text_match)
         else:
             stmt = stmt.where(geo_match)
     elif location:
         term = f"%{location.strip()}%"
         stmt = stmt.where(
-            Property.title.ilike(term) | Property.location.ilike(term)
+            Property.title.ilike(term)
+            | Property.location.ilike(term)
+            | Property.property_code.ilike(term)
         )
     if budget_min is not None:
         stmt = stmt.where(Property.price >= budget_min)
@@ -128,10 +134,12 @@ def search_properties(
 
     if location:
         term = f"%{location.strip()}%"
+        code_exact = location.strip().upper()
         text_priority = case(
-            (Property.title.ilike(term), 0),
-            (Property.location.ilike(term), 1),
-            else_=2,
+            (func.upper(Property.property_code) == code_exact, 0),
+            (Property.title.ilike(term), 1),
+            (Property.location.ilike(term), 2),
+            else_=3,
         )
         stmt = stmt.order_by(text_priority, Property.created_at.desc(), Property.id)
     else:

@@ -165,6 +165,32 @@ class TestPropertyDetails:
 
         assert "error" in result
 
+    def test_returns_a_current_listing_by_property_code(self, seeded: Session):
+        prop = seeded.execute(select(Property)).scalars().first()
+        result = tools.get_property_details(
+            _context(seeded), {"property_code": prop.property_code}
+        )
+
+        assert result["found"] is True
+        assert result["property"]["property_code"] == prop.property_code
+        assert result["property"]["title"] == prop.title
+
+    def test_returns_a_current_listing_by_property_id_containing_code(self, seeded: Session):
+        prop = seeded.execute(select(Property)).scalars().first()
+        result = tools.get_property_details(
+            _context(seeded), {"property_id": prop.property_code.lower()}
+        )
+
+        assert result["found"] is True
+        assert result["property"]["property_code"] == prop.property_code
+
+    def test_unmatched_code_returns_not_found(self, seeded: Session):
+        result = tools.get_property_details(
+            _context(seeded), {"property_code": "PA-9999"}
+        )
+        assert result["found"] is False
+        assert "no longer available" in result["guidance"].lower()
+
 
 class TestZeroMatches:
     """The regression guard the project owner asked for specifically.

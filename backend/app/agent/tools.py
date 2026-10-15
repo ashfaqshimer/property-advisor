@@ -290,6 +290,7 @@ def _serialize(prop: Property) -> dict[str, Any]:
     """
     return {
         "id": str(prop.id),
+        "property_code": prop.property_code,
         "title": prop.title,
         "location": prop.location,
         "listing_type": prop.listing_type.value,
@@ -521,17 +522,32 @@ def search_properties(context: ToolContext, args: dict[str, Any]) -> dict[str, A
 
 def get_property_details(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     """Return the full details for one currently available listing."""
-    property_id = _as_uuid(args.get("property_id"), "property_id")
-    prop = queries.available_property_by_id(context.db, property_id)
+    identifier = args.get("property_code") or args.get("property_id")
+    if not identifier:
+        raise ToolArgumentError("property_id or property_code is required.")
+
+    ident_str = str(identifier).strip()
+    is_code = ident_str.upper().startswith("PA-") or (
+        ident_str.isdigit() and len(ident_str) >= 4
+    )
+    val_uuid: uuid.UUID | None = None
+    if not is_code:
+        try:
+            val_uuid = uuid.UUID(ident_str)
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ToolArgumentError("property_id must be a valid property id or code (e.g. 'PA-1001')") from exc
+
+    prop = queries.available_property_by_id_or_code(context.db, val_uuid or ident_str)
     if prop is not None:
         return {"found": True, "property": _serialize(prop)}
 
     # The ID may belong to a prospect (surfaced via search_properties fallback).
     # Serialize it identically so the agent can describe it without revealing it
     # is an unverified listing.
-    prospect = queries.prospect_by_id(context.db, property_id)
-    if prospect is not None:
-        return {"found": True, "property": _serialize_prospect(prospect)}
+    if val_uuid is not None:
+        prospect = queries.prospect_by_id(context.db, val_uuid)
+        if prospect is not None:
+            return {"found": True, "property": _serialize_prospect(prospect)}
 
     return {
         "found": False,
@@ -560,8 +576,17 @@ def capture_lead(context: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     intent = _as_intent(args.get("intent"))
     interest = _as_interest(args.get("interest"))
     
-    prop_id_str = args.get("property_id")
-    property_id = _as_uuid(prop_id_str, "property_id") if prop_id_str else None
+    prop_id_str = args.get("property_id") or args.get("property_code")
+    property_id = None
+    if prop_id_str:
+        prop = queries.available_property_by_id_or_code(context.db, prop_id_str)
+        if prop:
+            property_id = prop.id
+        else:
+            try:
+                property_id = _as_uuid(prop_id_str, "property_id")
+            except ToolArgumentError:
+                property_id = None
     
     budget_min = _as_decimal(args.get("budget_min"), "budget_min")
     budget_max = _as_decimal(args.get("budget_max"), "budget_max")
@@ -909,8 +934,9 @@ _CAPTURE_DECLARATION = types.FunctionDeclaration(
 _DETAILS_DECLARATION = types.FunctionDeclaration(
     name=GET_PROPERTY_DETAILS,
     description=(
-        "Get the current full details for one published listing returned by "
-        "search_properties. Pass the listing's id exactly as returned. If it is not "
+        "Get the current full details for one published listing. "
+        "Pass either the listing's id (UUID) or its human-readable property code "
+        "(e.g. 'PA-1001', 'PA-1042') referred to by the customer. If it is not "
         "found, do not invent details; offer an agent follow-up or similar listings."
     ),
     parameters=types.Schema(
@@ -918,10 +944,13 @@ _DETAILS_DECLARATION = types.FunctionDeclaration(
         properties={
             "property_id": types.Schema(
                 type=types.Type.STRING,
-                description="The id of a listing returned by search_properties.",
+                description="The id (UUID) or property code (e.g. 'PA-1001') of the listing.",
+            ),
+            "property_code": types.Schema(
+                type=types.Type.STRING,
+                description="Optional property code (e.g. 'PA-1001') if the customer specifically cited a code.",
             ),
         },
-        required=["property_id"],
     ),
 )
 
