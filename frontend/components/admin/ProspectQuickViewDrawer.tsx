@@ -34,6 +34,7 @@ import {
   Layers,
   Star,
 } from "lucide-react";
+import { IoLogoWhatsapp } from "react-icons/io";
 
 import { Prospect } from "@/lib/api";
 import {
@@ -344,7 +345,7 @@ export function ProspectQuickViewDrawer({
                     onClick={handleOpenWhatsApp}
                     className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9"
                   >
-                    <MessageCircle className="h-4 w-4" />
+                    <IoLogoWhatsapp className="h-4 w-4 text-white" />
                     <span>WhatsApp Chat</span>
                   </Button>
 
@@ -600,7 +601,7 @@ export function ProspectQuickViewDrawer({
                 className="gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
                 title="Open WhatsApp chat"
               >
-                <MessageCircle className="h-3.5 w-3.5" />
+                <IoLogoWhatsapp className="h-3.5 w-3.5 text-[#25D366]" />
                 <span>WhatsApp</span>
               </Button>
             )}

@@ -36,6 +36,7 @@ import {
   Building2,
   Star,
 } from "lucide-react";
+import { IoLogoWhatsapp } from "react-icons/io";
 
 import {
   Table,
@@ -1437,14 +1438,36 @@ export default function ProspectsPage() {
                                 e.stopPropagation();
                                 handleOpenWhatsApp(prospect.phone_number);
                               }}
-                              className="p-0.5 text-emerald-600/70 hover:text-emerald-600 transition cursor-pointer rounded"
+                              className="p-0.5 text-[#25D366] hover:opacity-80 transition cursor-pointer rounded"
                               title="Open WhatsApp chat"
+                              aria-label="Open WhatsApp chat"
                             >
-                              <MessageCircle className="h-3 w-3" />
+                              <IoLogoWhatsapp className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         ) : (
-                          <span className="italic text-muted-foreground text-[11px]">No phone number</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="italic text-muted-foreground text-[11px]">No phone</span>
+                            {(prospect.classification === "owner" || prospect.source === "ikman") && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFetchSinglePhone(prospect.id);
+                                }}
+                                disabled={fetchingPhoneId === prospect.id}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 cursor-pointer"
+                                title="Fetch phone number from portal"
+                              >
+                                {fetchingPhoneId === prospect.id ? (
+                                  <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                                ) : (
+                                  <PhoneCall className="h-2.5 w-2.5 text-emerald-600" />
+                                )}
+                                <span>Fetch Phone</span>
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1517,61 +1540,13 @@ export default function ProspectsPage() {
                           <span>Mark Contacted</span>
                         </Button>
                       ) : prospect.status === "new" ? (
-                        isAdminOrRoot && telegramShortlistConfigured ? (
-                          <Button
-                            type="button"
-                            variant="default"
-                            onClick={() => handleSingleShortlistDispatch(prospect.id)}
-                            disabled={isShortlisting}
-                            className="w-full min-h-[38px] text-xs font-semibold gap-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-xs cursor-pointer"
-                          >
-                            <Star className="h-3.5 w-3.5 fill-zinc-950" />
-                            <span>Shortlist on Telegram</span>
-                          </Button>
-                        ) : prospect.phone_number ? (
-                          isAdminOrRoot && telegramAgentConfigured ? (
-                            prospect.assignment_status === "pending" ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => handleUpdateStatus(prospect.id, "contacted")}
-                                disabled={updatingStatusId === prospect.id}
-                                className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
-                              >
-                                <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                                <span>Mark Contacted</span>
-                              </Button>
-                            ) : (
-                              <Button
-                                type="button"
-                                variant="default"
-                                onClick={() => handleSingleAssign(prospect.id)}
-                                disabled={isAssigning}
-                                className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                                <span>Dispatch to Agent</span>
-                              </Button>
-                            )
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => handleUpdateStatus(prospect.id, "contacted")}
-                              disabled={updatingStatusId === prospect.id}
-                              className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
-                            >
-                              <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                              <span>Mark Contacted</span>
-                            </Button>
-                          )
-                        ) : prospect.classification === "owner" ? (
+                        !prospect.phone_number && (prospect.classification === "owner" || prospect.source === "ikman") ? (
                           <Button
                             type="button"
                             variant="outline"
                             onClick={() => handleFetchSinglePhone(prospect.id)}
                             disabled={fetchingPhoneId === prospect.id}
-                            className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
+                            className="w-full min-h-[38px] text-xs font-semibold gap-1.5 text-emerald-700 dark:text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer"
                           >
                             {fetchingPhoneId === prospect.id ? (
                               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -1586,8 +1561,9 @@ export default function ProspectsPage() {
                             variant="outline"
                             onClick={() => handleUpdateStatus(prospect.id, "contacted")}
                             disabled={updatingStatusId === prospect.id}
-                            className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
+                            className="w-full min-h-[38px] text-xs font-semibold gap-1.5 cursor-pointer"
                           >
+                            <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                             <span>Mark Contacted</span>
                           </Button>
                         )
@@ -1603,8 +1579,29 @@ export default function ProspectsPage() {
                         onClick={() => handleOpenWhatsApp(prospect.phone_number)}
                         className="min-h-[38px] w-10 p-0 text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-500/30 cursor-pointer shrink-0"
                         title="Open WhatsApp chat"
+                        aria-label="Open WhatsApp chat"
                       >
-                        <MessageCircle className="h-4 w-4" />
+                        <IoLogoWhatsapp className="h-4 w-4 text-[#25D366]" />
+                      </Button>
+                    )}
+
+                    {/* Shortlist to Telegram 1-tap micro-action icon button */}
+                    {isAdminOrRoot && telegramShortlistConfigured && !isTerminal && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSingleShortlistDispatch(prospect.id)}
+                        disabled={isShortlisting}
+                        className={`min-h-[38px] w-10 p-0 cursor-pointer shrink-0 ${
+                          prospect.status === "shortlisted"
+                            ? "text-amber-500 border-amber-500/40 bg-amber-500/10"
+                            : "text-muted-foreground hover:text-amber-500 hover:border-amber-500/30"
+                        }`}
+                        title={prospect.status === "shortlisted" ? "Already Shortlisted" : "Shortlist on Telegram"}
+                        aria-label="Shortlist on Telegram"
+                      >
+                        <Star className={`h-4 w-4 ${prospect.status === "shortlisted" ? "fill-amber-500 text-amber-500" : ""}`} />
                       </Button>
                     )}
 
@@ -1634,7 +1631,7 @@ export default function ProspectsPage() {
                               <span>Copy Phone</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleOpenWhatsApp(prospect.phone_number)}>
-                              <MessageCircle className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                              <IoLogoWhatsapp className="h-3.5 w-3.5 mr-2 text-[#25D366]" />
                               <span>WhatsApp Chat</span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -1925,10 +1922,11 @@ export default function ProspectsPage() {
                                     e.stopPropagation();
                                     handleOpenWhatsApp(prospect.phone_number);
                                   }}
-                                  className="p-0.5 text-emerald-600/70 hover:text-emerald-600 transition cursor-pointer rounded"
+                                  className="p-0.5 text-[#25D366] hover:opacity-80 transition cursor-pointer rounded"
                                   title="Open WhatsApp chat"
+                                  aria-label="Open WhatsApp chat"
                                 >
-                                  <MessageCircle className="h-3 w-3" />
+                                  <IoLogoWhatsapp className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             ) : (
@@ -2005,57 +2003,13 @@ export default function ProspectsPage() {
                               <span>Contacted</span>
                             </Button>
                           ) : prospect.status === "new" ? (
-                            isAdminOrRoot && telegramShortlistConfigured ? (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => handleSingleShortlistDispatch(prospect.id)}
-                                disabled={isShortlisting}
-                                className="h-7 gap-1 px-2.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 cursor-pointer shadow-xs"
-                                title="Send to personal Telegram shortlist topic"
-                              >
-                                <Star className="h-3 w-3 fill-zinc-950" />
-                                <span>Shortlist</span>
-                              </Button>
-                            ) : prospect.phone_number ? (
-                              isAdminOrRoot && telegramAgentConfigured ? (
-                                prospect.assignment_status === "pending" ? (
-                                  <Badge variant="warning" className="h-7 gap-1 px-2 text-[11px] font-medium" title="Dispatched to field agent">
-                                    <Clock className="h-3 w-3" />
-                                    <span>Assigned</span>
-                                  </Badge>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => handleSingleAssign(prospect.id)}
-                                    disabled={isAssigning}
-                                    className="h-7 gap-1 px-2.5 text-xs font-semibold cursor-pointer"
-                                    title="Dispatch to agent via Telegram"
-                                  >
-                                    <Send className="h-3 w-3" />
-                                    <span>Assign</span>
-                                  </Button>
-                                )
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleUpdateStatus(prospect.id, "contacted")}
-                                  disabled={updatingStatusId === prospect.id}
-                                  className="h-7 gap-1 px-2.5 text-xs font-semibold cursor-pointer"
-                                >
-                                  <PhoneCall className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                                  <span>Contacted</span>
-                                </Button>
-                              )
-                            ) : prospect.classification === "owner" ? (
+                            !prospect.phone_number && (prospect.classification === "owner" || prospect.source === "ikman") ? (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleFetchSinglePhone(prospect.id)}
                                 disabled={fetchingPhoneId === prospect.id}
-                                className="h-7 gap-1 px-2 text-xs font-medium cursor-pointer"
+                                className="h-7 gap-1 px-2 text-xs font-medium cursor-pointer text-emerald-700 dark:text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10"
                               >
                                 {fetchingPhoneId === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <PhoneCall className="h-3 w-3 text-emerald-600" />}
                                 <span>{fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch Phone"}</span>
@@ -2066,8 +2020,9 @@ export default function ProspectsPage() {
                                 variant="outline"
                                 onClick={() => handleUpdateStatus(prospect.id, "contacted")}
                                 disabled={updatingStatusId === prospect.id}
-                                className="h-7 gap-1 px-2 text-xs font-medium cursor-pointer"
+                                className="h-7 gap-1 px-2.5 text-xs font-semibold cursor-pointer"
                               >
+                                <PhoneCall className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                                 <span>Contacted</span>
                               </Button>
                             )
@@ -2081,10 +2036,11 @@ export default function ProspectsPage() {
                                 e.stopPropagation();
                                 handleOpenWhatsApp(prospect.phone_number);
                               }}
-                              className="h-7 w-7 rounded-md inline-flex items-center justify-center transition-colors cursor-pointer text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/10 border border-emerald-500/20"
+                              className="h-7 w-7 rounded-md inline-flex items-center justify-center transition-colors cursor-pointer text-[#25D366] hover:bg-emerald-500/10 border border-emerald-500/20"
                               title="Open WhatsApp chat"
+                              aria-label="Open WhatsApp chat"
                             >
-                              <MessageCircle className="h-3.5 w-3.5" />
+                              <IoLogoWhatsapp className="h-3.5 w-3.5" />
                             </button>
                           )}
 
@@ -2133,7 +2089,7 @@ export default function ProspectsPage() {
                                     <span>Copy Phone</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleOpenWhatsApp(prospect.phone_number)} className="cursor-pointer">
-                                    <MessageCircle className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                                    <IoLogoWhatsapp className="h-3.5 w-3.5 mr-2 text-[#25D366]" />
                                     <span>WhatsApp Chat</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
