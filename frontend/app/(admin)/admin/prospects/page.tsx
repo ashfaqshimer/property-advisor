@@ -34,6 +34,7 @@ import {
   Eye,
   User,
   Building2,
+  Star,
 } from "lucide-react";
 
 import {
@@ -77,6 +78,7 @@ import {
   getProspectMetrics,
   bulkUpdateProspects,
   ProspectMetrics,
+  dispatchProspectsToShortlist,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
@@ -142,12 +144,45 @@ export default function ProspectsPage() {
   const isAdminOrRoot = user?.role === "admin" || user?.role === "root";
 
   const [telegramAgentConfigured, setTelegramAgentConfigured] = useState(false);
+  const [telegramShortlistConfigured, setTelegramShortlistConfigured] = useState(false);
   const [selectedProspectIds, setSelectedProspectIds] = useState<Set<string>>(new Set());
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isShortlisting, setIsShortlisting] = useState(false);
   const [metrics, setMetrics] = useState<ProspectMetrics | null>(null);
   const [isBulkDiscardOpen, setIsBulkDiscardOpen] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isBulkFetchingPhones, setIsBulkFetchingPhones] = useState(false);
+
+  const handleBulkShortlistDispatch = async () => {
+    if (selectedProspectIds.size === 0) return;
+    setIsShortlisting(true);
+    try {
+      const ids = Array.from(selectedProspectIds);
+      const result = await dispatchProspectsToShortlist(ids);
+      toast.success(`Dispatched ${result.dispatched} prospect(s) to Telegram Shortlist topic.`);
+      setSelectedProspectIds(new Set());
+    } catch (err: any) {
+      toast.error(err.message || "Failed to dispatch to Telegram shortlist topic.");
+    } finally {
+      setIsShortlisting(false);
+    }
+  };
+
+  const handleSingleShortlistDispatch = async (prospectId: string) => {
+    setIsShortlisting(true);
+    try {
+      const result = await dispatchProspectsToShortlist([prospectId]);
+      if (result.dispatched > 0) {
+        toast.success("Dispatched to Telegram Shortlist topic.");
+      } else {
+        toast.error("Failed to send prospect to Telegram.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to dispatch to Telegram shortlist topic.");
+    } finally {
+      setIsShortlisting(false);
+    }
+  };
 
   const toggleSelectProspect = (id: string) => {
     setSelectedProspectIds((prev) => {
@@ -484,6 +519,9 @@ export default function ProspectsPage() {
       if (typeof data.telegram_agent_configured === "boolean") {
         setTelegramAgentConfigured(data.telegram_agent_configured);
       }
+      if (typeof data.telegram_shortlist_configured === "boolean") {
+        setTelegramShortlistConfigured(data.telegram_shortlist_configured);
+      }
     } catch (err) {
       toast.error("Failed to load prospects");
     } finally {
@@ -726,6 +764,14 @@ export default function ProspectsPage() {
         <Badge variant="info" className="gap-1 text-xs font-medium shrink-0">
           <PhoneCall className="h-3 w-3" />
           Contacted
+        </Badge>
+      );
+    }
+    if (prospect.status === "shortlisted") {
+      return (
+        <Badge variant="outline" className="gap-1 text-xs font-semibold border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300 shrink-0">
+          <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+          Shortlisted
         </Badge>
       );
     }
@@ -1037,6 +1083,7 @@ export default function ProspectsPage() {
           <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
             {[
               { id: "new", label: "New Leads", count: metrics?.new_count },
+              { id: "shortlisted", label: "Shortlisted", count: metrics?.shortlisted_count },
               { id: "contacted", label: "Contacted", count: metrics?.contacted_count },
               { id: "converted", label: "Converted", count: metrics?.converted_count },
               { id: "discarded", label: "Discarded", count: metrics?.discarded_count },
@@ -1053,6 +1100,8 @@ export default function ProspectsPage() {
                         ? "bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800 shadow-xs"
                         : tab.id === "converted"
                         ? "bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800 shadow-xs"
+                        : tab.id === "shortlisted"
+                        ? "bg-amber-500 text-zinc-950 border border-amber-600 shadow-xs font-bold"
                         : "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                   }`}
@@ -1066,6 +1115,8 @@ export default function ProspectsPage() {
                             ? "bg-amber-200 text-amber-950 dark:bg-amber-800 dark:text-amber-100"
                             : tab.id === "converted"
                             ? "bg-emerald-200 text-emerald-950 dark:bg-emerald-800 dark:text-emerald-100"
+                            : tab.id === "shortlisted"
+                            ? "bg-zinc-950/20 text-zinc-950"
                             : "bg-primary-foreground/20 text-primary-foreground"
                           : "bg-muted text-muted-foreground"
                       }`}
@@ -1434,6 +1485,17 @@ export default function ProspectsPage() {
                             <span>Converted to Listing</span>
                           </Badge>
                         </div>
+                      ) : prospect.status === "shortlisted" ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                          disabled={updatingStatusId === prospect.id}
+                          className="w-full min-h-[38px] text-xs font-semibold gap-1.5 border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                        >
+                          <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                          <span>Mark Contacted</span>
+                        </Button>
                       ) : prospect.status === "new" ? (
                         prospect.phone_number ? (
                           isAdminOrRoot && telegramAgentConfigured ? (
@@ -1573,6 +1635,12 @@ export default function ProspectsPage() {
                               </DropdownMenuItem>
                             )}
                           </>
+                        )}
+                        {isAdminOrRoot && telegramShortlistConfigured && !isTerminal && (
+                          <DropdownMenuItem onClick={() => handleSingleShortlistDispatch(prospect.id)}>
+                            <Star className="h-3.5 w-3.5 mr-2 text-amber-500" />
+                            <span>Shortlist on Telegram</span>
+                          </DropdownMenuItem>
                         )}
                         {isDiscarded ? (
                           <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "new")}>
@@ -1880,6 +1948,17 @@ export default function ProspectsPage() {
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               <span>Ready</span>
                             </span>
+                          ) : prospect.status === "shortlisted" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                              disabled={updatingStatusId === prospect.id}
+                              className="h-7 gap-1 px-2.5 text-xs font-semibold border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 cursor-pointer"
+                            >
+                              <PhoneCall className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                              <span>Contacted</span>
+                            </Button>
                           ) : prospect.status === "new" ? (
                             prospect.phone_number ? (
                               isAdminOrRoot && telegramAgentConfigured ? (
@@ -2010,6 +2089,12 @@ export default function ProspectsPage() {
                                   )}
                                 </>
                               )}
+                              {isAdminOrRoot && telegramShortlistConfigured && !isTerminal && (
+                                <DropdownMenuItem onClick={() => handleSingleShortlistDispatch(prospect.id)} className="cursor-pointer">
+                                  <Star className="h-3.5 w-3.5 mr-2 text-amber-500" />
+                                  <span>Shortlist on Telegram</span>
+                                </DropdownMenuItem>
+                              )}
                               {isDiscarded ? (
                                 <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "new")} className="text-emerald-600 cursor-pointer">
                                   <Undo2 className="h-3.5 w-3.5 mr-2" />
@@ -2091,12 +2176,25 @@ export default function ProspectsPage() {
             <button
               type="button"
               onClick={handleBulkAssign}
-              disabled={isAssigning || isBulkUpdating || isBulkFetchingPhones}
+              disabled={isAssigning || isShortlisting || isBulkUpdating || isBulkFetchingPhones}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold px-3 py-1.5 text-xs shadow transition disabled:opacity-50 cursor-pointer"
               title="Dispatch selected prospects to Telegram field agent"
             >
               <Send className="h-3.5 w-3.5" />
               <span>{isAssigning ? "Dispatching..." : "Dispatch to Agent"}</span>
+            </button>
+          )}
+
+          {telegramShortlistConfigured && (
+            <button
+              type="button"
+              onClick={handleBulkShortlistDispatch}
+              disabled={isAssigning || isShortlisting || isBulkUpdating || isBulkFetchingPhones}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-3 py-1.5 text-xs shadow transition disabled:opacity-50 cursor-pointer"
+              title="Dispatch selected prospects to Telegram shortlist review topic"
+            >
+              <Star className="h-3.5 w-3.5 fill-zinc-950" />
+              <span>{isShortlisting ? "Sending..." : "Shortlist on TG"}</span>
             </button>
           )}
 
@@ -2396,11 +2494,13 @@ export default function ProspectsPage() {
         onDiscard={(p) => setDiscardModalProspect(p)}
         onFetchPhone={handleFetchSinglePhone}
         onAssignToAgent={isAdminOrRoot && telegramAgentConfigured ? handleSingleAssign : undefined}
+        onShortlistOnTelegram={isAdminOrRoot && telegramShortlistConfigured ? handleSingleShortlistDispatch : undefined}
         onEditAssignment={handleOpenEditAssignment}
         isFetchingPhone={fetchingPhoneId === quickViewProspect?.id}
         isConverting={draftLoading === quickViewProspect?.id}
         isAdminOrRoot={isAdminOrRoot}
         telegramAgentConfigured={telegramAgentConfigured}
+        telegramShortlistConfigured={telegramShortlistConfigured}
       />
     </div>
   );

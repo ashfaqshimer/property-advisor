@@ -26,6 +26,7 @@ from app.schemas.prospect import (
     ProspectUpdate,
     ProspectBulkUpdate,
     ProspectMetrics,
+    ProspectShortlistDispatch,
     ScanRequest,
     ProspectList,
     ScanJobRead,
@@ -47,6 +48,7 @@ from app.services.prospect_contacts import (
     _enrich_location_from_detail,
     fetch_prospect_contact_details,
 )
+from app.services.telegram_dispatch import send_shortlist_message
 import json
 
 logger = structlog.get_logger(__name__)
@@ -1252,6 +1254,7 @@ def get_prospect_metrics(
     metrics_stmt = select(
         func.count(case((Prospect.status.notin_(TERMINAL_STATUSES), 1))).label("total_active"),
         func.count(case((Prospect.status == "new", 1))).label("new_count"),
+        func.count(case((Prospect.status == "shortlisted", 1))).label("shortlisted_count"),
         func.count(case((Prospect.status == "contacted", 1))).label("contacted_count"),
         func.count(case((Prospect.status == "converted", 1))).label("converted_count"),
         func.count(case((Prospect.status == "discarded", 1))).label("discarded_count"),
@@ -1271,6 +1274,7 @@ def get_prospect_metrics(
     return {
         "total_active": row.total_active or 0,
         "new_count": row.new_count or 0,
+        "shortlisted_count": row.shortlisted_count or 0,
         "contacted_count": row.contacted_count or 0,
         "converted_count": row.converted_count or 0,
         "discarded_count": row.discarded_count or 0,
@@ -1536,6 +1540,7 @@ def list_prospects(
             reads.sort(key=lambda r: (r.price_diff_percent is None, r.price_diff_percent if r.price_diff_percent is not None else 999))
         settings = get_settings()
         tg_configured = settings.telegram_field_dispatch_configured
+        tg_shortlist_configured = settings.telegram_shortlist_configured
         return {
             "items": reads,
             "total": len(reads) if price_grade else total,
@@ -1543,6 +1548,7 @@ def list_prospects(
             "page_size": 100,
             "total_pages": 1,
             "telegram_agent_configured": tg_configured,
+            "telegram_shortlist_configured": tg_shortlist_configured,
         }
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -1563,6 +1569,7 @@ def list_prospects(
 
     settings = get_settings()
     tg_configured = settings.telegram_field_dispatch_configured
+    tg_shortlist_configured = settings.telegram_shortlist_configured
 
     return {
         "items": reads,
@@ -1571,6 +1578,7 @@ def list_prospects(
         "page_size": page_size,
         "total_pages": total_pages,
         "telegram_agent_configured": tg_configured,
+        "telegram_shortlist_configured": tg_shortlist_configured,
     }
 
 
@@ -1728,4 +1736,60 @@ def reset_scan_presets(
     db.commit()
     db.refresh(config)
     return config.scanner_settings.get("presets", list(DEFAULT_SCAN_PRESETS))
+
+
+@admin_router.post("/shortlist-dispatch")
+def dispatch_prospects_to_shortlist(
+    payload: ProspectShortlistDispatch,
+    db: DbSession,
+    _admin: CurrentStaffUser,
+) -> dict[str, Any]:
+    """Dispatch selected prospects to the Telegram shortlist review topic."""
+    if _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin or Root access required")
+
+    settings = get_settings()
+    if not settings.telegram_shortlist_configured:
+        raise HTTPException(status_code=400, detail="Telegram shortlist topic is not configured.")
+
+    if not payload.prospect_ids:
+        raise HTTPException(status_code=422, detail="No prospect IDs provided.")
+
+    prospects = db.scalars(
+        select(Prospect).where(Prospect.id.in_(payload.prospect_ids))
+    ).all()
+
+    if not prospects:
+        raise HTTPException(status_code=404, detail="No matching prospects found.")
+
+    dispatched = 0
+    failed = 0
+
+    for prospect in prospects:
+        target_url = prospect.source_url or prospect.ikman_url
+        msg_id = send_shortlist_message(
+            prospect_id=str(prospect.id),
+            poster_name=prospect.poster_name,
+            phone_number=prospect.phone_number,
+            title=prospect.title,
+            location=prospect.location,
+            price=prospect.price,
+            property_type=prospect.property_type,
+            listing_type=prospect.listing_type,
+            classification=prospect.classification,
+            confidence=prospect.confidence,
+            ikman_url=target_url,
+            listing_url=target_url,
+        )
+        if msg_id:
+            dispatched += 1
+        else:
+            failed += 1
+
+    return {
+        "dispatched": dispatched,
+        "failed": failed,
+        "total": len(prospects),
+    }
+
 

@@ -1263,6 +1263,7 @@ export type PaginatedProspects = {
   page_size: number;
   total_pages: number;
   telegram_agent_configured?: boolean;
+  telegram_shortlist_configured?: boolean;
 };
 
 export interface ScanJob {
@@ -1352,6 +1353,7 @@ export async function updateProspect(
 export interface ProspectMetrics {
   total_active: number;
   new_count: number;
+  shortlisted_count: number;
   contacted_count: number;
   converted_count: number;
   discarded_count: number;
@@ -1709,6 +1711,27 @@ export async function createFieldAssignments(prospectIds: string[]): Promise<Fie
     throw new ChatError("unexpected", detail, response.status);
   }
   return (await response.json()) as FieldAssignment[];
+}
+
+export async function dispatchProspectsToShortlist(
+  prospectIds: string[]
+): Promise<{ dispatched: number; failed: number; total: number }> {
+  const response = await fetch(
+    `${baseUrl()}/admin/prospects/shortlist-dispatch`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ prospect_ids: prospectIds }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+  if (!response.ok) {
+    let detail = `Shortlist dispatch failed (${response.status}).`;
+    try { const p = await response.json(); if (p.detail) detail = p.detail; } catch {}
+    throw new ChatError("unexpected", detail, response.status);
+  }
+  return (await response.json()) as { dispatched: number; failed: number; total: number };
 }
 
 export async function getFieldAssignments(filters?: {

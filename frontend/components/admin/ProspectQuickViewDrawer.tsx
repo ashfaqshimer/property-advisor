@@ -32,6 +32,7 @@ import {
   Pencil,
   Check,
   Layers,
+  Star,
 } from "lucide-react";
 
 import { Prospect } from "@/lib/api";
@@ -57,10 +58,12 @@ export interface ProspectQuickViewDrawerProps {
   onFetchPhone: (id: string) => Promise<void> | void;
   onAssignToAgent?: (id: string) => void;
   onEditAssignment?: (prospect: Prospect) => void;
+  onShortlistOnTelegram?: (id: string) => void;
   isFetchingPhone?: boolean;
   isConverting?: boolean;
   isAssigning?: boolean;
   telegramAgentConfigured?: boolean;
+  telegramShortlistConfigured?: boolean;
   isAdminOrRoot?: boolean;
 }
 
@@ -74,10 +77,12 @@ export function ProspectQuickViewDrawer({
   onFetchPhone,
   onAssignToAgent,
   onEditAssignment,
+  onShortlistOnTelegram,
   isFetchingPhone = false,
   isConverting = false,
   isAssigning = false,
   telegramAgentConfigured = false,
+  telegramShortlistConfigured = false,
   isAdminOrRoot = false,
 }: ProspectQuickViewDrawerProps) {
   if (!prospect) return null;
@@ -421,6 +426,17 @@ export function ProspectQuickViewDrawer({
                     >
                       <Send className="h-3 w-3" />
                       <span>Dispatch to Agent</span>
+                    </Button>
+                  )}
+                  {!isTerminal && onShortlistOnTelegram && telegramShortlistConfigured && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onShortlistOnTelegram(prospect.id)}
+                      className="h-7 px-2.5 text-xs gap-1.5 font-semibold text-amber-700 dark:text-amber-400 border-amber-500/40 hover:bg-amber-500/10 cursor-pointer"
+                    >
+                      <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                      <span>Shortlist on Telegram</span>
                     </Button>
                   )}
                 </div>

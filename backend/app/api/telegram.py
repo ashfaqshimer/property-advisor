@@ -20,11 +20,16 @@ from app.models.prospect import Prospect
 from app.models.scan_job import ScanJob
 from app.services.telegram_dispatch import (
     PROSPECT_STATUS_MAP,
+    _build_shortlist_keyboard,
     answer_callback_query,
     build_classification_keyboard,
+    build_shortlist_collapsed_keyboard,
     calculate_next_reminder_time,
+    delete_telegram_message,
     edit_assignment_card,
     edit_telegram_message,
+    format_shortlist_collapsed_message,
+    format_shortlist_message,
     get_updates,
     process_due_reminders,
     register_webhook,
@@ -42,12 +47,13 @@ def _get_agent_chat_id() -> str:
 
 
 def _is_authorized_chat(chat_id: str, sender_id: str) -> bool:
-    """Allow updates if they come from the designated assignment chat, agent DM, or general chat."""
+    """Allow updates if they come from the designated assignment/shortlist chat, agent DM, or general chat."""
     settings = get_settings()
     legacy_agent_id = _get_agent_chat_id()
     allowed = {
         c.strip()
         for c in (
+            settings.telegram_shortlist_chat_id,
             settings.telegram_assignments_chat_id,
             legacy_agent_id,
             settings.telegram_chat_id,
@@ -91,6 +97,111 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
         return
 
     user_name = from_user.get("first_name") or from_user.get("username")
+
+    # Handle shortlist triage button taps: sl:<prospect_id>:<keep|pass|undo>
+    if data.startswith("sl:"):
+        parts = data.split(":")
+        if len(parts) != 3:
+            answer_callback_query(token, cq_id, "Unknown action.")
+            return
+
+        _, prospect_id_str, action = parts
+        try:
+            prospect_uuid = uuid.UUID(prospect_id_str)
+        except ValueError:
+            answer_callback_query(token, cq_id, "Invalid prospect ID.")
+            return
+
+        prospect = db.get(Prospect, prospect_uuid)
+        if not prospect:
+            answer_callback_query(token, cq_id, "Prospect not found.")
+            return
+
+        target_url = prospect.source_url or prospect.ikman_url
+
+        if action == "keep":
+            prospect.status = "shortlisted"
+            db.commit()
+
+            collapsed_text = format_shortlist_collapsed_message(
+                poster_name=prospect.poster_name,
+                phone_number=prospect.phone_number,
+                title=prospect.title,
+                location=prospect.location,
+                price=prospect.price,
+                ikman_url=target_url,
+                listing_url=target_url,
+                handled_by=user_name,
+            )
+            collapsed_keyboard = build_shortlist_collapsed_keyboard(
+                prospect_id=str(prospect.id),
+                phone_number=prospect.phone_number,
+            )
+            if msg_id:
+                edit_telegram_message(
+                    token=token,
+                    chat_id=origin_chat_id,
+                    message_id=msg_id,
+                    text=collapsed_text,
+                    reply_markup=collapsed_keyboard,
+                )
+            answer_callback_query(token, cq_id, "⭐ Saved to Shortlist!")
+            logger.info("prospect_shortlisted_via_telegram", prospect_id=prospect_id_str, user=user_name)
+            return
+
+        elif action == "pass":
+            old_status = prospect.status
+            prospect.status = "discarded"
+            prospect.discard_reason = "not_interested"
+            if old_status != "discarded" and prospect.first_scan_job_id:
+                scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                if scan_job:
+                    scan_job.new_count = max(0, (scan_job.new_count or 0) - 1)
+                    scan_job.filtered_count = (scan_job.filtered_count or 0) + 1
+            db.commit()
+
+            if msg_id:
+                delete_telegram_message(token, origin_chat_id, msg_id)
+            answer_callback_query(token, cq_id, "❌ Removed.")
+            logger.info("prospect_passed_via_telegram", prospect_id=prospect_id_str, user=user_name)
+            return
+
+        elif action == "undo":
+            old_status = prospect.status
+            prospect.status = "new"
+            prospect.discard_reason = None
+            if old_status == "discarded" and prospect.first_scan_job_id:
+                scan_job = db.get(ScanJob, prospect.first_scan_job_id)
+                if scan_job:
+                    scan_job.new_count = (scan_job.new_count or 0) + 1
+                    scan_job.filtered_count = max(0, (scan_job.filtered_count or 0) - 1)
+            db.commit()
+
+            restored_text = format_shortlist_message(
+                poster_name=prospect.poster_name,
+                phone_number=prospect.phone_number,
+                title=prospect.title,
+                location=prospect.location,
+                price=prospect.price,
+                property_type=prospect.property_type,
+                listing_type=prospect.listing_type,
+                classification=prospect.classification,
+                confidence=prospect.confidence,
+                ikman_url=target_url,
+                listing_url=target_url,
+            )
+            restored_keyboard = _build_shortlist_keyboard(str(prospect.id))
+            if msg_id:
+                edit_telegram_message(
+                    token=token,
+                    chat_id=origin_chat_id,
+                    message_id=msg_id,
+                    text=restored_text,
+                    reply_markup=restored_keyboard,
+                )
+            answer_callback_query(token, cq_id, "↩️ Restored to queue.")
+            logger.info("prospect_shortlist_undone_via_telegram", prospect_id=prospect_id_str, user=user_name)
+            return
 
     # Handle post-contact classification button taps: fac:<assignment_id>:<owner|broker|skip>
     if data.startswith("fac:"):

@@ -82,10 +82,15 @@ class ProspectBulkUpdate(BaseModel):
 class ProspectMetrics(BaseModel):
     total_active: int
     new_count: int
+    shortlisted_count: int = 0
     contacted_count: int
     converted_count: int
     discarded_count: int
     direct_owners_count: int
+
+
+class ProspectShortlistDispatch(BaseModel):
+    prospect_ids: list[UUID]
 
 
 class ProspectRead(ProspectBase):
@@ -122,6 +127,7 @@ class ProspectList(BaseModel):
     page_size: int
     total_pages: int
     telegram_agent_configured: bool = False
+    telegram_shortlist_configured: bool = False
 
 
 class ScanJobRead(BaseModel):

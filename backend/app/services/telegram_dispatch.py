@@ -84,6 +84,118 @@ def build_classification_keyboard(assignment_id: str) -> dict[str, Any]:
     }
 
 
+def _build_shortlist_keyboard(prospect_id: str) -> dict[str, Any]:
+    """Build inline keyboard for shortlist triage: Shortlist or Pass."""
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "⭐ Shortlist", "callback_data": f"sl:{prospect_id}:keep"},
+                {"text": "❌ Pass", "callback_data": f"sl:{prospect_id}:pass"},
+            ]
+        ]
+    }
+
+
+def build_shortlist_collapsed_keyboard(prospect_id: str, phone_number: str | None = None) -> dict[str, Any]:
+    """Build inline keyboard for collapsed shortlisted card: WhatsApp direct link + Undo."""
+    row: list[dict[str, str]] = []
+    if phone_number:
+        clean_phone = re.sub(r"[^\d+]", "", phone_number)
+        if clean_phone.startswith("0") and len(clean_phone) == 10:
+            clean_phone = "94" + clean_phone[1:]
+        elif not clean_phone.startswith("+") and len(clean_phone) == 9:
+            clean_phone = "94" + clean_phone
+        elif clean_phone.startswith("+"):
+            clean_phone = clean_phone[1:]
+        row.append({"text": "💬 WhatsApp", "url": f"https://wa.me/{clean_phone}"})
+
+    row.append({"text": "↩️ Undo", "callback_data": f"sl:{prospect_id}:undo"})
+    return {"inline_keyboard": [row]}
+
+
+def format_shortlist_message(
+    *,
+    poster_name: str | None,
+    phone_number: str | None,
+    title: str,
+    location: str,
+    price: str,
+    property_type: str,
+    listing_type: str,
+    classification: str | None = None,
+    confidence: int | None = None,
+    ikman_url: str | None = None,
+    listing_url: str | None = None,
+) -> str:
+    """Build an HTML-formatted prospect card for the shortlist triage topic."""
+    lt = listing_type.replace("for_", "").replace("_", " ").title()
+    pt = property_type.replace("_", " ").title()
+
+    cl_lower = (classification or "").lower()
+    if cl_lower == "owner":
+        likely_label = "Direct Owner"
+    elif cl_lower in ("agent", "broker"):
+        likely_label = "Another Agent / Broker"
+    else:
+        likely_label = None
+
+    lines = [
+        "⭐ <b>Review for Shortlist</b>",
+        "",
+        f"🏠 <b>Property:</b> {html.escape(title)}",
+        f"📍 <b>Location:</b> {html.escape(location)}",
+        f"💰 <b>Price:</b> {html.escape(price)}",
+        f"🏷️ <b>Type:</b> {pt} • {lt}",
+        f"👤 <b>Contact:</b> {html.escape(poster_name or 'Unknown')}",
+    ]
+
+    if phone_number:
+        clean_phone = re.sub(r"[^\d+]", "", phone_number)
+        if clean_phone.startswith("0") and len(clean_phone) == 10:
+            clean_phone = "+94 " + clean_phone[1:]
+        lines.append(f"📞 <b>Phone:</b> {clean_phone}")
+
+    if likely_label:
+        conf_suffix = ""
+        if confidence is not None:
+            conf_val = int(confidence * 100) if isinstance(confidence, float) and 0 < confidence <= 1 else int(confidence)
+            conf_suffix = f" ({conf_val}% confidence)"
+        lines.append(f"💡 <b>Classification:</b> {likely_label}{conf_suffix}")
+
+    target_url = listing_url or ikman_url
+    if target_url:
+        lines.append(f'🔗 <a href="{html.escape(target_url)}">View Original Listing</a>')
+
+    return "\n".join(lines)
+
+
+def format_shortlist_collapsed_message(
+    *,
+    poster_name: str | None,
+    phone_number: str | None,
+    title: str,
+    location: str,
+    price: str,
+    ikman_url: str | None = None,
+    listing_url: str | None = None,
+    handled_by: str | None = None,
+) -> str:
+    """Build a compact one/two-line HTML snippet for a saved shortlisted prospect."""
+    by_text = f" by {html.escape(handled_by)}" if handled_by else ""
+    target_url = listing_url or ikman_url
+    title_html = f'<a href="{html.escape(target_url)}">{html.escape(title)}</a>' if target_url else html.escape(title)
+
+    phone_part = f" • 📞 {phone_number}" if phone_number else ""
+    name_part = f" • 👤 {html.escape(poster_name)}" if poster_name else ""
+
+    lines = [
+        f"⭐ <b>Shortlisted{by_text}</b>",
+        f"🏠 {title_html}",
+        f"📍 {html.escape(location)} • 💰 {html.escape(price)}{name_part}{phone_part}",
+    ]
+    return "\n".join(lines)
+
+
 def format_assignment_message(
     *,
     poster_name: str | None,
@@ -275,6 +387,94 @@ def delete_assignment_message(message_id: int) -> bool:
     except Exception as exc:
         logger.warning("telegram_assignment_delete_error", error=str(exc), message_id=message_id)
         return False
+
+
+def delete_telegram_message(token: str, chat_id: str | int, message_id: int) -> bool:
+    """Delete a specific message from Telegram by message_id."""
+    if not token or not chat_id or not message_id:
+        return False
+    try:
+        with httpx.Client(timeout=6.0) as client:
+            resp = client.post(
+                _api_url(token, "deleteMessage"),
+                json={"chat_id": chat_id, "message_id": message_id},
+            )
+            data = resp.json()
+            if not data.get("ok"):
+                logger.warning("telegram_delete_message_failed", response=data, message_id=message_id)
+                return False
+            logger.info("telegram_message_deleted", message_id=message_id)
+            return True
+    except Exception as exc:
+        logger.warning("telegram_delete_message_error", error=str(exc), message_id=message_id)
+        return False
+
+
+def send_shortlist_message(
+    *,
+    prospect_id: str,
+    poster_name: str | None,
+    phone_number: str | None,
+    title: str,
+    location: str,
+    price: str,
+    property_type: str,
+    listing_type: str,
+    classification: str | None = None,
+    confidence: int | None = None,
+    ikman_url: str | None = None,
+    listing_url: str | None = None,
+) -> int | None:
+    """Send a prospect card to the shortlist review topic on Telegram."""
+    settings = get_settings()
+    token = settings.telegram_bot_token.strip()
+    chat_id = (
+        settings.telegram_shortlist_chat_id.strip()
+        or settings.telegram_assignments_chat_id.strip()
+        or settings.telegram_chat_id.strip()
+    )
+    thread_id = settings.telegram_shortlist_thread_id
+
+    if not token or not chat_id:
+        logger.warning("telegram_shortlist_skipped.unconfigured")
+        return None
+
+    text = format_shortlist_message(
+        poster_name=poster_name,
+        phone_number=phone_number,
+        title=title,
+        location=location,
+        price=price,
+        property_type=property_type,
+        listing_type=listing_type,
+        classification=classification,
+        confidence=confidence,
+        ikman_url=ikman_url,
+        listing_url=listing_url,
+    )
+    keyboard = _build_shortlist_keyboard(prospect_id)
+    payload: dict[str, Any] = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "reply_markup": keyboard,
+    }
+    if thread_id is not None and str(chat_id).startswith("-"):
+        payload["message_thread_id"] = thread_id
+
+    try:
+        with httpx.Client(timeout=8.0) as client:
+            resp = client.post(_api_url(token, "sendMessage"), json=payload)
+            data = resp.json()
+            if not data.get("ok"):
+                logger.warning("telegram_shortlist_send_failed", response=data)
+                return None
+            message_id: int = data["result"]["message_id"]
+            logger.info("telegram_shortlist_sent", prospect_id=prospect_id, message_id=message_id)
+            return message_id
+    except Exception as exc:
+        logger.warning("telegram_shortlist_send_error", error=str(exc))
+        return None
 
 
 def answer_callback_query(token: str, callback_query_id: str, text: str = "") -> None:
