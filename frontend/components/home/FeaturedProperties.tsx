@@ -14,7 +14,7 @@ import {
 } from "@/lib/api";
 
 function formatInventoryCount(count: number | null): string {
-  if (!count || count < 100) return "1,300+";
+  if (!count || count < 100) return "1,500+";
   if (count >= 1000) {
     const rounded = Math.floor(count / 100) * 100;
     return `${rounded.toLocaleString()}+`;
@@ -25,6 +25,7 @@ function formatInventoryCount(count: number | null): string {
 
 export type FeaturedItem = {
   id: string;
+  propertyCode?: string;
   title: string;
   location: string;
   badge: "For Sale" | "For Rent";
@@ -38,6 +39,7 @@ export type FeaturedItem = {
 const FALLBACK_FEATURED_ITEMS: FeaturedItem[] = [
   {
     id: "colombo-03-apartment",
+    propertyCode: "PA-1001",
     title: "Modern Apartment – Colombo 03",
     location: "Colombo 03",
     badge: "For Sale",
@@ -49,6 +51,7 @@ const FALLBACK_FEATURED_ITEMS: FeaturedItem[] = [
   },
   {
     id: "nugegoda-luxury-house",
+    propertyCode: "PA-1002",
     title: "Luxury House – Nugegoda",
     location: "Nugegoda",
     badge: "For Sale",
@@ -60,6 +63,7 @@ const FALLBACK_FEATURED_ITEMS: FeaturedItem[] = [
   },
   {
     id: "rajagiriya-apartment",
+    propertyCode: "PA-1003",
     title: "Apartment – Rajagiriya",
     location: "Rajagiriya",
     badge: "For Rent",
@@ -71,6 +75,7 @@ const FALLBACK_FEATURED_ITEMS: FeaturedItem[] = [
   },
   {
     id: "galle-land",
+    propertyCode: "PA-1004",
     title: "Land – Galle",
     location: "Galle",
     badge: "For Sale",
@@ -162,6 +167,7 @@ function formatPrice(record: PropertyApiRecord): string {
 function mapRecordToFeaturedItem(record: PropertyApiRecord): FeaturedItem {
   return {
     id: record.id,
+    propertyCode: record.property_code,
     title: record.title,
     location: record.location,
     badge: record.listing_type === "rent" ? "For Rent" : "For Sale",
@@ -194,13 +200,27 @@ function getGridColsClass(count: number): string {
   }
 }
 
-export default function FeaturedProperties() {
+export interface FeaturedPropertiesProps {
+  initialInventoryCount?: number | null;
+  initialVisibleCount?: number;
+  initialCycleIntervalSeconds?: number;
+  initialAutoCycle?: boolean;
+}
+
+export default function FeaturedProperties({
+  initialInventoryCount = null,
+  initialVisibleCount,
+  initialCycleIntervalSeconds,
+  initialAutoCycle,
+}: FeaturedPropertiesProps = {}) {
   const [items, setItems] = useState<FeaturedItem[] | null>(null);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-  const [inventoryCount, setInventoryCount] = useState<number | null>(null);
-  const [visibleCount, setVisibleCount] = useState<number>(4);
-  const [cycleIntervalMs, setCycleIntervalMs] = useState<number>(6000);
-  const [autoCycle, setAutoCycle] = useState<boolean>(true);
+  const [inventoryCount, setInventoryCount] = useState<number | null>(initialInventoryCount);
+  const [visibleCount, setVisibleCount] = useState<number>(initialVisibleCount ?? 4);
+  const [cycleIntervalMs, setCycleIntervalMs] = useState<number>(
+    (initialCycleIntervalSeconds ?? 6) * 1000
+  );
+  const [autoCycle, setAutoCycle] = useState<boolean>(initialAutoCycle ?? true);
   const [startIndex, setStartIndex] = useState<number>(0);
   const [isFading, setIsFading] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -283,8 +303,9 @@ export default function FeaturedProperties() {
   };
 
   const handleAskAmayaAboutProperty = (item: FeaturedItem) => {
+    const ref = item.propertyCode ? `property ${item.propertyCode} ("${item.title}")` : `"${item.title}"`;
     openChat({
-      prompt: `Hi Amaya, tell me more about ${item.title} in ${item.location} (${item.price}). Is it still available?`,
+      prompt: `Hi Amaya, tell me more about ${ref} in ${item.location} (${item.price}). Is it still available?`,
     });
   };
 
@@ -485,9 +506,15 @@ export default function FeaturedProperties() {
                       />
                     </Link>
 
-                    {/* Badge: For Sale / For Rent */}
-                    <div className="absolute bottom-3 left-3 pointer-events-none">
+                    {/* Badge: For Sale / For Rent + Ref Code */}
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1.5 pointer-events-none">
                       <Badge variant={item.badgeVariant}>{item.badge}</Badge>
+                      {item.propertyCode && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-ink/80 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-2xs font-mono">
+                          <span className="text-[9px] uppercase tracking-wider text-neutral-300 font-sans">Ref</span>
+                          <span>{item.propertyCode}</span>
+                        </span>
+                      )}
                     </div>
 
                     {/* Heart Favorite Button */}
@@ -514,6 +541,12 @@ export default function FeaturedProperties() {
 
                   {/* Details */}
                   <div className="flex flex-1 flex-col p-5">
+                    {item.propertyCode && (
+                      <div className="mb-1 flex items-center gap-1 text-[11px] font-bold font-mono text-emerald-800 dark:text-emerald-400">
+                        <span className="text-[10px] uppercase font-semibold text-neutral-400 font-sans tracking-wider">Ref:</span>
+                        <span>{item.propertyCode}</span>
+                      </div>
+                    )}
                     <h3 className="font-semibold text-base text-ink line-clamp-1 group-hover:text-brand transition-colors">
                       <Link href={`/properties/${item.id}`} className="hover:underline">
                         {item.title}
@@ -652,7 +685,7 @@ export default function FeaturedProperties() {
                 {/* Bottom Overlay: Database Scope Pill */}
                 <div className="relative z-10 rounded-xl bg-black/40 backdrop-blur-md border border-white/15 px-3 py-1 text-center shadow-xs">
                   <p className="text-[11px] font-medium text-emerald-100 truncate">
-                    Access to 1,300+ Verified &amp; Off-Market Listings
+                    Access to {displayCount} Verified &amp; Off-Market Listings
                   </p>
                 </div>
               </div>

@@ -9,8 +9,16 @@ import FaqSection from "@/components/home/FaqSection";
 import AskAmayaBanner from "@/components/home/AskAmayaBanner";
 import Footer from "@/components/layout/Footer";
 import ChatDialog from "@/components/chat/ChatDialog";
+import { getInventorySummary, getSiteConfiguration } from "@/lib/api";
 
-export default function Home() {
+export const revalidate = 60;
+
+export default async function Home() {
+  const [summary, config] = await Promise.all([
+    getInventorySummary().catch(() => null),
+    getSiteConfiguration().catch(() => null),
+  ]);
+
   return (
     <>
       <Navbar />
@@ -19,7 +27,12 @@ export default function Home() {
         <HowItWorks />
         <ServicesSection />
         <PropertyJourney />
-        <FeaturedProperties />
+        <FeaturedProperties
+          initialInventoryCount={summary?.total_listings ?? null}
+          initialVisibleCount={config?.featured_settings?.visible_count}
+          initialCycleIntervalSeconds={config?.featured_settings?.cycle_interval_seconds}
+          initialAutoCycle={config?.featured_settings?.auto_cycle}
+        />
         <IslandWideReach />
         <FaqSection />
         <AskAmayaBanner />

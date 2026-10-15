@@ -657,6 +657,8 @@ function baseUrl(): string {
   if (typeof window === "undefined") {
     const backendUrl = process.env.BACKEND_URL?.trim();
     if (backendUrl) return backendUrl.replace(/\/+$/, "");
+    const publicUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (publicUrl && !publicUrl.startsWith("/")) return publicUrl.replace(/\/+$/, "");
     return "http://localhost:8000";
   }
 

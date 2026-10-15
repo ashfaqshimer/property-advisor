@@ -63,10 +63,16 @@ export default function PropertyCatalog({
                   />
                 </Link>
 
-                <div className="absolute bottom-3 left-3 pointer-events-none">
+                <div className="absolute bottom-3 left-3 flex items-center gap-1.5 pointer-events-none">
                   <Badge variant={item.listing_type === "rent" ? "rent" : "sale"}>
                     {item.listing_type === "rent" ? "For Rent" : "For Sale"}
                   </Badge>
+                  {item.property_code && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-ink/80 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-2xs font-mono">
+                      <span className="text-[9px] uppercase tracking-wider text-neutral-300 font-sans">Ref</span>
+                      <span>{item.property_code}</span>
+                    </span>
+                  )}
                 </div>
 
                 <button
@@ -89,6 +95,12 @@ export default function PropertyCatalog({
 
               {/* Body */}
               <div className="flex flex-1 flex-col p-5">
+                {item.property_code && (
+                  <div className="mb-1 flex items-center gap-1 text-[11px] font-bold font-mono text-emerald-800 dark:text-emerald-400">
+                    <span className="text-[10px] uppercase font-semibold text-neutral-400 font-sans tracking-wider">Ref:</span>
+                    <span>{item.property_code}</span>
+                  </div>
+                )}
                 <h2 className="font-semibold text-base text-ink line-clamp-1 group-hover:text-brand transition-colors">
                   <Link href={`/properties/${item.id}`} className="hover:underline">
                     {item.title}

@@ -6,6 +6,7 @@ import * as api from "@/lib/api";
 
 const baseRecord: api.PropertyApiRecord = {
   id: "prop-db-1",
+  property_code: "PROP-001",
   title: "Luxury Seaview Condo",
   description: "Stunning ocean views.",
   listing_type: "sale",
@@ -169,5 +170,43 @@ describe("FeaturedProperties", () => {
     expect(event.detail?.prompt).toContain("off-market");
 
     window.removeEventListener("open-amaya-chat", eventSpy);
+  });
+
+  it("renders provided initialInventoryCount immediately without waiting for client fetch", async () => {
+    vi.spyOn(api, "getFeaturedProperties").mockResolvedValue(mockRecords);
+    vi.spyOn(api, "getInventorySummary").mockResolvedValue({
+      total_listings: 1566,
+      verified_properties: 7,
+      tracked_prospects: 1559,
+    });
+
+    render(<FeaturedProperties initialInventoryCount={1566} />);
+
+    // Header count and search link are rendered immediately
+    expect(screen.getByText(/1,500\+\s*Properties & Market Listings/)).toBeInTheDocument();
+    expect(screen.getByText(/Search all\s*1,500\+\s*listings/)).toBeInTheDocument();
+
+    // After properties load, concierge card is also populated with displayCount
+    await waitFor(() => {
+      expect(
+        screen.getByText("Access to 1,500+ Verified & Off-Market Listings"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("defaults to 1,500+ fallback when count is unavailable", async () => {
+    vi.spyOn(api, "getFeaturedProperties").mockResolvedValue(mockRecords);
+    vi.spyOn(api, "getInventorySummary").mockRejectedValue(new Error("Network error"));
+
+    render(<FeaturedProperties />);
+
+    expect(screen.getByText(/1,500\+\s*Properties & Market Listings/)).toBeInTheDocument();
+    expect(screen.getByText(/Search all\s*1,500\+\s*listings/)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Access to 1,500+ Verified & Off-Market Listings"),
+      ).toBeInTheDocument();
+    });
   });
 });

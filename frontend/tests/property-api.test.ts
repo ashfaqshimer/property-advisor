@@ -14,6 +14,7 @@ import { formatPrice, mapProperty } from "@/lib/properties";
 
 const record: PropertyApiRecord = {
   id: "property-1",
+  property_code: "PROP-001",
   title: "Garden Villa",
   description: "A bright villa.",
   listing_type: "sale",
@@ -163,6 +164,7 @@ describe("property mapping", () => {
       imageUrl: "https://images.unsplash.com/photo-villa",
       imageAlt: "White villa beside a pool",
       listingType: "sale",
+      propertyCode: "PROP-001",
     });
   });
 

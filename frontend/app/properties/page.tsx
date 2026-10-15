@@ -41,6 +41,7 @@ export const metadata: Metadata = {
 const FALLBACK_PROPERTIES: PropertyApiRecord[] = [
   {
     id: "colombo-03-apartment",
+    property_code: "PROP-C03",
     title: "Modern Apartment – Colombo 03",
     description: "Stunning modern luxury apartment living room with panoramic glass balcony overlooking Colombo.",
     location: "Colombo 03",
@@ -68,6 +69,7 @@ const FALLBACK_PROPERTIES: PropertyApiRecord[] = [
   },
   {
     id: "nugegoda-luxury-house",
+    property_code: "PROP-NUG",
     title: "Luxury House – Nugegoda",
     description: "Contemporary architect-designed house with warm exterior lighting and garden in prime Nugegoda residential neighborhood.",
     location: "Nugegoda",
@@ -95,6 +97,7 @@ const FALLBACK_PROPERTIES: PropertyApiRecord[] = [
   },
   {
     id: "rajagiriya-apartment",
+    property_code: "PROP-RAJ",
     title: "Apartment – Rajagiriya",
     description: "Bright high-rise apartment interior with wide windows and modern furniture overlooking wetland parklands.",
     location: "Rajagiriya",
@@ -122,6 +125,7 @@ const FALLBACK_PROPERTIES: PropertyApiRecord[] = [
   },
   {
     id: "galle-land",
+    property_code: "PROP-GAL",
     title: "Land – Galle",
     description: "Pristine coastal headland and turquoise beach bay parcel ideal for boutique villa or hospitality development.",
     location: "Galle",

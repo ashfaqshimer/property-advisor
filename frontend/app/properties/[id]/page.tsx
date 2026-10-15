@@ -253,8 +253,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     Verified listing in {property.location}. Complete with detailed market pricing evaluation.
                   </p>
                 </div>
-                <div className="pt-4 border-t border-neutral-100 text-xs text-neutral-500">
-                  ID: <span className="font-mono">{property.id.slice(0, 8)}</span>
+                <div className="pt-4 border-t border-neutral-100 text-xs text-neutral-500 flex items-center justify-between">
+                  <span>
+                    Reference: <span className="font-mono font-semibold text-neutral-800">{property.property_code || property.id.slice(0, 8)}</span>
+                  </span>
                 </div>
               </div>
             )}
