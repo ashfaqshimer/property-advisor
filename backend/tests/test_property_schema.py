@@ -15,6 +15,7 @@ from app.models.property import ListingType, Property, PropertyStatus, PropertyT
 
 EXPECTED_KEYS = {
     "id",
+    "property_code",
     "title",
     "description",
     "listing_type",

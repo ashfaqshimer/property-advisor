@@ -138,6 +138,8 @@ def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffU
                 detail="Agents are not permitted to assign property owner details.",
             )
     property_data = payload.model_dump()
+    if not property_data.get("property_code"):
+        property_data["property_code"] = queries.generate_next_property_code(db)
     coordinates = _geocode_location(property_data["location"])
     property_record = Property(
         **property_data,
@@ -295,9 +297,9 @@ def get_inventory_summary(db: DbSession) -> InventorySummary:
 
 
 @router.get("/{property_id}", response_model=PropertyRead)
-def get_public_property(property_id: UUID, db: DbSession) -> PropertyRead:
-    """Public read endpoint for a single property by ID."""
-    property_record = db.get(Property, property_id)
+def get_public_property(property_id: str, db: DbSession) -> PropertyRead:
+    """Public read endpoint for a single property by ID or property code."""
+    property_record = queries.available_property_by_id_or_code(db, property_id)
     if property_record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
     grade_info = grade_property_pricing(db, property_record)

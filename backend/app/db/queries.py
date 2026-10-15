@@ -265,13 +265,41 @@ def search_prospects(
     return db.execute(stmt).scalars().all()
 
 
-def available_property_by_id(db: Session, property_id: uuid.UUID) -> Property | None:
-    """Return one available listing by its stable public id."""
-    stmt = select(Property).where(
-        Property.id == property_id,
-        Property.status == PropertyStatus.AVAILABLE,
-    )
+def generate_next_property_code(db: Session) -> str:
+    """Generate the next sequential property code in the format PA-XXXX."""
+    codes = db.scalars(
+        select(Property.property_code).where(Property.property_code.like("PA-%"))
+    ).all()
+    max_num = 1000
+    for code in codes:
+        suffix = code.removeprefix("PA-")
+        if suffix.isdigit():
+            val = int(suffix)
+            if val > max_num:
+                max_num = val
+    return f"PA-{max_num + 1}"
+
+
+def available_property_by_id_or_code(
+    db: Session, identifier: uuid.UUID | str
+) -> Property | None:
+    """Return one available listing by its stable public id or human-readable property code."""
+    stmt = select(Property).where(Property.status == PropertyStatus.AVAILABLE)
+    if isinstance(identifier, uuid.UUID):
+        stmt = stmt.where(Property.id == identifier)
+    else:
+        ident_str = str(identifier).strip()
+        try:
+            val_uuid = uuid.UUID(ident_str)
+            stmt = stmt.where(Property.id == val_uuid)
+        except ValueError:
+            stmt = stmt.where(func.upper(Property.property_code) == ident_str.upper())
     return db.execute(stmt).scalar_one_or_none()
+
+
+def available_property_by_id(db: Session, property_id: uuid.UUID | str) -> Property | None:
+    """Return one available listing by its stable public id or property code."""
+    return available_property_by_id_or_code(db, property_id)
 
 
 def prospect_by_id(db: Session, prospect_id: uuid.UUID) -> Prospect | None:
@@ -297,7 +325,11 @@ def admin_properties(
 
     if search:
         term = f"%{search.strip()}%"
-        stmt = stmt.where(Property.title.ilike(term) | Property.location.ilike(term))
+        stmt = stmt.where(
+            Property.title.ilike(term)
+            | Property.location.ilike(term)
+            | Property.property_code.ilike(term)
+        )
     if status is not None:
         stmt = stmt.where(Property.status == status)
     if property_type is not None:

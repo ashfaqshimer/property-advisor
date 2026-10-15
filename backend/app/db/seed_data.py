@@ -35,6 +35,7 @@ def seed_id(slug: str) -> uuid.UUID:
 SEED_PROPERTIES: list[dict[str, Any]] = [
     {
         "slug": "garden-villa-ward-place",
+        "property_code": "PA-1001",
         "title": "Garden Villa on Ward Place",
         "location": "Colombo 7",
         "latitude": 6.9147,
@@ -55,6 +56,7 @@ SEED_PROPERTIES: list[dict[str, Any]] = [
     },
     {
         "slug": "havelock-residences",
+        "property_code": "PA-1002",
         "title": "Havelock Residences",
         "location": "Colombo 5",
         "latitude": 6.8913,
@@ -75,6 +77,7 @@ SEED_PROPERTIES: list[dict[str, Any]] = [
     },
     {
         "slug": "courtyard-townhouse",
+        "property_code": "PA-1003",
         "title": "Courtyard Townhouse",
         "location": "Rajagiriya",
         "latitude": 6.9063,
@@ -95,6 +98,7 @@ SEED_PROPERTIES: list[dict[str, Any]] = [
     },
     {
         "slug": "skyline-penthouse",
+        "property_code": "PA-1004",
         "title": "Skyline Penthouse",
         "location": "Colombo 3",
         "latitude": 6.9041,
@@ -116,6 +120,7 @@ SEED_PROPERTIES: list[dict[str, Any]] = [
     },
     {
         "slug": "restored-colonial-retreat",
+        "property_code": "PA-1005",
         "title": "Restored Colonial Retreat",
         "location": "Galle",
         "latitude": 6.0329,
@@ -136,6 +141,7 @@ SEED_PROPERTIES: list[dict[str, Any]] = [
     },
     {
         "slug": "hillside-bungalow",
+        "property_code": "PA-1006",
         "title": "Hillside Bungalow",
         "location": "Kandy",
         "latitude": 7.2906,
@@ -154,6 +160,7 @@ SEED_PROPERTIES: list[dict[str, Any]] = [
     },
     {
         "slug": "poolside-garden-house",
+        "property_code": "PA-1007",
         "title": "Poolside Garden House",
         "location": "Colombo 7",
         "latitude": 6.9147,
@@ -174,6 +181,7 @@ SEED_PROPERTIES: list[dict[str, Any]] = [
     },
     {
         "slug": "beachside-terrace-house",
+        "property_code": "PA-1008",
         "title": "Beachside Terrace House",
         "location": "Mount Lavinia",
         "latitude": 6.8389,

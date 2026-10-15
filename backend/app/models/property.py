@@ -46,6 +46,10 @@ class PropertyStatus(str, enum.Enum):
     SOLD = "sold"
 
 
+def _generate_default_code() -> str:
+    return f"PA-{uuid.uuid4().hex[:6].upper()}"
+
+
 class Property(Base):
     __tablename__ = "properties"
 
@@ -53,6 +57,14 @@ class Property(Base):
     # then available before flush, and the model stays creatable on SQLite in tests.
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+
+    property_code: Mapped[str] = mapped_column(
+        String(20),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=_generate_default_code,
     )
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)

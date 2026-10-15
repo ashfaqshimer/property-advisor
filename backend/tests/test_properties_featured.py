@@ -85,7 +85,21 @@ def test_get_public_property_by_id(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == target_id
+    assert data["property_code"] == "PA-1001"
     assert "Ward Place" in data["title"]
+
+
+def test_get_public_property_by_code(client: TestClient) -> None:
+    response = client.get("/properties/PA-1001")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["property_code"] == "PA-1001"
+    assert "Ward Place" in data["title"]
+
+    # Case-insensitive
+    response_lower = client.get("/properties/pa-1001")
+    assert response_lower.status_code == 200
+    assert response_lower.json()["id"] == data["id"]
 
 
 def test_get_public_property_not_found(client: TestClient) -> None:

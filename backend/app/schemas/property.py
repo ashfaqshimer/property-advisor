@@ -28,6 +28,7 @@ class PropertyRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    property_code: str
     title: str
     description: str
     listing_type: ListingType
@@ -83,6 +84,7 @@ class PropertyRead(BaseModel):
 
 
 class PropertyCreate(BaseModel):
+    property_code: str | None = None
     title: str
     description: str = ""
     listing_type: ListingType
@@ -117,6 +119,7 @@ class PropertyCreate(BaseModel):
 
 
 class PropertyUpdate(BaseModel):
+    property_code: str | None = None
     title: str | None = None
     description: str | None = None
     listing_type: ListingType | None = None
