@@ -4,7 +4,34 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCw, Filter, Search, PhoneCall, Clock, X, CheckCircle2, Sparkles, MapPin, Compass, Undo2, Square, CheckSquare, Send, Bookmark, Bot, Trash2, Pencil } from "lucide-react";
+import {
+  ExternalLink,
+  RefreshCw,
+  Filter,
+  Search,
+  PhoneCall,
+  Clock,
+  X,
+  CheckCircle2,
+  Sparkles,
+  MapPin,
+  Compass,
+  Undo2,
+  Square,
+  CheckSquare,
+  Send,
+  Bookmark,
+  Bot,
+  Trash2,
+  Pencil,
+  MoreHorizontal,
+  UserCheck,
+  SlidersHorizontal,
+  Copy,
+  MessageCircle,
+  RotateCcw,
+  Check,
+} from "lucide-react";
 
 import {
   Table,
@@ -17,6 +44,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 
 import {
   Prospect,
@@ -48,6 +83,7 @@ export default function ProspectsPage() {
   // Filters & Pagination
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterSource, setFilterSource] = useState<string>("");
+  const [filterClassification, setFilterClassification] = useState<string>("all");
   const [transactionType, setTransactionType] = useState<"sale" | "rent">("sale");
   const [propertyType, setPropertyType] = useState<string>("all");
   const [filterPriceGrade, setFilterPriceGrade] = useState<string>("all");
@@ -337,6 +373,7 @@ export default function ProspectsPage() {
         status: filterStatus || undefined,
         property_type,
         listing_type,
+        classification: filterClassification === "all" ? undefined : filterClassification,
         price_grade: filterPriceGrade === "all" ? undefined : filterPriceGrade,
         sort_by: sortBy === "default" ? undefined : sortBy,
         page,
@@ -357,7 +394,7 @@ export default function ProspectsPage() {
 
   useEffect(() => {
     fetchProspects();
-  }, [filterStatus, transactionType, propertyType, filterPriceGrade, sortBy, page, debouncedSearch]);
+  }, [filterStatus, transactionType, propertyType, filterClassification, filterPriceGrade, sortBy, page, debouncedSearch]);
 
   const refreshActiveJobs = async () => {
     try {
@@ -532,6 +569,113 @@ export default function ProspectsPage() {
     }
   };
 
+  const activeSecondaryFiltersCount =
+    (filterPriceGrade !== "all" ? 1 : 0) +
+    (filterSource ? 1 : 0) +
+    (sortBy !== "default" ? 1 : 0) +
+    (filterClassification !== "all" ? 1 : 0);
+
+  const resetSecondaryFilters = () => {
+    setFilterPriceGrade("all");
+    setFilterSource("");
+    setSortBy("default");
+    setFilterClassification("all");
+    setPage(1);
+  };
+
+  const handleCopyPhone = (phone?: string | null) => {
+    if (!phone) return;
+    navigator.clipboard.writeText(phone);
+    toast.success("Phone number copied to clipboard");
+  };
+
+  const handleOpenWhatsApp = (phone?: string | null) => {
+    if (!phone) return;
+    let cleaned = phone.replace(/\D/g, "");
+    if (cleaned.startsWith("0")) {
+      cleaned = "94" + cleaned.slice(1);
+    } else if (!cleaned.startsWith("94")) {
+      cleaned = "94" + cleaned;
+    }
+    window.open(`https://wa.me/${cleaned}`, "_blank");
+  };
+
+  const renderStatusBadge = (prospect: Prospect) => {
+    if (prospect.status === "discarded") {
+      return (
+        <Badge
+          variant={isBrokerSignalReason(prospect.discard_reason) ? "secondary" : "warning"}
+          className="gap-1 text-[10px] font-bold uppercase tracking-wide shrink-0"
+        >
+          {isBrokerSignalReason(prospect.discard_reason) && <Bot className="h-3 w-3" />}
+          {getDiscardReasonLabel(prospect.discard_reason)}
+        </Badge>
+      );
+    }
+    if (prospect.status === "converted") {
+      return (
+        <Badge variant="success" className="gap-1 text-xs font-semibold shrink-0">
+          <CheckCircle2 className="h-3 w-3" />
+          Converted
+        </Badge>
+      );
+    }
+    if (prospect.status === "contacted") {
+      return (
+        <Badge variant="info" className="gap-1 text-xs font-medium shrink-0">
+          <PhoneCall className="h-3 w-3" />
+          Contacted
+        </Badge>
+      );
+    }
+    if (prospect.status === "new") {
+      return (
+        <Badge variant="outline" className="text-xs font-medium border-blue-400/50 bg-blue-50/60 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 shrink-0">
+          New
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-xs capitalize shrink-0">
+        {prospect.status.replace(/_/g, " ")}
+      </Badge>
+    );
+  };
+
+  const renderClassificationBadge = (prospect: Prospect) => {
+    const isOwner = prospect.classification === "owner";
+    const isBroker = prospect.classification === "broker";
+    if (!isOwner && !isBroker) return null;
+
+    const tooltip = prospect.classification_reasons?.length
+      ? prospect.classification_reasons.join(", ")
+      : isOwner
+      ? "AI classified as direct owner"
+      : "AI classified as broker / agency";
+
+    if (isOwner) {
+      return (
+        <span
+          title={tooltip}
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shrink-0 cursor-help"
+        >
+          <UserCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>Direct Owner {prospect.confidence ? `${prospect.confidence}%` : ""}</span>
+        </span>
+      );
+    }
+
+    return (
+      <span
+        title={tooltip}
+        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground border border-border shrink-0 cursor-help"
+      >
+        <Bot className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
+        <span>Broker {prospect.confidence ? `${prospect.confidence}%` : ""}</span>
+      </span>
+    );
+  };
+
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -677,143 +821,255 @@ export default function ProspectsPage() {
         </div>
       )}
 
-      {/* Filters + Search */}
-      <div className="mt-8 flex flex-col gap-4 border-b border-border pb-4">
-        {/* Search bar */}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search by location, title or contact name…"
-            className="w-full rounded-lg border border-input bg-background pl-9 pr-9 py-2 text-sm outline-none focus:border-primary placeholder:text-muted-foreground text-foreground"
-          />
-          {searchQuery && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-              aria-label="Clear search"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+      {/* Filters + Search Header */}
+      <div className="mt-8 flex flex-col gap-3.5 border-b border-border pb-5">
+        {/* Row 1: Search Bar & Core Property Type Chips */}
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          {/* Search bar */}
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search location, title or poster..."
+              className="w-full rounded-lg border border-input bg-background pl-9 pr-9 py-2 text-sm outline-none focus:border-primary placeholder:text-muted-foreground text-foreground"
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Transaction Type (Sales / Rentals) & Category Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+            <div className="flex shrink-0 items-center rounded-lg bg-muted p-0.5">
+              <button
+                type="button"
+                onClick={() => { setTransactionType("sale"); setPropertyType("all"); setPage(1); }}
+                className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  transactionType === "sale"
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sales
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTransactionType("rent"); setPropertyType("all"); setPage(1); }}
+                className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  transactionType === "rent"
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Rentals
+              </button>
+            </div>
+
+            <div className="h-4 w-px bg-border shrink-0" />
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => { setPropertyType("all"); setPage(1); }}
+                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  propertyType === "all"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
+                }`}
+              >
+                All Types
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPropertyType("house"); setPage(1); }}
+                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  propertyType === "house"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
+                }`}
+              >
+                Houses
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPropertyType("apartment"); setPage(1); }}
+                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  propertyType === "apartment"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
+                }`}
+              >
+                Apartments
+              </button>
+              {transactionType === "sale" && (
+                <button
+                  type="button"
+                  onClick={() => { setPropertyType("land"); setPage(1); }}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    propertyType === "land"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
+                  }`}
+                >
+                  Land
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Filter row */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex items-center gap-2 text-sm shrink-0">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium text-foreground">Filters</span>
-        </div>
-        <Select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="h-9 w-full sm:w-auto text-sm"
-        >
-          <option value="">All Statuses</option>
-          <option value="new">New</option>
-          <option value="contacted">Contacted</option>
-          <option value="converted">Converted</option>
-          <option value="discarded">Discarded</option>
-        </Select>
-        <Select
-          value={filterSource}
-          onChange={(e) => setFilterSource(e.target.value)}
-          className="h-9 w-full sm:w-auto text-sm"
-        >
-          <option value="">All Portals</option>
-          <option value="ikman">ikman.lk</option>
-          <option value="lpw">LankaPropertyWeb</option>
-        </Select>
-        <Select
-          value={filterPriceGrade}
-          onChange={(e) => { setFilterPriceGrade(e.target.value); setPage(1); }}
-          className="h-9 w-full sm:w-auto text-sm"
-        >
-          <option value="all">All Deal Grades</option>
-          <option value="underpriced">🔥 Hot Deals (Below Market)</option>
-          <option value="fair_market">Fair Market Value</option>
-          <option value="overpriced">Overpriced (Negotiable)</option>
-          <option value="unrated">Unrated</option>
-        </Select>
-        <Select
-          value={sortBy}
-          onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
-          className="h-9 w-full sm:w-auto text-sm"
-        >
-          <option value="default">Newest Seen</option>
-          <option value="best_deals">🔥 Best Deals First</option>
-        </Select>
-        {/* Segmented Control for Transaction Type */}
-        <div className="flex shrink-0 items-center rounded-lg bg-muted p-1 w-full sm:w-auto">
-          <button
-            onClick={() => { setTransactionType("sale"); setPropertyType("all"); setPage(1); }}
-            className={`flex-1 sm:flex-none cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-              transactionType === "sale" 
-                ? "bg-card text-foreground shadow-xs" 
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Sales
-          </button>
-          <button
-            onClick={() => { setTransactionType("rent"); setPropertyType("all"); setPage(1); }}
-            className={`flex-1 sm:flex-none cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-              transactionType === "rent" 
-                ? "bg-card text-foreground shadow-xs" 
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Rentals
-          </button>
-        </div>
+        {/* Row 2: Pipeline Stages & Secondary Filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+          {/* Status Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+            {[
+              { id: "", label: "Active Pipeline" },
+              { id: "new", label: "New Leads" },
+              { id: "contacted", label: "Contacted" },
+              { id: "converted", label: "Converted" },
+              { id: "discarded", label: "Discarded" },
+            ].map((tab) => {
+              const isActive = filterStatus === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => { setFilterStatus(tab.id); setPage(1); }}
+                  className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    isActive
+                      ? tab.id === "discarded"
+                        ? "bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800 shadow-xs"
+                        : tab.id === "converted"
+                        ? "bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800 shadow-xs"
+                        : "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Pill Buttons for Property Type */}
-        <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap w-full sm:w-auto pb-2 sm:pb-0 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
-          <button
-            onClick={() => { setPropertyType("all"); setPage(1); }}
-            className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-              propertyType === "all"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => { setPropertyType("house"); setPage(1); }}
-            className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-              propertyType === "house"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
-            }`}
-          >
-            Houses
-          </button>
-          <button
-            onClick={() => { setPropertyType("apartment"); setPage(1); }}
-            className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-              propertyType === "apartment"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
-            }`}
-          >
-            Apartments
-          </button>
-          {transactionType === "sale" && (
+          {/* Quick AI "Direct Owners" toggle + More Filters dropdown */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Direct Owners Only Quick Chip */}
             <button
-              onClick={() => { setPropertyType("land"); setPage(1); }}
-              className={`cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                propertyType === "land"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
+              type="button"
+              onClick={() => {
+                setFilterClassification((prev) => (prev === "owner" ? "all" : "owner"));
+                setPage(1);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                filterClassification === "owner"
+                  ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 shadow-xs"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-foreground/40"
               }`}
+              title="Show only direct owner listings identified by AI classifier"
             >
-              Land
+              <UserCheck className={`h-3.5 w-3.5 ${filterClassification === "owner" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`} />
+              <span>Direct Owners</span>
+              {filterClassification === "owner" && (
+                <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+              )}
             </button>
-          )}
-        </div>
+
+            {/* More Filters Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`h-8 gap-1.5 px-2.5 text-xs font-medium cursor-pointer ${
+                    activeSecondaryFiltersCount > 0 ? "border-primary text-primary font-semibold" : ""
+                  }`}
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  <span>Filters</span>
+                  {activeSecondaryFiltersCount > 0 && (
+                    <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground px-1">
+                      {activeSecondaryFiltersCount}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-2 space-y-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Deal Intelligence</label>
+                  <Select
+                    value={filterPriceGrade}
+                    onChange={(e) => { setFilterPriceGrade(e.target.value); setPage(1); }}
+                    className="h-8 w-full text-xs"
+                  >
+                    <option value="all">All Deal Grades</option>
+                    <option value="underpriced">🔥 Hot Deals (Below Market)</option>
+                    <option value="fair_market">Fair Market Value</option>
+                    <option value="overpriced">Overpriced (Negotiable)</option>
+                    <option value="unrated">Unrated</option>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Source Portal</label>
+                  <Select
+                    value={filterSource}
+                    onChange={(e) => { setFilterSource(e.target.value); setPage(1); }}
+                    className="h-8 w-full text-xs"
+                  >
+                    <option value="">All Portals</option>
+                    <option value="ikman">ikman.lk</option>
+                    <option value="lpw">LankaPropertyWeb</option>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Sort Order</label>
+                  <Select
+                    value={sortBy}
+                    onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+                    className="h-8 w-full text-xs"
+                  >
+                    <option value="default">Newest Seen</option>
+                    <option value="best_deals">🔥 Best Deals First</option>
+                  </Select>
+                </div>
+
+                {activeSecondaryFiltersCount > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={resetSecondaryFilters}
+                      className="text-xs text-destructive focus:text-destructive flex items-center justify-center font-medium cursor-pointer py-1.5"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1.5" />
+                      <span>Reset Filters</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {activeSecondaryFiltersCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetSecondaryFilters}
+                className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground hidden lg:inline-flex"
+                title="Reset active secondary filters"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                <span>Reset</span>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -822,9 +1078,9 @@ export default function ProspectsPage() {
         {/* Mobile Cards */}
         <div className="flex flex-col divide-y divide-border md:hidden">
           {loading ? (
-            <div className="p-6 text-center text-muted-foreground">Loading prospects...</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">Loading prospects...</div>
           ) : prospects.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground">No prospects found.</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">No prospects found.</div>
           ) : (
             prospects
               .filter((p) => !filterSource || (p.source || "ikman").toLowerCase() === filterSource.toLowerCase())
@@ -835,18 +1091,19 @@ export default function ProspectsPage() {
               return (
                 <div
                   key={prospect.id}
-                  className={`p-4 flex flex-col gap-3 ${
+                  className={`p-4 flex flex-col gap-3 transition-colors ${
                     isSelected
                       ? "bg-emerald-50/60 dark:bg-emerald-950/30 ring-1 ring-emerald-500/30"
                       : isDiscarded
-                      ? "bg-amber-50/25 dark:bg-amber-950/15 hover:bg-amber-50/40 dark:hover:bg-amber-950/25"
+                      ? "bg-amber-50/20 dark:bg-amber-950/15"
                       : isTerminal
-                      ? "bg-muted/40 opacity-70 hover:opacity-90"
-                      : "hover:bg-muted/50"
+                      ? "bg-muted/40 opacity-70"
+                      : "hover:bg-muted/30"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  {/* Card Header: Selection, Date, Source, AI Classification, Status Badge */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {isAdminOrRoot && telegramAgentConfigured && (
                         <button
                           type="button"
@@ -861,86 +1118,60 @@ export default function ProspectsPage() {
                           )}
                         </button>
                       )}
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground">
                         {format(parseISO(prospect.first_seen_at), "MMM d, yyyy")}
                       </span>
                       <SourceBadge source={prospect.source} url={prospect.ikman_url} />
-                      {isDiscarded && (
-                        <Badge
-                          variant={isBrokerSignalReason(prospect.discard_reason) ? "secondary" : "warning"}
-                          className="gap-1 text-[10px] font-bold uppercase tracking-wide"
-                        >
-                          {isBrokerSignalReason(prospect.discard_reason) && <Bot className="h-3 w-3" />}
-                          {getDiscardReasonLabel(prospect.discard_reason)}
-                        </Badge>
-                      )}
+                      {renderClassificationBadge(prospect)}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {isDiscarded && (
-                        <Button
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleUpdateStatus(prospect.id, "new")}
-                          disabled={updatingStatusId === prospect.id}
-                          className="h-7 gap-1 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
-                          title="Restore this prospect to active pipeline"
-                        >
-                          <Undo2 className="h-3 w-3" />
-                          <span>Keep</span>
-                        </Button>
-                      )}
-                      <Select
-                        value={prospect.status}
-                        disabled={updatingStatusId === prospect.id}
-                        onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
-                        className={`h-7 w-auto py-0 pl-2 pr-6 text-xs font-medium cursor-pointer ${
-                          isDiscarded
-                            ? "border-amber-500/50 bg-amber-50/50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                            : "bg-background"
-                        }`}
-                      >
-                        <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="converted">Converted</option>
-                        <option value="discarded">Discarded...</option>
-                        {!["new", "contacted", "converted", "discarded"].includes(prospect.status) && (
-                          <option value={prospect.status}>{prospect.status.replace(/_/g, " ")}</option>
-                        )}
-                      </Select>
-                    </div>
+                    <div>{renderStatusBadge(prospect)}</div>
                   </div>
-                
-                <div>
-                  <div className="flex items-start gap-2">
-                    <span className="font-medium text-foreground line-clamp-2">{prospect.title}</span>
-                    {prospect.ikman_url && (
-                      <a href={prospect.ikman_url} target="_blank" rel="noopener noreferrer" className="shrink-0 mt-1 text-blue-600 hover:text-blue-800">
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    )}
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
-                    <span>{prospect.property_type}</span>
-                    <span>•</span>
-                    <span>{prospect.listing_type}</span>
-                    <span>•</span>
-                    <span>{prospect.location}</span>
-                  </div>
-                </div>
 
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-foreground">
-                      {prospect.price || "Price not listed"}
-                    </span>
+                  {/* Title & Location */}
+                  <div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="font-semibold text-foreground text-sm line-clamp-2">{prospect.title}</span>
+                      {prospect.ikman_url && (
+                        <a href={prospect.ikman_url} target="_blank" rel="noopener noreferrer" className="shrink-0 mt-0.5 text-blue-600 hover:text-blue-800">
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="capitalize">{prospect.property_type}</span>
+                      <span>•</span>
+                      <span className="capitalize">{prospect.listing_type}</span>
+                      <span>•</span>
+                      {prospect.suburb ? (
+                        <span className="font-medium text-foreground inline-flex items-center gap-1">
+                          {prospect.suburb_source === "ikman_detail" ? (
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          ) : (
+                            <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                          )}
+                          <span>{prospect.suburb}</span>
+                        </span>
+                      ) : (
+                        <span>{prospect.location}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Price & Deal Rating */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-bold text-foreground">
+                        {prospect.price || "Price not listed"}
+                      </span>
+                      {prospect.price_unit_rate && (
+                        <span className="text-[11px] text-muted-foreground">
+                          (≈ LKR {Math.round(prospect.price_unit_rate).toLocaleString()} {prospect.price_unit_label || ""})
+                        </span>
+                      )}
+                    </div>
                     {prospect.price_grade && prospect.price_grade !== "unrated" && (
                       <span
-                        title={
-                          prospect.price_unit_rate && prospect.market_median_unit_rate
-                            ? `Listing: LKR ${Math.round(prospect.price_unit_rate).toLocaleString()} | Market Median: LKR ${Math.round(prospect.market_median_unit_rate).toLocaleString()}`
-                            : undefined
-                        }
-                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold border ${
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold border ${
                           prospect.price_grade === "underpriced"
                             ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800"
                             : prospect.price_grade === "overpriced"
@@ -953,200 +1184,56 @@ export default function ProspectsPage() {
                       </span>
                     )}
                   </div>
-                  {prospect.price_unit_rate && (
-                    <span className="text-[11px] text-muted-foreground">
-                      ≈ LKR {Math.round(prospect.price_unit_rate).toLocaleString()} {prospect.price_unit_label || ""}
-                    </span>
-                  )}
-                </div>
 
-                <div className="rounded-lg bg-muted/50 p-3 text-sm flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Contact</span>
-                    <span className="font-medium text-foreground">{prospect.poster_name || "Unknown"}</span>
-                  </div>
-                  {prospect.phone_number ? (
-                    <div className="font-medium text-foreground">{prospect.phone_number}</div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <span className="text-muted-foreground italic text-sm">Phone not fetched</span>
-                      {prospect.classification === "owner" && (
-                        <Button 
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFetchSinglePhone(prospect.id)}
-                          disabled={fetchingPhoneId === prospect.id}
-                          className="w-full h-8 text-xs gap-2"
-                        >
-                          {fetchingPhoneId === prospect.id && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
-                          {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch Phone Number"}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                  {isAdminOrRoot && telegramAgentConfigured && !isTerminal && (
-                    <div className="pt-2 border-t border-border flex items-center gap-2">
-                      {prospect.assignment_status === "pending" ? (
-                        <div className="flex-1 flex items-center justify-between gap-1.5">
-                          <Badge variant="warning" className="gap-1.5 py-1 text-xs font-medium">
-                            <Clock className="h-3.5 w-3.5" />
-                            <span>Assigned (Awaiting Response)</span>
-                          </Badge>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRemoveAssignment(prospect)}
-                            disabled={removingAssignmentProspectId === prospect.id}
-                            className="h-6 gap-1 px-2 text-[11px]"
-                            title="Remove sent assignment from agent"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            <span>Cancel</span>
-                          </Button>
-                        </div>
-                      ) : prospect.assignment_status === "contacted" || prospect.assignment_status === "interested" ? (
-                        <div className="flex-1 flex items-center justify-between gap-2">
-                          <Badge variant="success" className="gap-1.5 py-1 text-xs font-medium">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            <span>Contacted</span>
-                          </Badge>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEditAssignment(prospect)}
-                            className="h-7 gap-1 px-2.5 text-xs font-medium"
-                            title="Edit assignment outcome"
-                          >
-                            <Pencil className="h-3 w-3" />
-                            <span>Change</span>
-                          </Button>
-                        </div>
-                      ) : prospect.assignment_status === "not_interested" ? (
-                        <div className="flex-1 flex items-center justify-between gap-2">
-                          <Badge variant="destructive" className="py-1 text-xs font-medium">
-                            <span>Not Interested</span>
-                          </Badge>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEditAssignment(prospect)}
-                            className="h-7 gap-1 px-2.5 text-xs font-medium"
-                            title="Edit or correct assignment outcome"
-                          >
-                            <Pencil className="h-3 w-3" />
-                            <span>Fix</span>
-                          </Button>
-                        </div>
-                      ) : prospect.assignment_status === "no_answer" ? (
-                        <div className="flex-1 flex items-center justify-between gap-2">
-                          <Badge variant="secondary" className="text-xs font-medium">Outcome: No Answer</Badge>
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenEditAssignment(prospect)}
-                              className="h-7 gap-1 px-2 text-xs"
-                              title="Edit assignment outcome"
-                            >
-                              <Pencil className="h-3 w-3" />
-                              <span>Edit</span>
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleSingleAssign(prospect.id)}
-                              disabled={isAssigning}
-                              className="h-7 gap-1 px-2.5 text-xs"
-                            >
-                              <Send className="h-3 w-3" />
-                              <span>Re-assign</span>
-                            </Button>
-                          </div>
-                        </div>
-                      ) : prospect.assignment_status === "callback_later" ? (
-                        <div className="flex-1 flex items-center justify-between gap-2">
-                          <Badge variant="info" className="text-xs font-medium">Outcome: Call Back Later</Badge>
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenEditAssignment(prospect)}
-                              className="h-7 gap-1 px-2 text-xs"
-                              title="Edit assignment outcome"
-                            >
-                              <Pencil className="h-3 w-3" />
-                              <span>Edit</span>
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleSingleAssign(prospect.id)}
-                              disabled={isAssigning}
-                              className="h-7 gap-1 px-2.5 text-xs"
-                            >
-                              <Send className="h-3 w-3" />
-                              <span>Re-assign</span>
-                            </Button>
-                          </div>
-                        </div>
+                  {/* Contact Summary Box */}
+                  <div className="rounded-lg bg-muted/40 p-2.5 text-xs flex items-center justify-between gap-2">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-muted-foreground truncate">{prospect.poster_name || "Unknown poster"}</span>
+                      {prospect.phone_number ? (
+                        <span className="font-mono font-medium text-foreground">{prospect.phone_number}</span>
                       ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSingleAssign(prospect.id)}
-                          disabled={isAssigning}
-                          className="flex-1 h-8 gap-1.5 text-xs"
-                        >
-                          <Send className="h-3 w-3" />
-                          <span>Dispatch to Agent</span>
-                        </Button>
+                        <span className="italic text-muted-foreground text-[11px]">No phone number</span>
                       )}
                     </div>
-                  )}
-                </div>
+                    {/* Assignment status indicator if any */}
+                    {prospect.assignment_status && (
+                      <Badge
+                        variant={
+                          prospect.assignment_status === "contacted" || prospect.assignment_status === "interested"
+                            ? "success"
+                            : prospect.assignment_status === "pending"
+                            ? "warning"
+                            : prospect.assignment_status === "not_interested"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                        className="text-[10px] shrink-0 capitalize"
+                      >
+                        {prospect.assignment_status.replace(/_/g, " ")}
+                      </Badge>
+                    )}
+                  </div>
 
-                {/* Mobile card quick action buttons */}
-                <div className="pt-2 border-t border-border flex items-center gap-2">
-                  {isDiscarded ? (
-                    <Button
-                      type="button"
-                      variant="default"
-                      onClick={() => handleUpdateStatus(prospect.id, "new")}
-                      disabled={updatingStatusId === prospect.id}
-                      className="flex-1 min-h-[40px] text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    >
-                      <Undo2 className="h-3.5 w-3.5" />
-                      <span>Keep / Restore to Active</span>
-                    </Button>
-                  ) : (
-                    <>
-                      {prospect.status === "new" && (
+                  {/* Mobile Card Action Bar: Primary Action + Overflow Menu */}
+                  <div className="pt-2 border-t border-border flex items-center gap-2">
+                    <div className="flex-1">
+                      {isDiscarded ? (
                         <Button
                           type="button"
-                          variant="outline"
-                          onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                          variant="default"
+                          onClick={() => handleUpdateStatus(prospect.id, "new")}
                           disabled={updatingStatusId === prospect.id}
-                          className="flex-1 min-h-[40px] text-xs font-semibold gap-1.5"
+                          className="w-full min-h-[38px] text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
                         >
-                          <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                          <span>Mark Contacted</span>
+                          <Undo2 className="h-3.5 w-3.5" />
+                          <span>Restore to Active</span>
                         </Button>
-                      )}
-
-                      {prospect.status === "contacted" && (
+                      ) : prospect.status === "contacted" ? (
                         <Button
                           type="button"
                           onClick={() => handleGenerateDraft(prospect)}
                           disabled={draftLoading === prospect.id}
-                          className="flex-1 min-h-[40px] text-xs font-semibold gap-1.5"
+                          className="w-full min-h-[38px] text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
                         >
                           {draftLoading === prospect.id ? (
                             <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -1157,36 +1244,170 @@ export default function ProspectsPage() {
                             </>
                           )}
                         </Button>
-                      )}
-
-                      {prospect.status === "converted" && (
-                        <div className="flex-1 flex items-center justify-center min-h-[40px]">
+                      ) : prospect.status === "converted" ? (
+                        <div className="w-full flex items-center justify-center min-h-[38px]">
                           <Badge variant="success" className="w-full justify-center gap-1.5 py-2 text-xs font-bold">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             <span>Converted to Listing</span>
                           </Badge>
                         </div>
-                      )}
+                      ) : prospect.status === "new" ? (
+                        prospect.phone_number ? (
+                          isAdminOrRoot && telegramAgentConfigured ? (
+                            prospect.assignment_status === "pending" ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                                disabled={updatingStatusId === prospect.id}
+                                className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
+                              >
+                                <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                                <span>Mark Contacted</span>
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="default"
+                                onClick={() => handleSingleAssign(prospect.id)}
+                                disabled={isAssigning}
+                                className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                <span>Dispatch to Agent</span>
+                              </Button>
+                            )
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                              disabled={updatingStatusId === prospect.id}
+                              className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
+                            >
+                              <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                              <span>Mark Contacted</span>
+                            </Button>
+                          )
+                        ) : prospect.classification === "owner" ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleFetchSinglePhone(prospect.id)}
+                            disabled={fetchingPhoneId === prospect.id}
+                            className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
+                          >
+                            {fetchingPhoneId === prospect.id ? (
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
+                            )}
+                            <span>{fetchingPhoneId === prospect.id ? "Fetching Phone..." : "Fetch Phone Number"}</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                            disabled={updatingStatusId === prospect.id}
+                            className="w-full min-h-[38px] text-xs font-semibold gap-1.5"
+                          >
+                            <span>Mark Contacted</span>
+                          </Button>
+                        )
+                      ) : null}
+                    </div>
 
-                      {!isTerminal && (
+                    {/* Secondary Actions Overflow Dropdown */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => setDiscardModalProspect(prospect)}
-                          disabled={updatingStatusId === prospect.id}
-                          className="min-h-[40px] px-3 text-xs font-medium text-destructive border-destructive/30 hover:bg-destructive/10"
+                          size="sm"
+                          className="min-h-[38px] w-10 p-0 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+                          title="More actions"
                         >
-                          <span>Discard...</span>
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
-                      )}
-                    </>
-                  )}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        {prospect.phone_number && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleCopyPhone(prospect.phone_number)}>
+                              <Copy className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                              <span>Copy Phone</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenWhatsApp(prospect.phone_number)}>
+                              <MessageCircle className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                              <span>WhatsApp Chat</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
+                        {prospect.ikman_url && (
+                          <DropdownMenuItem onClick={() => window.open(prospect.ikman_url, "_blank")}>
+                            <ExternalLink className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                            <span>Open Original Ad</span>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        {prospect.status === "new" && (
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "contacted")}>
+                            <PhoneCall className="h-3.5 w-3.5 mr-2 text-blue-600" />
+                            <span>Mark as Contacted</span>
+                          </DropdownMenuItem>
+                        )}
+                        {prospect.status === "contacted" && (
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "new")}>
+                            <Undo2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                            <span>Mark as New</span>
+                          </DropdownMenuItem>
+                        )}
+                        {isAdminOrRoot && telegramAgentConfigured && (
+                          <>
+                            {prospect.assignment_status === "pending" && (
+                              <DropdownMenuItem onClick={() => handleRemoveAssignment(prospect)} className="text-amber-600">
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                <span>Cancel Assignment</span>
+                              </DropdownMenuItem>
+                            )}
+                            {prospect.assignment_id && (
+                              <DropdownMenuItem onClick={() => handleOpenEditAssignment(prospect)}>
+                                <Pencil className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                <span>Edit Outcome</span>
+                              </DropdownMenuItem>
+                            )}
+                            {!prospect.assignment_id && !isTerminal && (
+                              <DropdownMenuItem onClick={() => handleSingleAssign(prospect.id)}>
+                                <Send className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                <span>Dispatch to Agent</span>
+                              </DropdownMenuItem>
+                            )}
+                          </>
+                        )}
+                        {isDiscarded ? (
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "new")}>
+                            <Undo2 className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                            <span>Restore to Active</span>
+                          </DropdownMenuItem>
+                        ) : !isTerminal ? (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setDiscardModalProspect(prospect)} className="text-destructive focus:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5 mr-2" />
+                              <span>Discard Prospect...</span>
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+              );
+            })
+          )}
+        </div>
 
         {/* Desktop Table */}
         <div className="hidden md:block">
@@ -1209,10 +1430,10 @@ export default function ProspectsPage() {
                     </button>
                   </TableHead>
                 )}
-                <TableHead className="px-6 py-4">Date</TableHead>
+                <TableHead className="px-6 py-4">Date & Portal</TableHead>
                 <TableHead className="px-6 py-4">Title / Location</TableHead>
                 <TableHead className="px-6 py-4">Price</TableHead>
-                <TableHead className="px-6 py-4">Contact Info</TableHead>
+                <TableHead className="px-6 py-4">Contact & AI</TableHead>
                 <TableHead className="px-6 py-4">Status</TableHead>
                 <TableHead className="px-6 py-4 text-right">Actions</TableHead>
               </TableRow>
@@ -1337,253 +1558,217 @@ export default function ProspectsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="px-6 py-4">
-                        {prospect.phone_number ? (
-                          <div className="font-medium text-foreground">{prospect.phone_number}</div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground italic text-xs">Not fetched</span>
-                            {prospect.classification === "owner" && (
-                              <Button 
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleFetchSinglePhone(prospect.id)}
-                                disabled={fetchingPhoneId === prospect.id}
-                                className="h-6 gap-1 px-2 text-xs"
-                              >
-                                {fetchingPhoneId === prospect.id && <RefreshCw className="h-3 w-3 animate-spin" />}
-                                {fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}
-                              </Button>
-                            )}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-foreground text-xs">{prospect.poster_name || "Unknown"}</span>
+                            {renderClassificationBadge(prospect)}
                           </div>
-                        )}
-                        <div className="mt-1 text-xs text-muted-foreground">{prospect.poster_name || "-"}</div>
+                          {prospect.phone_number ? (
+                            <div className="font-mono text-xs text-foreground font-medium">
+                              {prospect.phone_number}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground italic text-xs">No phone</span>
+                              {prospect.classification === "owner" && (
+                                <Button 
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleFetchSinglePhone(prospect.id)}
+                                  disabled={fetchingPhoneId === prospect.id}
+                                  className="h-6 gap-1 px-2 text-[11px] cursor-pointer"
+                                >
+                                  {fetchingPhoneId === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <PhoneCall className="h-3 w-3 text-emerald-600" />}
+                                  <span>{fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch"}</span>
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={prospect.status}
-                            disabled={updatingStatusId === prospect.id}
-                            onChange={(e) => handleUpdateStatus(prospect.id, e.target.value)}
-                            className={`h-7 w-auto py-0 pl-2 pr-6 text-xs font-medium cursor-pointer ${
-                              isDiscarded
-                                ? "border-amber-500/50 bg-amber-50/50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                                : "bg-background"
-                            }`}
-                          >
-                            <option value="new">New</option>
-                            <option value="contacted">Contacted</option>
-                            <option value="converted">Converted</option>
-                            <option value="discarded">Discarded...</option>
-                            {!["new", "contacted", "converted", "discarded"].includes(prospect.status) && (
-                              <option value={prospect.status}>{prospect.status.replace(/_/g, " ")}</option>
-                            )}
-                          </Select>
-                          {isDiscarded && (
-                            <Badge
-                              variant={isBrokerSignalReason(prospect.discard_reason) ? "secondary" : "warning"}
-                              className="gap-1 text-[10px] font-bold uppercase tracking-wide"
-                            >
-                              {isBrokerSignalReason(prospect.discard_reason) && <Bot className="h-3 w-3" />}
-                              {getDiscardReasonLabel(prospect.discard_reason)}
-                            </Badge>
+                        <div className="flex flex-col gap-1 items-start">
+                          {renderStatusBadge(prospect)}
+                          {prospect.assignment_status && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <span>Agent:</span>
+                              <span className="font-medium capitalize text-foreground">{prospect.assignment_status.replace(/_/g, " ")}</span>
+                            </span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Contextual Primary Action */}
                           {isDiscarded ? (
-                            <div className="flex items-center gap-1.5">
-                              {prospect.assignment_id && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleOpenEditAssignment(prospect)}
-                                  className="h-8 gap-1.5 px-2.5 text-xs font-semibold cursor-pointer"
-                                  title="Fix or edit assignment outcome"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                  <span>Fix Outcome</span>
-                                </Button>
-                              )}
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => handleUpdateStatus(prospect.id, "new")}
-                                disabled={updatingStatusId === prospect.id}
-                                className="h-8 gap-1.5 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
-                                title="Restore this prospect to active pipeline"
-                              >
-                                <Undo2 className="h-3.5 w-3.5" />
-                                <span>Keep</span>
-                              </Button>
-                            </div>
-                          ) : !isTerminal ? (
-                            <div className="flex items-center gap-1.5">
-                              {isAdminOrRoot && telegramAgentConfigured && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleUpdateStatus(prospect.id, "new")}
+                              disabled={updatingStatusId === prospect.id}
+                              className="h-7 gap-1 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                              title="Restore this prospect to active pipeline"
+                            >
+                              <Undo2 className="h-3.5 w-3.5" />
+                              <span>Restore</span>
+                            </Button>
+                          ) : prospect.status === "contacted" ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleGenerateDraft(prospect)}
+                              disabled={draftLoading === prospect.id}
+                              className="h-7 gap-1 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                              title="Convert to property listing"
+                            >
+                              {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                              <span>Convert ⚡</span>
+                            </Button>
+                          ) : prospect.status === "converted" ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span>Ready</span>
+                            </span>
+                          ) : prospect.status === "new" ? (
+                            prospect.phone_number ? (
+                              isAdminOrRoot && telegramAgentConfigured ? (
                                 prospect.assignment_status === "pending" ? (
-                                  <div className="flex items-center gap-1">
-                                    <Badge
-                                      variant="warning"
-                                      className="gap-1 py-1 text-xs font-medium"
-                                      title="Dispatched to agent — awaiting response"
-                                    >
-                                      <Clock className="h-3 w-3" />
-                                      <span>Assigned</span>
-                                    </Badge>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleRemoveAssignment(prospect)}
-                                      disabled={removingAssignmentProspectId === prospect.id}
-                                      className="h-7 gap-1 px-2 text-xs"
-                                      title="Remove sent assignment from agent"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                      <span>Cancel</span>
-                                    </Button>
-                                  </div>
-                                ) : prospect.assignment_status === "contacted" || prospect.assignment_status === "interested" ? (
-                                  <div className="flex items-center gap-1">
-                                    <Badge
-                                      variant="success"
-                                      className="gap-1 py-1 text-xs font-medium"
-                                      title="Agent outcome: Contacted"
-                                    >
-                                      <CheckCircle2 className="h-3 w-3" />
-                                      <span>Contacted</span>
-                                    </Badge>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleOpenEditAssignment(prospect)}
-                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                                      title="Edit assignment outcome"
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                ) : prospect.assignment_status === "not_interested" ? (
-                                  <div className="flex items-center gap-1">
-                                    <Badge
-                                      variant="destructive"
-                                      className="py-1 text-xs font-medium"
-                                      title="Agent outcome: Not Interested"
-                                    >
-                                      <span>Not Interested</span>
-                                    </Badge>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleOpenEditAssignment(prospect)}
-                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                                      title="Fix or edit assignment outcome"
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                ) : prospect.assignment_status === "no_answer" ? (
-                                  <div className="flex items-center gap-1">
-                                    <Badge
-                                      variant="secondary"
-                                      className="py-1 text-xs font-medium"
-                                      title="Agent outcome: No Answer"
-                                    >
-                                      <span>No Answer</span>
-                                    </Badge>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleOpenEditAssignment(prospect)}
-                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                                      title="Edit assignment outcome"
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleSingleAssign(prospect.id)}
-                                      disabled={isAssigning}
-                                      className="h-7 gap-1 px-2 text-xs"
-                                      title="Re-assign to agent"
-                                    >
-                                      <Send className="h-3 w-3" />
-                                      <span>Re-assign</span>
-                                    </Button>
-                                  </div>
-                                ) : prospect.assignment_status === "callback_later" ? (
-                                  <div className="flex items-center gap-1">
-                                    <Badge
-                                      variant="info"
-                                      className="py-1 text-xs font-medium"
-                                      title="Agent outcome: Call Back Later"
-                                    >
-                                      <span>Call Later</span>
-                                    </Badge>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleOpenEditAssignment(prospect)}
-                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                                      title="Edit assignment outcome"
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleSingleAssign(prospect.id)}
-                                      disabled={isAssigning}
-                                      className="h-7 gap-1 px-2 text-xs"
-                                      title="Re-assign to agent"
-                                    >
-                                      <Send className="h-3 w-3" />
-                                      <span>Re-assign</span>
-                                    </Button>
-                                  </div>
+                                  <Badge variant="warning" className="h-7 gap-1 px-2 text-[11px] font-medium" title="Dispatched to field agent">
+                                    <Clock className="h-3 w-3" />
+                                    <span>Assigned</span>
+                                  </Badge>
                                 ) : (
                                   <Button
-                                    type="button"
-                                    variant="outline"
                                     size="sm"
+                                    variant="default"
                                     onClick={() => handleSingleAssign(prospect.id)}
                                     disabled={isAssigning}
-                                    className="h-7 gap-1 px-2.5 text-xs font-medium"
+                                    className="h-7 gap-1 px-2.5 text-xs font-semibold cursor-pointer"
                                     title="Dispatch to agent via Telegram"
                                   >
                                     <Send className="h-3 w-3" />
                                     <span>Assign</span>
                                   </Button>
                                 )
-                              )}
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                                  disabled={updatingStatusId === prospect.id}
+                                  className="h-7 gap-1 px-2.5 text-xs font-semibold cursor-pointer"
+                                >
+                                  <PhoneCall className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                  <span>Contacted</span>
+                                </Button>
+                              )
+                            ) : prospect.classification === "owner" ? (
                               <Button
-                                size="sm"
-                                onClick={() => handleGenerateDraft(prospect)}
-                                disabled={draftLoading === prospect.id}
-                                className="h-7 gap-1 px-3 text-xs font-medium"
-                              >
-                                {draftLoading === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Convert ⚡"}
-                              </Button>
-                              <Button
-                                type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setDiscardModalProspect(prospect)}
-                                disabled={updatingStatusId === prospect.id}
-                                className="h-7 gap-1 px-2.5 text-xs font-medium text-destructive border-destructive/30 hover:bg-destructive/10"
-                                title="Discard prospect with a reason"
+                                onClick={() => handleFetchSinglePhone(prospect.id)}
+                                disabled={fetchingPhoneId === prospect.id}
+                                className="h-7 gap-1 px-2 text-xs font-medium cursor-pointer"
                               >
-                                <span>Discard...</span>
+                                {fetchingPhoneId === prospect.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <PhoneCall className="h-3 w-3 text-emerald-600" />}
+                                <span>{fetchingPhoneId === prospect.id ? "Fetching..." : "Fetch Phone"}</span>
                               </Button>
-                            </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                                disabled={updatingStatusId === prospect.id}
+                                className="h-7 gap-1 px-2 text-xs font-medium cursor-pointer"
+                              >
+                                <span>Contacted</span>
+                              </Button>
+                            )
                           ) : null}
+
+                          {/* Secondary Actions Overflow Dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                                title="More options"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              {prospect.phone_number && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleCopyPhone(prospect.phone_number)} className="cursor-pointer">
+                                    <Copy className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                    <span>Copy Phone</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleOpenWhatsApp(prospect.phone_number)} className="cursor-pointer">
+                                    <MessageCircle className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                                    <span>WhatsApp Chat</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+                              {prospect.ikman_url && (
+                                <DropdownMenuItem onClick={() => window.open(prospect.ikman_url, "_blank")} className="cursor-pointer">
+                                  <ExternalLink className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                  <span>Open Original Ad</span>
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              {prospect.status === "new" && (
+                                <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "contacted")} className="cursor-pointer">
+                                  <PhoneCall className="h-3.5 w-3.5 mr-2 text-blue-600" />
+                                  <span>Mark as Contacted</span>
+                                </DropdownMenuItem>
+                              )}
+                              {prospect.status === "contacted" && (
+                                <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "new")} className="cursor-pointer">
+                                  <Undo2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                  <span>Mark as New</span>
+                                </DropdownMenuItem>
+                              )}
+                              {isAdminOrRoot && telegramAgentConfigured && (
+                                <>
+                                  {prospect.assignment_status === "pending" && (
+                                    <DropdownMenuItem onClick={() => handleRemoveAssignment(prospect)} className="text-amber-600 cursor-pointer">
+                                      <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                      <span>Cancel Assignment</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {prospect.assignment_id && (
+                                    <DropdownMenuItem onClick={() => handleOpenEditAssignment(prospect)} className="cursor-pointer">
+                                      <Pencil className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                      <span>Edit Outcome</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {!prospect.assignment_id && !isTerminal && (
+                                    <DropdownMenuItem onClick={() => handleSingleAssign(prospect.id)} className="cursor-pointer">
+                                      <Send className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                      <span>Dispatch to Agent</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                </>
+                              )}
+                              {isDiscarded ? (
+                                <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "new")} className="text-emerald-600 cursor-pointer">
+                                  <Undo2 className="h-3.5 w-3.5 mr-2" />
+                                  <span>Restore to Active</span>
+                                </DropdownMenuItem>
+                              ) : !isTerminal ? (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setDiscardModalProspect(prospect)} className="text-destructive focus:text-destructive cursor-pointer">
+                                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                    <span>Discard Prospect...</span>
+                                  </DropdownMenuItem>
+                                </>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>

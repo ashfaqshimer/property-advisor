@@ -22,12 +22,57 @@ so it wouldn't trigger today — the flag is there so it can't start.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Protocol
+import random
+import time
+from typing import Any, Callable, Protocol, TypeVar
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
+import httpx
+import structlog
 
 from app.config import get_settings
+
+logger = structlog.get_logger()
+
+TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+T = TypeVar("T")
+
+
+def is_transient_error(exc: Exception) -> bool:
+    """True if `exc` is a temporary network or upstream server/rate error worth retrying."""
+    if isinstance(exc, genai_errors.APIError):
+        code = getattr(exc, "code", None)
+        return code in TRANSIENT_STATUS_CODES
+    if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError, httpx.ConnectError)):
+        return True
+    return False
+
+
+def retry_with_backoff(
+    fn: Callable[[], T],
+    max_attempts: int = 3,
+    base_delay: float = 0.5,
+    description: str = "gemini_call",
+) -> T:
+    """Execute `fn` with exponential backoff on transient upstream errors."""
+    for attempt in range(max_attempts):
+        try:
+            return fn()
+        except Exception as exc:
+            if not is_transient_error(exc) or attempt == max_attempts - 1:
+                raise
+            delay = base_delay * (2 ** attempt) + random.uniform(0.05, 0.2)
+            logger.warning(
+                "gemini_transient_error_retry",
+                operation=description,
+                attempt=attempt + 1,
+                delay_seconds=round(delay, 2),
+                error=str(exc),
+            )
+            time.sleep(delay)
+    raise RuntimeError("unreachable")
 
 
 class GeminiNotConfigured(RuntimeError):
@@ -83,17 +128,19 @@ class GeminiClient:
         tools: list[types.Tool],
         system_instruction: str,
     ) -> types.GenerateContentResponse:
-        return self._client.models.generate_content(
-            model=self._model,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                tools=tools,
-                # See the module docstring: the loop is ours, not the SDK's.
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                    disable=True
+        return retry_with_backoff(
+            lambda: self._client.models.generate_content(
+                model=self._model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=tools,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                        disable=True
+                    ),
                 ),
             ),
+            description="generate_content",
         )
 
     def generate_stream(
@@ -102,30 +149,62 @@ class GeminiClient:
         tools: list[types.Tool],
         system_instruction: str,
     ) -> Any:
-        return self._client.models.generate_content_stream(
-            model=self._model,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                tools=tools,
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                    disable=True
+        def start_stream():
+            return self._client.models.generate_content_stream(
+                model=self._model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=tools,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                        disable=True
+                    ),
                 ),
-            ),
-        )
+            )
+
+        max_attempts = 3
+        base_delay = 0.5
+        for attempt in range(max_attempts):
+            try:
+                stream = start_stream()
+                it = iter(stream)
+                try:
+                    first_chunk = next(it)
+                except StopIteration:
+                    return iter([])
+
+                def stream_wrapper():
+                    yield first_chunk
+                    yield from it
+
+                return stream_wrapper()
+            except Exception as exc:
+                if not is_transient_error(exc) or attempt == max_attempts - 1:
+                    raise
+                delay = base_delay * (2 ** attempt) + random.uniform(0.05, 0.2)
+                logger.warning(
+                    "gemini_stream_retry",
+                    attempt=attempt + 1,
+                    delay_seconds=round(delay, 2),
+                    error=str(exc),
+                )
+                time.sleep(delay)
 
     def generate_structured(
         self,
         prompt: str,
         schema: Any,
     ) -> Any:
-        response = self._client.models.generate_content(
-            model=self._model,
-            contents=[prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=schema,
+        response = retry_with_backoff(
+            lambda: self._client.models.generate_content(
+                model=self._model,
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=schema,
+                ),
             ),
+            description="generate_structured",
         )
         return response.parsed
 

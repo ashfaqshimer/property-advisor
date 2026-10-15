@@ -53,6 +53,13 @@ from app.agent import tools
 from app.agent.client import SupportsGenerate, get_gemini_client
 from app.agent.persona import FALLBACK_REPLY, GREETING
 from app.agent.prompt_builder import build_system_prompt
+from app.agent.tracing import (
+    format_contents_for_trace,
+    trace_generation,
+    trace_tool,
+    trace_turn,
+)
+from app.config import get_settings
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
 
@@ -108,6 +115,79 @@ def _next_seq(db: Session, conversation_id: uuid.UUID) -> int:
     return 0 if highest is None else highest + 1
 
 
+def compact_tool_response(name: str, response: dict[str, Any]) -> dict[str, Any]:
+    """Prune large historical tool outputs to keep context window compact.
+
+    Only essential fields (id, title, price, location) are retained so the model
+    can still reference previously discussed properties without wasting thousands
+    of tokens re-reading full descriptions and image URLs.
+    """
+    if not isinstance(response, dict):
+        return response
+
+    if name == "search_properties":
+        matches = response.get("matches")
+        if isinstance(matches, list):
+            compacted_matches = []
+            for item in matches:
+                if not isinstance(item, dict):
+                    continue
+                compact_item = {
+                    "id": item.get("id"),
+                    "title": item.get("title"),
+                    "location": item.get("location"),
+                    "price_lkr": item.get("price_lkr"),
+                    "property_type": item.get("property_type"),
+                }
+                if "bedrooms" in item and item["bedrooms"] is not None:
+                    compact_item["bedrooms"] = item["bedrooms"]
+                if "bathrooms" in item and item["bathrooms"] is not None:
+                    compact_item["bathrooms"] = item["bathrooms"]
+                compacted_matches.append(compact_item)
+
+            compacted: dict[str, Any] = {
+                "match_count": response.get("match_count", len(compacted_matches)),
+                "matches": compacted_matches,
+            }
+            if "suggested_alternatives" in response:
+                alt_matches = []
+                for item in response.get("suggested_alternatives", []):
+                    if isinstance(item, dict):
+                        alt_matches.append(
+                            {
+                                "id": item.get("id"),
+                                "title": item.get("title"),
+                                "location": item.get("location"),
+                                "price_lkr": item.get("price_lkr"),
+                                "property_type": item.get("property_type"),
+                            }
+                        )
+                compacted["suggested_alternatives"] = alt_matches
+            return compacted
+
+    elif name == "get_property_details":
+        desc = response.get("description") or ""
+        return {
+            "id": response.get("id"),
+            "title": response.get("title"),
+            "price_lkr": response.get("price_lkr"),
+            "location": response.get("location"),
+            "property_type": response.get("property_type"),
+            "bedrooms": response.get("bedrooms"),
+            "bathrooms": response.get("bathrooms"),
+            "description": (desc[:150] + "...") if len(desc) > 150 else desc,
+        }
+
+    elif name == "get_market_value":
+        return {
+            "location": response.get("location"),
+            "benchmark": response.get("benchmark"),
+            "summary": response.get("summary"),
+        }
+
+    return response
+
+
 def _replay(messages: list[Message]) -> list[types.Content]:
     """Turn persisted rows back into `Content` parts.
 
@@ -115,7 +195,7 @@ def _replay(messages: list[Message]) -> list[types.Content]:
     tool's return value are structured — which is why `messages.tool_payload` exists.
     """
     contents: list[types.Content] = []
-    for message in messages:
+    for idx, message in enumerate(messages):
         payload = message.tool_payload or {}
 
         if call := payload.get("function_call"):
@@ -130,12 +210,18 @@ def _replay(messages: list[Message]) -> list[types.Content]:
                 )
             )
         elif response := payload.get("function_response"):
+            resp_data = response.get("response") or {}
+            # If this tool exchange was from a previous turn (followed by a subsequent user message),
+            # compact its payload to keep the prompt context lean.
+            if any(m.role is MessageRole.USER for m in messages[idx + 1 :]):
+                resp_data = compact_tool_response(response.get("name", ""), resp_data)
+
             contents.append(
                 types.Content(
                     role="user",  # see module docstring
                     parts=[
                         types.Part.from_function_response(
-                            name=response["name"], response=response.get("response") or {}
+                            name=response["name"], response=resp_data
                         )
                     ],
                 )
@@ -223,124 +309,173 @@ def run_turn(
         record(MessageRole.ASSISTANT, content=reply)
         db.commit()
 
-    for i in range(MAX_TOOL_ITERATIONS):
-        call_start = time.perf_counter()
-        response_stream = gemini.generate_stream(
-            contents=contents,
-            tools=tools.TOOL_DECLARATIONS,
-            system_instruction=build_system_prompt(db),
-        )
-        
-        # We need to pull the first chunk to see if it's not empty
-        iterator = iter(response_stream)
-        try:
-            first_chunk = next(iterator)
-        except StopIteration:
-            duration_ms = (time.perf_counter() - call_start) * 1000
-            logger.warning(
-                "gemini_empty_response",
-                session_id=session_id,
-                iteration=i,
-                duration_ms=round(duration_ms, 2),
-            )
-            finish(FALLBACK_REPLY)
-            yield FALLBACK_REPLY
-            return
-            
-        all_parts = []
-        calls = []
-        full_text = ""
-        prompt_tokens = None
-        candidates_tokens = None
-        total_tokens = None
-        
-        for chunk in [first_chunk] + list(iterator):
-            usage = getattr(chunk, "usage_metadata", None)
-            if usage:
-                prompt_tokens = getattr(usage, "prompt_token_count", prompt_tokens)
-                candidates_tokens = getattr(usage, "candidates_token_count", candidates_tokens)
-                total_tokens = getattr(usage, "total_token_count", total_tokens)
+    with trace_turn(session_id=session_id, user_message=text) as turn_trace:
+        for i in range(MAX_TOOL_ITERATIONS):
+            call_start = time.perf_counter()
+            model_name = getattr(gemini, "model", None) or get_settings().gemini_model
+            with trace_generation(
+                name="generate-reply",
+                model=model_name,
+                input_data=format_contents_for_trace(contents),
+                metadata={"iteration": i},
+            ) as gen_trace:
+                response_stream = gemini.generate_stream(
+                    contents=contents,
+                    tools=tools.TOOL_DECLARATIONS,
+                    system_instruction=build_system_prompt(db),
+                )
 
-            parts = _parts_of(chunk)
-            all_parts.extend(parts)
-            for part in parts:
-                if part.function_call:
-                    calls.append(part.function_call)
-                elif part.text:
-                    full_text += part.text
-                    yield part.text
-        
-        duration_ms = (time.perf_counter() - call_start) * 1000
-        logger.info(
-            "gemini_turn",
-            session_id=session_id,
-            iteration=i,
-            duration_ms=round(duration_ms, 2),
-            prompt_tokens=prompt_tokens,
-            candidates_tokens=candidates_tokens,
-            total_tokens=total_tokens,
-            tool_calls_count=len(calls),
-        )
-        
-        if calls:
-            if full_text:
-                yield "\n\n"
-            contents.append(types.Content(role="model", parts=all_parts))
-            for part in all_parts:
-                if part.function_call:
-                    record(
-                        MessageRole.ASSISTANT,
-                        payload={
-                            "function_call": {
-                                "name": part.function_call.name,
-                                "args": dict(part.function_call.args or {}),
-                            }
-                        },
+                # We need to pull the first chunk to see if it's not empty
+                iterator = iter(response_stream)
+                try:
+                    first_chunk = next(iterator)
+                except StopIteration:
+                    duration_ms = (time.perf_counter() - call_start) * 1000
+                    logger.warning(
+                        "gemini_empty_response",
+                        session_id=session_id,
+                        iteration=i,
+                        duration_ms=round(duration_ms, 2),
                     )
-                elif part.text:
-                    record(MessageRole.ASSISTANT, content=part.text)
+                    gen_trace.update(level="WARNING", status_message="gemini_empty_response")
+                    turn_trace.update(output=FALLBACK_REPLY)
+                    finish(FALLBACK_REPLY)
+                    yield FALLBACK_REPLY
+                    return
 
-            # Execute the tools
-            response_parts: list[types.Part] = []
-            for call in calls:
-                name = call.name or ""
-                args = dict(call.args or {})
-                logger.info("tool_execution", tool=name, session_id=session_id)
-                result = tools.execute_tool(name, args, context)
-                record(
-                    MessageRole.TOOL,
-                    payload={"function_response": {"name": name, "response": result}},
+                all_parts = []
+                calls = []
+                full_text = ""
+                prompt_tokens = None
+                candidates_tokens = None
+                total_tokens = None
+
+                for chunk in [first_chunk] + list(iterator):
+                    usage = getattr(chunk, "usage_metadata", None)
+                    if usage:
+                        prompt_tokens = getattr(usage, "prompt_token_count", prompt_tokens)
+                        candidates_tokens = getattr(usage, "candidates_token_count", candidates_tokens)
+                        total_tokens = getattr(usage, "total_token_count", total_tokens)
+
+                    parts = _parts_of(chunk)
+                    all_parts.extend(parts)
+                    for part in parts:
+                        if part.function_call:
+                            calls.append(part.function_call)
+                        elif part.text:
+                            full_text += part.text
+                            yield part.text
+
+                duration_ms = (time.perf_counter() - call_start) * 1000
+                logger.info(
+                    "gemini_turn",
+                    session_id=session_id,
+                    iteration=i,
+                    duration_ms=round(duration_ms, 2),
+                    prompt_tokens=prompt_tokens,
+                    candidates_tokens=candidates_tokens,
+                    total_tokens=total_tokens,
+                    tool_calls_count=len(calls),
                 )
-                response_parts.append(
-                    types.Part.from_function_response(name=name, response=result)
+
+                if calls:
+                    gen_trace.update(
+                        output=[
+                            {"name": call.name, "args": dict(call.args or {})}
+                            for call in calls
+                        ],
+                        usage_details={
+                            "input": prompt_tokens or 0,
+                            "output": candidates_tokens or 0,
+                            "total": total_tokens or 0,
+                        }
+                        if (prompt_tokens or candidates_tokens)
+                        else None,
+                    )
+                    if full_text:
+                        yield "\n\n"
+                    contents.append(types.Content(role="model", parts=all_parts))
+                    for part in all_parts:
+                        if part.function_call:
+                            record(
+                                MessageRole.ASSISTANT,
+                                payload={
+                                    "function_call": {
+                                        "name": part.function_call.name,
+                                        "args": dict(part.function_call.args or {}),
+                                    }
+                                },
+                            )
+                        elif part.text:
+                            record(MessageRole.ASSISTANT, content=part.text)
+
+                    # Execute the tools
+                    response_parts: list[types.Part] = []
+                    for call in calls:
+                        name = call.name or ""
+                        args = dict(call.args or {})
+                        logger.info("tool_execution", tool=name, session_id=session_id)
+                        with trace_tool(name=name, args=args) as tool_trace:
+                            result = tools.execute_tool(name, args, context)
+                            if isinstance(result, dict) and "error" in result:
+                                tool_trace.update(
+                                    output=result,
+                                    level="ERROR",
+                                    status_message=str(result["error"]),
+                                )
+                            else:
+                                tool_trace.update(output=result)
+
+                        record(
+                            MessageRole.TOOL,
+                            payload={"function_response": {"name": name, "response": result}},
+                        )
+                        response_parts.append(
+                            types.Part.from_function_response(name=name, response=result)
+                        )
+                    contents.append(types.Content(role="user", parts=response_parts))
+
+                    # Emit a status hint so the frontend can show a contextual indicator while
+                    # we spin up the next Gemini call. The hint is chosen by iteration index so
+                    # successive calls rotate through the list rather than repeating.
+                    hint = _STATUS_HINTS[(i + 1) % len(_STATUS_HINTS)]
+                    yield _status_event(hint)
+                    continue
+
+                # If there are no function calls, it is a text reply to stream to the user.
+                final_text = full_text.strip()
+                if not final_text:
+                    logger.warning(
+                        "Gemini returned no usable text for chat session %s",
+                        session_id,
+                    )
+                    final_text = FALLBACK_REPLY
+                    yield final_text
+
+                gen_trace.update(
+                    output=final_text,
+                    usage_details={
+                        "input": prompt_tokens or 0,
+                        "output": candidates_tokens or 0,
+                        "total": total_tokens or 0,
+                    }
+                    if (prompt_tokens or candidates_tokens)
+                    else None,
                 )
-            contents.append(types.Content(role="user", parts=response_parts))
+                turn_trace.update(output=final_text)
+                finish(final_text)
+                return
 
-            # Emit a status hint so the frontend can show a contextual indicator while
-            # we spin up the next Gemini call. The hint is chosen by iteration index so
-            # successive calls rotate through the list rather than repeating.
-            hint = _STATUS_HINTS[(i + 1) % len(_STATUS_HINTS)]
-            yield _status_event(hint)
-            continue
-            
-        # If there are no function calls, it is a text reply to stream to the user.
-        final_text = full_text.strip()
-        if not final_text:
-            logger.warning(
-                "Gemini returned no usable text for chat session %s",
-                session_id,
-            )
-            final_text = FALLBACK_REPLY
-            yield final_text
-            
-        finish(final_text)
-        return
-
-    # Cap reached with the model still calling tools. Answer in prose rather than looping.
-    logger.warning(
-        "Gemini tool-call iteration cap reached for chat session %s",
-        session_id,
-    )
-    finish(FALLBACK_REPLY)
-    yield FALLBACK_REPLY
+        # Cap reached with the model still calling tools. Answer in prose rather than looping.
+        logger.warning(
+            "Gemini tool-call iteration cap reached for chat session %s",
+            session_id,
+        )
+        turn_trace.update(
+            output=FALLBACK_REPLY,
+            level="WARNING",
+            status_message="iteration_cap_reached",
+        )
+        finish(FALLBACK_REPLY)
+        yield FALLBACK_REPLY
 

@@ -1225,6 +1225,8 @@ export type Prospect = {
   phone_number: string | null;
   classification: string;
   confidence: number;
+  classification_reasons?: string[];
+  classification_method?: string;
   status: string;
   first_seen_at: string;
   first_scan_job_id?: string | null;
@@ -1237,6 +1239,16 @@ export type Prospect = {
   price_unit_label?: string | null;
   market_median_unit_rate?: number | null;
   price_diff_percent?: number | null;
+  price_numeric?: number | null;
+  is_price_per_perch?: boolean;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  land_size_perches?: number | null;
+  floor_area_sqft?: number | null;
+  is_member?: boolean;
+  is_auth_dealer?: boolean;
+  membership_level?: string;
+  shop_name?: string | null;
 };
 
 export type PaginatedProspects = {
@@ -1281,6 +1293,7 @@ export async function getProspects(filters?: {
   status?: string;
   property_type?: string;
   listing_type?: string;
+  classification?: string;
   price_grade?: string;
   sort_by?: string;
   page?: number;
@@ -1291,6 +1304,7 @@ export async function getProspects(filters?: {
   if (filters?.status) params.append("status", filters.status);
   if (filters?.property_type) params.append("property_type", filters.property_type);
   if (filters?.listing_type) params.append("listing_type", filters.listing_type);
+  if (filters?.classification && filters.classification !== "all") params.append("classification", filters.classification);
   if (filters?.price_grade && filters.price_grade !== "all") params.append("price_grade", filters.price_grade);
   if (filters?.sort_by) params.append("sort_by", filters.sort_by);
   if (filters?.q) params.append("q", filters.q);

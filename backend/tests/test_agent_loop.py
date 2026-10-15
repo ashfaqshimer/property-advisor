@@ -366,3 +366,34 @@ class TestConversationContinuity:
     def test_blank_session_id_is_rejected(self, seeded: Session):
         with pytest.raises(ValueError):
             loop.get_or_create_conversation(seeded, "  ")
+
+    def test_historical_tool_responses_are_compacted(self, seeded: Session):
+        """Older turns' search responses prune full descriptions to preserve context window."""
+        # Turn 1: user searches, tool responds, assistant replies
+        client_turn_1 = ScriptedGemini(
+            [call_response("search_properties", {}), text_response("I found these.")]
+        )
+        run_turn(seeded, "s1", "Search Colombo 5", client=client_turn_1)
+
+        # Turn 2: next user turn
+        client_turn_2 = ScriptedGemini([text_response("Got it.")])
+        run_turn(seeded, "s1", "Which one is closest to Galle Road?", client=client_turn_2)
+
+        # Inspect what was sent in turn 2's contents
+        turn_2_contents = client_turn_2.turns[0].contents
+        tool_responses = [
+            part.function_response
+            for c in turn_2_contents
+            for part in (c.parts or [])
+            if part.function_response
+        ]
+        assert len(tool_responses) == 1
+        resp = tool_responses[0].response
+        assert "matches" in resp
+        # Check that description and image_urls were pruned in the replayed prompt
+        assert "description" not in resp["matches"][0]
+        # But essential identifiers remain
+        assert "id" in resp["matches"][0]
+        assert "title" in resp["matches"][0]
+        assert "price_lkr" in resp["matches"][0]
+

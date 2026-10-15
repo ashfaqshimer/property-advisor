@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     app_environment: str = "development"
 
+    # Observability: Langfuse tracing (agent tracing)
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
+    langfuse_enabled: bool = True
+
     # Used only by the one-time local bootstrap command.
     bootstrap_admin_secret: str = ""
 
@@ -100,6 +106,14 @@ class Settings(BaseSettings):
                 self.cloudinary_api_key,
                 self.cloudinary_api_secret,
             )
+        )
+
+    @property
+    def langfuse_configured(self) -> bool:
+        return bool(
+            self.langfuse_enabled
+            and self.langfuse_public_key.strip()
+            and self.langfuse_secret_key.strip()
         )
 
     @property

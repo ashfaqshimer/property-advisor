@@ -1374,6 +1374,7 @@ def list_prospects(
     status: str | None = None,
     property_type: str | None = None,
     listing_type: str | None = None,
+    classification: str | None = None,
     price_grade: str | None = None,
     sort_by: str | None = None,
     q: str | None = None,
@@ -1398,6 +1399,8 @@ def list_prospects(
         stmt = stmt.where(Prospect.property_type == property_type)
     if listing_type:
         stmt = stmt.where(Prospect.listing_type == listing_type)
+    if classification and classification != "all":
+        stmt = stmt.where(Prospect.classification == classification)
 
     if q:
         term = q.strip()
