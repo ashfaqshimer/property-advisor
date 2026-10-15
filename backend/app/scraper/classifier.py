@@ -52,36 +52,60 @@ def classify_lpw_listing_heuristics(
     """
     reasons = []
 
-    # 1. Detail-level explicit advertiser label
-    if detail and detail.agent_type:
-        agent_type_lower = detail.agent_type.strip().lower()
-        if "owner" in agent_type_lower:
-            return ("owner", 95, ["lpw_explicit_owner_tag"])
-        if "agent" in agent_type_lower or "broker" in agent_type_lower:
-            return ("broker", 95, ["lpw_explicit_agent_tag"])
-        if "developer" in agent_type_lower or "builder" in agent_type_lower:
-            return ("broker", 90, ["lpw_developer_tag"])
+    # 1. Detail-level explicit advertiser label & poster name
+    if detail:
+        if detail.agent_type:
+            agent_type_lower = detail.agent_type.strip().lower()
+            if "owner" in agent_type_lower:
+                return ("owner", 95, ["lpw_explicit_owner_tag"])
+            if "agent" in agent_type_lower or "broker" in agent_type_lower:
+                return ("broker", 95, ["lpw_explicit_agent_tag"])
+            if "developer" in agent_type_lower or "builder" in agent_type_lower:
+                return ("broker", 90, ["lpw_developer_tag"])
 
-    # 2. Search card agency logo
+        if detail.poster_name:
+            pname_lower = detail.poster_name.lower()
+            agency_terms = (
+                "realt",
+                "properties",
+                "property solutions",
+                "pvt ltd",
+                "holdings",
+                "estate",
+                "ventures",
+                "development",
+                "developers",
+                "group",
+            )
+            for term in agency_terms:
+                if term in pname_lower:
+                    return ("broker", 90, [f"lpw_agency_poster_name:{detail.poster_name}"])
+
+    # 2. Search card agency logo or verified agent badge
     if ad.has_agent_logo:
-        return ("broker", 85, ["lpw_agency_logo_detected"])
+        return ("broker", 90, ["lpw_agency_logo_or_verified_badge"])
 
     # 3. Content heuristics for title and snippet
     text_corpus = f"{ad.title or ''} {ad.description_snippet or ''}".lower()
     broker_terms = [
         "real estate",
         "realtors",
+        "realtor",
         "properties (pvt)",
         "pvt ltd",
         "holdings",
         "half month agent fee",
         "agent fee applicable",
+        "agent fee",
         "professional fee",
         "call our agent",
+        "contact our agent",
+        "broker fee",
+        "exclusive listing",
     ]
     for term in broker_terms:
         if term in text_corpus:
-            return ("broker", 80, [f"broker_keyword:{term}"])
+            return ("broker", 85, [f"broker_keyword:{term}"])
 
     # 4. Default to owner with moderate confidence
     return ("owner", 75, ["no_agency_logo", "no_broker_signals"])

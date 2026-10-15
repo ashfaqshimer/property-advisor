@@ -317,7 +317,7 @@ def test_lpw_classification_heuristics():
 
     cls2, conf2, reas2 = classify_lpw_listing_heuristics(ad_agency)
     assert cls2 == "broker"
-    assert "lpw_agency_logo_detected" in reas2
+    assert "lpw_agency_logo_or_verified_badge" in reas2
 
     # Detail-level explicit label
     cls3, conf3, reas3 = classify_lpw_listing_heuristics(ad_private, detail=detail_owner)
@@ -329,6 +329,18 @@ def test_lpw_classification_heuristics():
     assert cls4 == "broker"
     assert conf4 == 95
     assert "lpw_explicit_agent_tag" in reas4
+
+    # Poster name agency heuristic
+    detail_company = LpwAdDetail(
+        id="103",
+        title="House for sale",
+        url="https://www.lankapropertyweb.com/sale/property_details-103.html",
+        poster_name="TSD Property Solutions",
+    )
+    cls5, conf5, reas5 = classify_lpw_listing_heuristics(ad_private, detail=detail_company)
+    assert cls5 == "broker"
+    assert conf5 == 90
+    assert any("lpw_agency_poster_name" in r for r in reas5)
 
 
 def test_lpw_save_and_prospect_provenance(db_session, monkeypatch):

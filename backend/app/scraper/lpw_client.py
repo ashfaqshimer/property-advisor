@@ -129,11 +129,17 @@ class LankaPropertyWebClient:
             if desc_snippet and desc_snippet.endswith("more »"):
                 desc_snippet = desc_snippet[:-6].strip()
 
-            # 7. Agent logo presence (strong broker signal)
-            agent_logo = item.find(class_=re.compile(r"agent-logo"))
+            # 7. Agent signals on search card (verified badge, agency logo, etc.)
             has_agent_logo = False
+            agent_logo = item.find(class_=re.compile(r"agent-logo"))
             if agent_logo and agent_logo.find("img"):
                 has_agent_logo = True
+            elif item.find(class_=re.compile(r"verified_agent")):
+                has_agent_logo = True
+            else:
+                footer = item.find(class_=re.compile(r"listing-footer"))
+                if footer and "verified agent" in footer.get_text().lower():
+                    has_agent_logo = True
 
             return LpwAd(
                 id=str(ad_id),
