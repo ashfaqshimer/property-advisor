@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AdminPropertiesPage from "@/app/(admin)/admin/page";
 import * as api from "@/lib/api";
+import * as downloadModule from "@/lib/download";
 
 const mockProperties: api.PropertyApiRecord[] = [
   {
@@ -26,7 +27,7 @@ const mockProperties: api.PropertyApiRecord[] = [
     road_access_ft: 30,
     furnishing_status: "furnished",
     amenities: { pool: true },
-    image_urls: [],
+    image_urls: ["https://images.unsplash.com/photo-1"],
     image_alt: "Condo balcony",
     status: "available",
     created_at: "2026-08-26T00:00:00Z",
@@ -125,5 +126,49 @@ describe("AdminPropertiesPage - Property Code display", () => {
 
     expect(screen.queryByText("Luxury Seaview Condo")).not.toBeInTheDocument();
     expect(screen.getAllByText("Modern Villa with Pool").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows download buttons for admin/root users and allows downloading photos", async () => {
+    const downloadZipSpy = vi.spyOn(downloadModule, "downloadAllPhotosZip").mockResolvedValue();
+
+    render(<AdminPropertiesPage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Luxury Seaview Condo").length).toBeGreaterThanOrEqual(1);
+    });
+
+    const photoButton = screen.getAllByLabelText("Select featured photo for Luxury Seaview Condo")[0];
+    fireEvent.click(photoButton);
+
+    const downloadZipBtn = screen.getByRole("button", { name: /Download All \(\.zip\)/i });
+    expect(downloadZipBtn).toBeInTheDocument();
+
+    fireEvent.click(downloadZipBtn);
+    expect(downloadZipSpy).toHaveBeenCalledWith("prop-1", "Luxury Seaview Condo", "PA-1001");
+  });
+
+  it("hides photo download buttons for agent users", async () => {
+    vi.spyOn(api, "getCurrentUser").mockResolvedValue({
+      id: "u-2",
+      email: "agent@propertyadvisor.lk",
+      full_name: "Agent User",
+      role: "agent",
+      is_active: true,
+      created_at: "2026-01-01T00:00:00Z",
+      phone: null,
+      notes: null,
+      last_login_at: null,
+    });
+
+    render(<AdminPropertiesPage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Luxury Seaview Condo").length).toBeGreaterThanOrEqual(1);
+    });
+
+    const photoButton = screen.getAllByLabelText("Select featured photo for Luxury Seaview Condo")[0];
+    fireEvent.click(photoButton);
+
+    expect(screen.queryByRole("button", { name: /Download All \(\.zip\)/i })).not.toBeInTheDocument();
   });
 });

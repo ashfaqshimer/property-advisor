@@ -40,6 +40,13 @@ def test_telegram_shortlist_formatting():
     assert kb["inline_keyboard"][0][0]["callback_data"] == "sl:abc-123:keep"
     assert kb["inline_keyboard"][0][1]["callback_data"] == "sl:abc-123:pass"
 
+    kb_with_phone = _build_shortlist_keyboard("abc-123", "0771234567")
+    assert len(kb_with_phone["inline_keyboard"]) == 2
+    assert kb_with_phone["inline_keyboard"][1][0]["text"] == "💬 WhatsApp"
+    assert "https://wa.me/94771234567" in kb_with_phone["inline_keyboard"][1][0]["url"]
+    assert kb_with_phone["inline_keyboard"][1][1]["text"] == "📞 Call"
+    assert "/telegram/call/94771234567" in kb_with_phone["inline_keyboard"][1][1]["url"]
+
     collapsed = format_shortlist_collapsed_message(
         poster_name="Kamal Perera",
         phone_number="0771234567",
@@ -53,10 +60,12 @@ def test_telegram_shortlist_formatting():
     assert "Modern Luxury Villa" in collapsed
 
     collapsed_kb = build_shortlist_collapsed_keyboard("abc-123", "0771234567")
-    buttons = collapsed_kb["inline_keyboard"][0]
-    assert buttons[0]["text"] == "💬 WhatsApp"
-    assert "https://wa.me/94771234567" in buttons[0]["url"]
-    assert buttons[1]["callback_data"] == "sl:abc-123:undo"
+    contact_buttons = collapsed_kb["inline_keyboard"][0]
+    assert contact_buttons[0]["text"] == "💬 WhatsApp"
+    assert "https://wa.me/94771234567" in contact_buttons[0]["url"]
+    assert contact_buttons[1]["text"] == "📞 Call"
+    assert "/telegram/call/94771234567" in contact_buttons[1]["url"]
+    assert collapsed_kb["inline_keyboard"][1][0]["callback_data"] == "sl:abc-123:undo"
 
 
 def test_send_shortlist_message_with_topic():
@@ -382,3 +391,11 @@ def test_admin_metrics_shortlisted_count(seeded, authenticated_client):
     data = resp.json()
     assert "shortlisted_count" in data
     assert data["shortlisted_count"] >= 1
+
+
+def test_call_redirect_endpoint(authenticated_client):
+    resp = authenticated_client.get("/telegram/call/94771234567")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers.get("content-type", "")
+    assert "tel:+94771234567" in resp.text
+    assert "Calling +94771234567" in resp.text

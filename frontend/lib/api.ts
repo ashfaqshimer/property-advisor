@@ -673,6 +673,14 @@ function baseUrl(): string {
   return configured.replace(/\/+$/, "");
 }
 
+export function getApiBaseUrl(): string {
+  try {
+    return baseUrl();
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Turn a rejected `fetch` into a classified error.
  *

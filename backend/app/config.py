@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     telegram_shortlist_thread_id: int | None = None  # Optional topic thread ID for shortlist
     telegram_shortlist_topic_id: int | None = None   # Alias for telegram_shortlist_thread_id
     telegram_webhook_secret: str = ""         # Optional: validates incoming webhook requests
+    backend_public_url: str = "https://property-advisor-96sg.onrender.com"
 
     @property
     def effective_shortlist_chat_id(self) -> str:

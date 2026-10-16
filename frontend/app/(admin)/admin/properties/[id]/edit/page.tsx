@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, use, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2, ArrowLeft, Copy, Check } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2, ArrowLeft, Copy, Check, Download, FolderArchive } from 'lucide-react';
+import { downloadPhoto, downloadAllPhotosZip } from '@/lib/download';
 import {
 	getAdminProperty,
 	updateAdminProperty,
@@ -115,6 +116,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 	const [showContactForm, setShowContactForm] = useState(false);
 	const [creatingContact, setCreatingContact] = useState(false);
 	const [isAgent, setIsAgent] = useState(false);
+	const [canDownload, setCanDownload] = useState(false);
 	const [isDragging, setIsDragging] = useState(false);
 
 	// AI Smart Autofill state
@@ -138,7 +140,12 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 	} | null>(null);
 
 	useEffect(() => {
-		getCurrentUser().then((user) => setIsAgent(user?.role === 'agent')).catch(() => {});
+		getCurrentUser()
+			.then((user) => {
+				setIsAgent(user?.role === 'agent');
+				setCanDownload(user?.role === 'root' || user?.role === 'admin');
+			})
+			.catch(() => {});
 		getPropertyContacts().then(setContacts).catch(() => {});
 
 		getAdminProperty(propertyId)
@@ -1069,9 +1076,23 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 						{/* Existing images list */}
 						{existingImages.length > 0 && (
 							<div className='mb-6'>
-								<p className='text-xs font-medium text-muted-foreground mb-2'>
-									Current photos ({existingImages.length})
-								</p>
+								<div className='flex items-center justify-between mb-2.5'>
+									<p className='text-xs font-medium text-muted-foreground'>
+										Current photos ({existingImages.length})
+									</p>
+									{canDownload && (
+										<Button
+											type='button'
+											variant='outline'
+											size='sm'
+											onClick={() => downloadAllPhotosZip(propertyId, form.title, propertyCode)}
+											className='h-7 text-xs gap-1.5'
+										>
+											<FolderArchive className='h-3.5 w-3.5' />
+											Download All (.zip)
+										</Button>
+									)}
+								</div>
 								<div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
 									{existingImages.map((imageUrl, idx) => {
 										const isFeatured = form.featuredImageUrl
@@ -1091,6 +1112,22 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 													alt={`Property photo ${idx + 1}`}
 													className='h-full w-full object-cover'
 												/>
+												{/* Download photo button */}
+												{canDownload && (
+													<button
+														type='button'
+														onClick={(e) => {
+															e.preventDefault();
+															downloadPhoto(imageUrl, `${propertyCode || propertyId}-photo-${idx + 1}.jpg`);
+														}}
+														className='absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer'
+														aria-label={`Download photo ${idx + 1}`}
+														title='Download photo'
+													>
+														<Download className='h-3.5 w-3.5' />
+													</button>
+												)}
+
 												{isFeatured ? (
 													<span className='absolute bottom-2 left-2 inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-xs'>
 														★ Featured

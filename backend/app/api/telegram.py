@@ -6,10 +6,12 @@ Handles:
 """
 
 import html
+import re
 from typing import Annotated
 import uuid
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -194,7 +196,7 @@ def _handle_callback_query(db: Session, cq: dict) -> None:
                 ikman_url=target_url,
                 listing_url=target_url,
             )
-            restored_keyboard = _build_shortlist_keyboard(str(prospect.id))
+            restored_keyboard = _build_shortlist_keyboard(str(prospect.id), phone_number=prospect.phone_number)
             if msg_id:
                 edit_telegram_message(
                     token=token,
@@ -467,3 +469,73 @@ def get_agent_chat_id() -> dict:
     seen = {c["chat_id"] for c in chats}
     unique_chats = [c for i, c in enumerate(chats) if c["chat_id"] not in {x["chat_id"] for x in chats[:i]}]
     return {"updates": len(updates), "chats": unique_chats}
+
+
+@router.get("/call/{phone}", response_class=HTMLResponse)
+def call_redirect(phone: str) -> HTMLResponse:
+    """Seamless call launcher for Telegram inline keyboard buttons."""
+    clean_digits = re.sub(r"[^\d+]", "", phone)
+    if not clean_digits.startswith("+"):
+        clean_digits = f"+{clean_digits}"
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="0;url=tel:{clean_digits}">
+    <title>Calling {clean_digits}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #0f172a;
+            color: #f8fafc;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }}
+        .card {{
+            background: #1e293b;
+            padding: 32px 24px;
+            border-radius: 16px;
+            max-width: 360px;
+            width: 100%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }}
+        .btn {{
+            display: block;
+            margin-top: 24px;
+            padding: 14px 20px;
+            background: #22c55e;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }}
+        .number {{
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #38bdf8;
+            margin: 12px 0;
+            letter-spacing: 0.5px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div>📞 Connecting Call</div>
+        <div class="number">{clean_digits}</div>
+        <p style="color: #94a3b8; font-size: 0.9rem; margin: 0;">If your phone dialer doesn't open automatically, tap below:</p>
+        <a class="btn" href="tel:{clean_digits}">📞 Call Now</a>
+    </div>
+    <script>
+        window.location.href = "tel:{clean_digits}";
+    </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)

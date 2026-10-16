@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Trash2, Plus, Image as ImageIcon, Search, Copy, Check } from 'lucide-react';
+import { Pencil, Trash2, Plus, Image as ImageIcon, Search, Copy, Check, Download, FolderArchive } from 'lucide-react';
+import { downloadPhoto, downloadAllPhotosZip } from '@/lib/download';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
@@ -716,10 +717,11 @@ export default function AdminPropertiesPage() {
 								const isSavingAny = Boolean(savingPhotoId);
 								const isDisabled = isSavingAny || isCurrent;
 								return (
-									<button
+									<div
 										key={url + idx}
-										type="button"
-										disabled={isDisabled}
+										role="button"
+										tabIndex={isDisabled ? -1 : 0}
+										aria-disabled={isDisabled}
 										aria-busy={isProcessingThis}
 										aria-label={
 											isProcessingThis
@@ -730,6 +732,12 @@ export default function AdminPropertiesPage() {
 										}
 										onClick={() => {
 											if (!isDisabled) {
+												handleSelectFeaturedPhoto(selectingPhotoProperty.id, url);
+											}
+										}}
+										onKeyDown={(e) => {
+											if (!isDisabled && (e.key === 'Enter' || e.key === ' ')) {
+												e.preventDefault();
 												handleSelectFeaturedPhoto(selectingPhotoProperty.id, url);
 											}
 										}}
@@ -750,6 +758,20 @@ export default function AdminPropertiesPage() {
 												isProcessingThis ? 'brightness-50 filter' : ''
 											}`}
 										/>
+										{canDelete && (
+											<button
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation();
+													downloadPhoto(url, `${selectingPhotoProperty.propertyCode || selectingPhotoProperty.id}-photo-${idx + 1}.jpg`);
+												}}
+												className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black/90 transition cursor-pointer shadow-xs"
+												title="Download photo"
+												aria-label={`Download photo ${idx + 1}`}
+											>
+												<Download className="h-3 w-3" />
+											</button>
+										)}
 										{isProcessingThis ? (
 											<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 bg-black/60 p-2 text-white">
 												<Spinner className="h-5 w-5 text-amber-400" />
@@ -766,12 +788,32 @@ export default function AdminPropertiesPage() {
 												Select
 											</span>
 										)}
-									</button>
+									</div>
 								);
 							})}
 						</div>
 
-						<div className="mt-4 flex justify-end gap-2 border-t border-border pt-3">
+						<div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+							{canDelete ? (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-8 gap-1.5 text-xs"
+									onClick={() =>
+										downloadAllPhotosZip(
+											selectingPhotoProperty.id,
+											selectingPhotoProperty.title,
+											selectingPhotoProperty.propertyCode
+										)
+									}
+								>
+									<FolderArchive className="h-3.5 w-3.5 text-primary" />
+									Download All (.zip)
+								</Button>
+							) : (
+								<div />
+							)}
 							<Button
 								type="button"
 								variant="outline"

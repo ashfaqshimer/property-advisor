@@ -1,12 +1,19 @@
 """Property read endpoints."""
 
+import asyncio
 from collections.abc import Sequence
+import io
+import re
 from typing import Annotated
+import urllib.parse
 from uuid import UUID
+import zipfile
 
 import cloudinary
 import cloudinary.uploader
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
+import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 import structlog
@@ -337,6 +344,175 @@ def get_admin_properties(
     if price_grade and price_grade != "all":
         reads = [r for r in reads if r.price_grade == price_grade]
     return reads
+
+
+@admin_router.get("/download-image")
+async def download_single_image(
+    url: Annotated[str, Query(description="Absolute URL of the image to download")],
+    _user: CurrentStaffUser,
+    filename: Annotated[str | None, Query(description="Optional custom file name for download")] = None,
+) -> Response:
+    """Proxy and force download of a property photo. Restricted to Root and Admin staff."""
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or Root access required to download property photos.",
+        )
+
+    clean_url = url.strip()
+    if not clean_url.startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only HTTP and HTTPS URLs are permitted.",
+        )
+
+    parsed = urllib.parse.urlparse(clean_url)
+    hostname = (parsed.hostname or "").lower()
+    if (
+        hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1")
+        or hostname.startswith("192.168.")
+        or hostname.startswith("10.")
+        or hostname.startswith("172.16.")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Disallowed target host.",
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(clean_url)
+            if resp.status_code != 200:
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail=f"Upstream server returned {resp.status_code}.",
+                )
+            content_type = resp.headers.get("content-type", "image/jpeg")
+            data = resp.content
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("single_photo_download_failed", url=clean_url, error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to retrieve image from upstream server.",
+        ) from exc
+
+    ext = ".jpg"
+    if "png" in content_type:
+        ext = ".png"
+    elif "webp" in content_type:
+        ext = ".webp"
+
+    base_name = re.sub(r"[^\w\-.]+", "_", filename.strip() if filename else "property-photo")
+    if not any(base_name.lower().endswith(e) for e in (".jpg", ".jpeg", ".png", ".webp")):
+        base_name = f"{base_name}{ext}"
+
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{base_name}"',
+            "Cache-Control": "public, max-age=86400",
+        },
+    )
+
+
+@admin_router.get("/{property_id}/photos/zip")
+async def download_property_photos_zip(
+    property_id: str,
+    db: DbSession,
+    _user: CurrentStaffUser,
+) -> StreamingResponse:
+    """Download all photos for a property bundled into a single ZIP archive. Restricted to Root and Admin staff."""
+    if _user.role not in (StaffRole.ROOT, StaffRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or Root access required to download property photos.",
+        )
+
+    ident_str = str(property_id).strip()
+    stmt = select(Property)
+    try:
+        val_uuid = UUID(ident_str)
+        stmt = stmt.where(Property.id == val_uuid)
+    except ValueError:
+        stmt = stmt.where(func.upper(Property.property_code) == ident_str.upper())
+    property_record = db.execute(stmt).scalar_one_or_none()
+
+    if property_record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found.")
+
+    urls: list[str] = []
+    if property_record.featured_image_url and property_record.featured_image_url.strip():
+        urls.append(property_record.featured_image_url.strip())
+    for u in property_record.image_urls or []:
+        if u and u.strip() and u.strip() not in urls:
+            urls.append(u.strip())
+
+    if not urls:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No photos available for this property.",
+        )
+
+    code = property_record.property_code or str(property_record.id)[:8]
+    slug = re.sub(r"[^\w\-]+", "-", f"{code}-{property_record.title}").strip("-")[:50] or "property"
+    zip_filename = f"{slug}-photos.zip"
+
+    async def _fetch(client: httpx.AsyncClient, u: str) -> tuple[str, bytes | None, str | None]:
+        if not u.startswith(("http://", "https://")):
+            return u, None, None
+        try:
+            r = await client.get(u)
+            if r.status_code == 200:
+                return u, r.content, r.headers.get("content-type")
+        except Exception as exc:
+            logger.warning("zip_photo_fetch_failed", url=u, error=str(exc))
+        return u, None, None
+
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+        results = await asyncio.gather(*[_fetch(client, u) for u in urls])
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        saved_count = 0
+        for idx, (orig_url, data, ctype) in enumerate(results, start=1):
+            if not data:
+                continue
+            ext = ".jpg"
+            if ctype:
+                if "png" in ctype:
+                    ext = ".png"
+                elif "webp" in ctype:
+                    ext = ".webp"
+                elif "jpeg" in ctype or "jpg" in ctype:
+                    ext = ".jpg"
+            else:
+                path_part = orig_url.split("?")[0].lower()
+                for ce in (".png", ".webp", ".jpeg", ".jpg"):
+                    if path_part.endswith(ce):
+                        ext = ce if ce != ".jpeg" else ".jpg"
+                        break
+            photo_filename = f"{slug}-{idx:02d}{ext}"
+            zf.writestr(photo_filename, data)
+            saved_count += 1
+
+    if saved_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not retrieve photos from remote host.",
+        )
+
+    zip_buffer.seek(0)
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{zip_filename}"',
+            "Cache-Control": "no-cache",
+        },
+    )
 
 
 @admin_router.get("/{property_id}", response_model=PropertyRead)

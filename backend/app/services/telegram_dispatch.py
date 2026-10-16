@@ -84,33 +84,53 @@ def build_classification_keyboard(assignment_id: str) -> dict[str, Any]:
     }
 
 
-def _build_shortlist_keyboard(prospect_id: str) -> dict[str, Any]:
-    """Build inline keyboard for shortlist triage: Shortlist or Pass."""
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "⭐ Shortlist", "callback_data": f"sl:{prospect_id}:keep"},
-                {"text": "❌ Pass", "callback_data": f"sl:{prospect_id}:pass"},
-            ]
+def normalize_phone_number(phone_number: str | None) -> str | None:
+    """Normalize phone number to international 94xxxxxxxxx format without leading +."""
+    if not phone_number:
+        return None
+    clean = re.sub(r"[^\d+]", "", phone_number)
+    if clean.startswith("+"):
+        clean = clean[1:]
+    if clean.startswith("0") and len(clean) == 10:
+        clean = "94" + clean[1:]
+    elif not clean.startswith("94") and len(clean) == 9:
+        clean = "94" + clean
+    return clean if clean else None
+
+
+def _build_shortlist_keyboard(prospect_id: str, phone_number: str | None = None) -> dict[str, Any]:
+    """Build inline keyboard for shortlist triage: Shortlist or Pass, plus WhatsApp and Call buttons."""
+    rows: list[list[dict[str, str]]] = [
+        [
+            {"text": "⭐ Shortlist", "callback_data": f"sl:{prospect_id}:keep"},
+            {"text": "❌ Pass", "callback_data": f"sl:{prospect_id}:pass"},
         ]
-    }
+    ]
+    clean_phone = normalize_phone_number(phone_number)
+    if clean_phone:
+        settings = get_settings()
+        base_url = (getattr(settings, "backend_public_url", "") or "https://property-advisor-96sg.onrender.com").rstrip("/")
+        rows.append([
+            {"text": "💬 WhatsApp", "url": f"https://wa.me/{clean_phone}"},
+            {"text": "📞 Call", "url": f"{base_url}/telegram/call/{clean_phone}"},
+        ])
+    return {"inline_keyboard": rows}
 
 
 def build_shortlist_collapsed_keyboard(prospect_id: str, phone_number: str | None = None) -> dict[str, Any]:
-    """Build inline keyboard for collapsed shortlisted card: WhatsApp direct link + Undo."""
-    row: list[dict[str, str]] = []
-    if phone_number:
-        clean_phone = re.sub(r"[^\d+]", "", phone_number)
-        if clean_phone.startswith("0") and len(clean_phone) == 10:
-            clean_phone = "94" + clean_phone[1:]
-        elif not clean_phone.startswith("+") and len(clean_phone) == 9:
-            clean_phone = "94" + clean_phone
-        elif clean_phone.startswith("+"):
-            clean_phone = clean_phone[1:]
-        row.append({"text": "💬 WhatsApp", "url": f"https://wa.me/{clean_phone}"})
+    """Build inline keyboard for collapsed shortlisted card: WhatsApp direct link + Call + Undo."""
+    rows: list[list[dict[str, str]]] = []
+    clean_phone = normalize_phone_number(phone_number)
+    if clean_phone:
+        settings = get_settings()
+        base_url = (getattr(settings, "backend_public_url", "") or "https://property-advisor-96sg.onrender.com").rstrip("/")
+        rows.append([
+            {"text": "💬 WhatsApp", "url": f"https://wa.me/{clean_phone}"},
+            {"text": "📞 Call", "url": f"{base_url}/telegram/call/{clean_phone}"},
+        ])
 
-    row.append({"text": "↩️ Undo", "callback_data": f"sl:{prospect_id}:undo"})
-    return {"inline_keyboard": [row]}
+    rows.append([{"text": "↩️ Undo", "callback_data": f"sl:{prospect_id}:undo"}])
+    return {"inline_keyboard": rows}
 
 
 def format_shortlist_message(
@@ -458,7 +478,7 @@ def send_shortlist_message(
         ikman_url=ikman_url,
         listing_url=listing_url,
     )
-    keyboard = _build_shortlist_keyboard(prospect_id)
+    keyboard = _build_shortlist_keyboard(prospect_id, phone_number=phone_number)
     payload: dict[str, Any] = {
         "chat_id": chat_id,
         "text": text,
