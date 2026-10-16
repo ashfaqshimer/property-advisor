@@ -307,7 +307,7 @@ export default function AdminPropertiesPage() {
 					<Table className='min-w-[900px]'>
 						<TableHeader className='bg-muted/50'>
 							<TableRow>
-								<TableHead className='px-4 py-4 font-semibold w-[120px]'>Code</TableHead>
+								<TableHead className='px-4 py-4 font-semibold whitespace-nowrap'>Code</TableHead>
 								<TableHead className='px-5 py-4 font-semibold'>Property</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Type</TableHead>
 								<TableHead className='px-4 py-4 font-semibold'>Location</TableHead>
@@ -334,10 +334,10 @@ export default function AdminPropertiesPage() {
 								</TableRow>
 							) : filteredProperties.map((property) => (
 								<TableRow key={property.id} className='transition hover:bg-muted/50'>
-									<TableCell className='px-4 py-4'>
+									<TableCell className='px-4 py-4 whitespace-nowrap'>
 										{property.propertyCode ? (
-											<div className='flex items-center gap-1.5'>
-												<span className='font-mono text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60'>
+											<div className='flex items-center gap-1 whitespace-nowrap'>
+												<span className='font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60 whitespace-nowrap'>
 													{property.propertyCode}
 												</span>
 												<button
@@ -345,7 +345,7 @@ export default function AdminPropertiesPage() {
 													onClick={() => copyPropertyCode(property.propertyCode)}
 													title='Copy property code'
 													aria-label={`Copy property code ${property.propertyCode}`}
-													className='rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer'
+													className='shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer'
 												>
 													{copiedCode === property.propertyCode ? (
 														<Check className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
@@ -499,8 +499,8 @@ export default function AdminPropertiesPage() {
 							<div className='flex items-start justify-between gap-3'>
 								<div className='flex flex-col gap-1.5 min-w-0'>
 									{property.propertyCode && (
-										<div className='flex items-center gap-1.5'>
-											<span className='font-mono text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60 w-fit'>
+										<div className='flex items-center gap-1 whitespace-nowrap'>
+											<span className='font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60 w-fit whitespace-nowrap'>
 												{property.propertyCode}
 											</span>
 											<button
@@ -508,7 +508,7 @@ export default function AdminPropertiesPage() {
 												onClick={() => copyPropertyCode(property.propertyCode)}
 												title='Copy property code'
 												aria-label={`Copy property code ${property.propertyCode}`}
-												className='rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer'
+												className='shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer'
 											>
 												{copiedCode === property.propertyCode ? (
 													<Check className='h-3 w-3 text-emerald-600 dark:text-emerald-400' />
