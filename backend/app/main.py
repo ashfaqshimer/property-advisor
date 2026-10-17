@@ -116,7 +116,13 @@ def gemini_not_configured(_request: Request, exc: GeminiNotConfigured) -> JSONRe
 
 
 @app.get("/health")
-def health(db: Session = Depends(get_db)) -> dict[str, str]:
-    """Smoke-test route: confirms the app boots, routing works, and DB responds."""
+def health() -> dict[str, str]:
+    """Smoke-test route: confirms the app boots and routing works without touching DB."""
+    return {"status": "ok"}
+
+
+@app.get("/health/db")
+def health_db(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Deep health-check route: confirms database connectivity."""
     db.execute(text("SELECT 1"))
     return {"status": "ok"}
