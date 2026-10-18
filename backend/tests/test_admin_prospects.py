@@ -454,4 +454,59 @@ def test_convert_prospect_draft_success(
     assert data["has_maids_toilet"] is True
 
 
+def test_list_prospects_with_source_filter(
+    authenticated_client: TestClient,
+    db_session: Session,
+) -> None:
+    from app.models.prospect import Prospect
+
+    p1 = Prospect(
+        id=uuid.uuid4(),
+        source="ikman",
+        title="Ikman House",
+        price="Rs 20,000,000",
+        location="Nugegoda",
+        property_type="house",
+        listing_type="sale",
+        classification="owner",
+        confidence=90,
+        classification_reasons=[],
+        classification_method="rule_based",
+        status="new",
+        first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    p2 = Prospect(
+        id=uuid.uuid4(),
+        source="lpw",
+        title="LPW Apartment",
+        price="Rs 30,000,000",
+        location="Colombo 03",
+        property_type="apartment",
+        listing_type="sale",
+        classification="owner",
+        confidence=90,
+        classification_reasons=[],
+        classification_method="rule_based",
+        status="new",
+        first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([p1, p2])
+    db_session.commit()
+
+    resp_ikman = authenticated_client.get("/admin/prospects?source=ikman")
+    assert resp_ikman.status_code == 200
+    ikman_items = resp_ikman.json()["items"]
+    assert any(item["id"] == str(p1.id) for item in ikman_items)
+    assert not any(item["id"] == str(p2.id) for item in ikman_items)
+
+    resp_lpw = authenticated_client.get("/admin/prospects?source=lpw")
+    assert resp_lpw.status_code == 200
+    lpw_items = resp_lpw.json()["items"]
+    assert any(item["id"] == str(p2.id) for item in lpw_items)
+    assert not any(item["id"] == str(p1.id) for item in lpw_items)
+
+
+
 

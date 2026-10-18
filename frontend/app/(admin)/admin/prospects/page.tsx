@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
@@ -89,38 +90,118 @@ import { ProspectQuickViewDrawer } from "../../../../components/admin/ProspectQu
 import { WhatsAppTemplateDialog } from "../../../../components/admin/WhatsAppTemplateDialog";
 import { getProspectWhatsAppUrl, setStoredWhatsAppTemplate } from "../../../../lib/whatsapp";
 
-export default function ProspectsPage() {
+function ProspectsContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Filters & Pagination
-  const [filterStatus, setFilterStatus] = useState<string>("new");
-  const [filterSource, setFilterSource] = useState<string>("");
-  const [filterClassification, setFilterClassification] = useState<string>("owner");
-  const [transactionType, setTransactionType] = useState<"sale" | "rent">("sale");
-  const [propertyType, setPropertyType] = useState<string>("all");
-  const [filterPriceGrade, setFilterPriceGrade] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("default");
-  const [page, setPage] = useState<number>(1);
+  // Filters & Pagination initialized from URL search params
+  const [filterStatus, setFilterStatus] = useState<string>(() => searchParams.get("status") || "new");
+  const [filterSource, setFilterSource] = useState<string>(() => searchParams.get("source") || "");
+  const [filterClassification, setFilterClassification] = useState<string>(() => searchParams.get("classification") || "owner");
+  const [transactionType, setTransactionType] = useState<"sale" | "rent">(() => (searchParams.get("listing_type") || searchParams.get("type") || "sale") as "sale" | "rent");
+  const [propertyType, setPropertyType] = useState<string>(() => searchParams.get("property_type") || "all");
+  const [filterPriceGrade, setFilterPriceGrade] = useState<string>(() => searchParams.get("price_grade") || "all");
+  const [sortBy, setSortBy] = useState<string>(() => searchParams.get("sort_by") || "default");
+  const [page, setPage] = useState<number>(() => Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1));
   const [totalPages, setTotalPages] = useState<number>(1);
   const autoFetchPhonesRef = useRef(false);
 
-
   // Search
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") || "");
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("q") || "");
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyFilterChange = useCallback((updates: {
+    status?: string;
+    listing_type?: "sale" | "rent";
+    property_type?: string;
+    classification?: string;
+    price_grade?: string;
+    source?: string;
+    sort_by?: string;
+    page?: number;
+    q?: string;
+  }) => {
+    const nextStatus = updates.status !== undefined ? updates.status : filterStatus;
+    const nextListingType = updates.listing_type !== undefined ? updates.listing_type : transactionType;
+    const nextPropertyType = updates.property_type !== undefined ? updates.property_type : propertyType;
+    const nextClassification = updates.classification !== undefined ? updates.classification : filterClassification;
+    const nextPriceGrade = updates.price_grade !== undefined ? updates.price_grade : filterPriceGrade;
+    const nextSource = updates.source !== undefined ? updates.source : filterSource;
+    const nextSortBy = updates.sort_by !== undefined ? updates.sort_by : sortBy;
+    const nextPage = updates.page !== undefined ? updates.page : 1;
+    const nextQ = updates.q !== undefined ? updates.q : debouncedSearch;
+
+    if (updates.status !== undefined) setFilterStatus(updates.status);
+    if (updates.listing_type !== undefined) setTransactionType(updates.listing_type);
+    if (updates.property_type !== undefined) setPropertyType(updates.property_type);
+    if (updates.classification !== undefined) setFilterClassification(updates.classification);
+    if (updates.price_grade !== undefined) setFilterPriceGrade(updates.price_grade);
+    if (updates.source !== undefined) setFilterSource(updates.source);
+    if (updates.sort_by !== undefined) setSortBy(updates.sort_by);
+    if (updates.page !== undefined) {
+      setPage(updates.page);
+    } else {
+      setPage(1);
+    }
+    if (updates.q !== undefined) {
+      setSearchQuery(updates.q);
+      setDebouncedSearch(updates.q);
+    }
+
+    const params = new URLSearchParams();
+    if (nextStatus && nextStatus !== "new") params.set("status", nextStatus);
+    if (nextListingType && nextListingType !== "sale") params.set("listing_type", nextListingType);
+    if (nextPropertyType && nextPropertyType !== "all") params.set("property_type", nextPropertyType);
+    if (nextClassification && nextClassification !== "owner") params.set("classification", nextClassification);
+    if (nextPriceGrade && nextPriceGrade !== "all") params.set("price_grade", nextPriceGrade);
+    if (nextSource) params.set("source", nextSource);
+    if (nextSortBy && nextSortBy !== "default") params.set("sort_by", nextSortBy);
+    if (nextPage > 1) params.set("page", String(nextPage));
+    if (nextQ && nextQ.trim()) params.set("q", nextQ.trim());
+
+    const qs = params.toString();
+    router.replace(qs ? `/admin/prospects?${qs}` : "/admin/prospects", { scroll: false });
+  }, [filterStatus, transactionType, propertyType, filterClassification, filterPriceGrade, filterSource, sortBy, debouncedSearch, router]);
+
+  useEffect(() => {
+    const s = searchParams.get("status") || "new";
+    const lt = (searchParams.get("listing_type") || searchParams.get("type") || "sale") as "sale" | "rent";
+    const pt = searchParams.get("property_type") || "all";
+    const cl = searchParams.get("classification") || "owner";
+    const pg = searchParams.get("price_grade") || "all";
+    const src = searchParams.get("source") || "";
+    const sb = searchParams.get("sort_by") || "default";
+    const p = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const q = searchParams.get("q") || "";
+
+    setFilterStatus((prev) => (prev !== s ? s : prev));
+    setTransactionType((prev) => (prev !== lt ? lt : prev));
+    setPropertyType((prev) => (prev !== pt ? pt : prev));
+    setFilterClassification((prev) => (prev !== cl ? cl : prev));
+    setFilterPriceGrade((prev) => (prev !== pg ? pg : prev));
+    setFilterSource((prev) => (prev !== src ? src : prev));
+    setSortBy((prev) => (prev !== sb ? sb : prev));
+    setPage((prev) => (prev !== p ? p : prev));
+    setSearchQuery((prev) => (prev !== q ? q : prev));
+    setDebouncedSearch((prev) => (prev !== q ? q : prev));
+  }, [searchParams]);
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => setDebouncedSearch(value), 350);
+    debounceTimer.current = setTimeout(() => {
+      applyFilterChange({ q: value });
+    }, 350);
   };
 
   const clearSearch = () => {
     setSearchQuery("");
-    setDebouncedSearch("");
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    applyFilterChange({ q: "" });
   };
   
   // Scan State
@@ -523,6 +604,7 @@ export default function ProspectsPage() {
         listing_type,
         classification: filterClassification === "all" ? undefined : filterClassification,
         price_grade: filterPriceGrade === "all" ? undefined : filterPriceGrade,
+        source: filterSource || undefined,
         sort_by: sortBy === "default" ? undefined : sortBy,
         page,
         page_size: 25,
@@ -546,7 +628,7 @@ export default function ProspectsPage() {
   useEffect(() => {
     fetchProspects();
     fetchMetrics();
-  }, [filterStatus, transactionType, propertyType, filterClassification, filterPriceGrade, sortBy, page, debouncedSearch]);
+  }, [filterStatus, transactionType, propertyType, filterClassification, filterPriceGrade, filterSource, sortBy, page, debouncedSearch]);
 
   const refreshActiveJobs = async () => {
     try {
@@ -729,11 +811,12 @@ export default function ProspectsPage() {
     (filterClassification !== "owner" ? 1 : 0);
 
   const resetSecondaryFilters = () => {
-    setFilterPriceGrade("all");
-    setFilterSource("");
-    setSortBy("default");
-    setFilterClassification("owner");
-    setPage(1);
+    applyFilterChange({
+      price_grade: "all",
+      source: "",
+      sort_by: "default",
+      classification: "owner",
+    });
   };
 
   const handleCopyPhone = (phone?: string | null) => {
@@ -1038,7 +1121,7 @@ export default function ProspectsPage() {
             <div className="flex shrink-0 items-center rounded-lg bg-muted p-0.5">
               <button
                 type="button"
-                onClick={() => { setTransactionType("sale"); setPropertyType("all"); setPage(1); }}
+                onClick={() => applyFilterChange({ listing_type: "sale", property_type: "all" })}
                 className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
                   transactionType === "sale"
                     ? "bg-card text-foreground shadow-xs"
@@ -1049,7 +1132,7 @@ export default function ProspectsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setTransactionType("rent"); setPropertyType("all"); setPage(1); }}
+                onClick={() => applyFilterChange({ listing_type: "rent", property_type: "all" })}
                 className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
                   transactionType === "rent"
                     ? "bg-card text-foreground shadow-xs"
@@ -1065,7 +1148,7 @@ export default function ProspectsPage() {
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                onClick={() => { setPropertyType("all"); setPage(1); }}
+                onClick={() => applyFilterChange({ property_type: "all" })}
                 className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                   propertyType === "all"
                     ? "border-primary bg-primary text-primary-foreground"
@@ -1076,7 +1159,7 @@ export default function ProspectsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setPropertyType("house"); setPage(1); }}
+                onClick={() => applyFilterChange({ property_type: "house" })}
                 className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                   propertyType === "house"
                     ? "border-primary bg-primary text-primary-foreground"
@@ -1087,7 +1170,7 @@ export default function ProspectsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setPropertyType("apartment"); setPage(1); }}
+                onClick={() => applyFilterChange({ property_type: "apartment" })}
                 className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                   propertyType === "apartment"
                     ? "border-primary bg-primary text-primary-foreground"
@@ -1099,7 +1182,7 @@ export default function ProspectsPage() {
               {transactionType === "sale" && (
                 <button
                   type="button"
-                  onClick={() => { setPropertyType("land"); setPage(1); }}
+                  onClick={() => applyFilterChange({ property_type: "land" })}
                   className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                     propertyType === "land"
                       ? "border-primary bg-primary text-primary-foreground"
@@ -1129,7 +1212,7 @@ export default function ProspectsPage() {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => { setFilterStatus(tab.id); setPage(1); }}
+                  onClick={() => applyFilterChange({ status: tab.id })}
                   className={`inline-flex items-center gap-1.5 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isActive
                       ? tab.id === "discarded"
@@ -1170,10 +1253,7 @@ export default function ProspectsPage() {
             {/* Direct Owners Only Quick Chip */}
             <button
               type="button"
-              onClick={() => {
-                setFilterClassification((prev) => (prev === "owner" ? "all" : "owner"));
-                setPage(1);
-              }}
+              onClick={() => applyFilterChange({ classification: filterClassification === "owner" ? "all" : "owner" })}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                 filterClassification === "owner"
                   ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 shadow-xs"
@@ -1223,8 +1303,9 @@ export default function ProspectsPage() {
                   <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Deal Intelligence</label>
                   <Select
                     value={filterPriceGrade}
-                    onChange={(e) => { setFilterPriceGrade(e.target.value); setPage(1); }}
+                    onChange={(e) => applyFilterChange({ price_grade: e.target.value })}
                     className="h-8 w-full text-xs"
+                    autoComplete="off"
                   >
                     <option value="all">All Deal Grades</option>
                     <option value="underpriced">🔥 Hot Deals (Below Market)</option>
@@ -1238,8 +1319,9 @@ export default function ProspectsPage() {
                   <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Source Portal</label>
                   <Select
                     value={filterSource}
-                    onChange={(e) => { setFilterSource(e.target.value); setPage(1); }}
+                    onChange={(e) => applyFilterChange({ source: e.target.value })}
                     className="h-8 w-full text-xs"
+                    autoComplete="off"
                   >
                     <option value="">All Portals</option>
                     <option value="ikman">ikman.lk</option>
@@ -1251,8 +1333,9 @@ export default function ProspectsPage() {
                   <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Sort Order</label>
                   <Select
                     value={sortBy}
-                    onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+                    onChange={(e) => applyFilterChange({ sort_by: e.target.value })}
                     className="h-8 w-full text-xs"
+                    autoComplete="off"
                   >
                     <option value="default">Newest Seen</option>
                     <option value="best_deals">🔥 Best Deals First</option>
@@ -2209,7 +2292,7 @@ export default function ProspectsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() => applyFilterChange({ page: Math.max(1, page - 1) })}
               disabled={page === 1}
             >
               Previous
@@ -2220,7 +2303,7 @@ export default function ProspectsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => applyFilterChange({ page: Math.min(totalPages, page + 1) })}
               disabled={page === totalPages}
             >
               Next
@@ -2591,5 +2674,20 @@ export default function ProspectsPage() {
         onClose={() => setIsTemplateDialogOpen(false)}
       />
     </div>
+  );
+}
+
+export default function ProspectsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+          <RefreshCw className="h-8 w-8 animate-spin mb-3 text-primary" />
+          <p className="text-sm font-medium">Loading prospects...</p>
+        </div>
+      }
+    >
+      <ProspectsContent />
+    </Suspense>
   );
 }

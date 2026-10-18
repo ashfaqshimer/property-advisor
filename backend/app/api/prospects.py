@@ -1474,6 +1474,7 @@ def list_prospects(
     classification: str | None = None,
     price_grade: str | None = None,
     sort_by: str | None = None,
+    source: str | None = None,
     q: str | None = None,
     page: int = 1,
     page_size: int = 50,
@@ -1498,6 +1499,8 @@ def list_prospects(
         stmt = stmt.where(Prospect.listing_type == listing_type)
     if classification and classification != "all":
         stmt = stmt.where(Prospect.classification == classification)
+    if source:
+        stmt = stmt.where(Prospect.source == source)
 
     if q:
         term = q.strip()

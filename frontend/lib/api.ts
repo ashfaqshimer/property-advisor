@@ -1310,6 +1310,7 @@ export async function getProspects(filters?: {
   classification?: string;
   price_grade?: string;
   sort_by?: string;
+  source?: string;
   page?: number;
   page_size?: number;
   q?: string;
@@ -1321,6 +1322,7 @@ export async function getProspects(filters?: {
   if (filters?.classification && filters.classification !== "all") params.append("classification", filters.classification);
   if (filters?.price_grade && filters.price_grade !== "all") params.append("price_grade", filters.price_grade);
   if (filters?.sort_by) params.append("sort_by", filters.sort_by);
+  if (filters?.source) params.append("source", filters.source);
   if (filters?.q) params.append("q", filters.q);
   // Skip page/page_size when q is present — backend handles that
   if (!filters?.q) {

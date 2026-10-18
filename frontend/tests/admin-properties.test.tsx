@@ -70,13 +70,9 @@ describe("AdminPropertiesPage - Property Code display", () => {
     vi.spyOn(api, "getCurrentUser").mockResolvedValue({
       id: "u-1",
       email: "admin@propertyadvisor.lk",
-      full_name: "Admin User",
+      name: "Admin User",
       role: "admin",
-      is_active: true,
       created_at: "2026-01-01T00:00:00Z",
-      phone: null,
-      notes: null,
-      last_login_at: null,
     });
     vi.spyOn(api, "getPropertyContacts").mockResolvedValue([]);
     vi.spyOn(api, "getAdminProperties").mockResolvedValue(mockProperties);
@@ -151,13 +147,9 @@ describe("AdminPropertiesPage - Property Code display", () => {
     vi.spyOn(api, "getCurrentUser").mockResolvedValue({
       id: "u-2",
       email: "agent@propertyadvisor.lk",
-      full_name: "Agent User",
+      name: "Agent User",
       role: "agent",
-      is_active: true,
       created_at: "2026-01-01T00:00:00Z",
-      phone: null,
-      notes: null,
-      last_login_at: null,
     });
 
     render(<AdminPropertiesPage />);
