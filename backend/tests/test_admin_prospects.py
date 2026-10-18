@@ -384,4 +384,74 @@ def test_prospect_metrics_and_bulk_update(authenticated_client: TestClient, db_s
     assert p2.discard_reason == "broker_signal"
 
 
+def test_convert_prospect_draft_success(
+    authenticated_client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.models.property import ListingType, PropertyType
+    from app.models.prospect import Prospect
+    from app.schemas.extractor import GeminiPropertyExtraction
+    from app.scraper.schemas import IkmanAdDetail
+
+    prospect = Prospect(
+        id=uuid.uuid4(),
+        source="ikman",
+        source_id="ikman-12345",
+        ikman_ad_id="ikman-12345",
+        ikman_slug="house-for-sale-in-rajagiriya",
+        title="House for sale in Rajagiriya",
+        price="Rs 35,000,000",
+        location="Rajagiriya",
+        property_type="house",
+        listing_type="sale",
+        poster_name="Kamal",
+        phone_number="0771234567",
+        classification="direct_owner",
+        confidence=90,
+        classification_method="rule_based",
+        status="new",
+        first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    db_session.add(prospect)
+    db_session.commit()
+
+    async def mock_fetch_ad_detail(self, slug: str) -> IkmanAdDetail:
+        return IkmanAdDetail(
+            id="ikman-12345",
+            title="House for sale in Rajagiriya",
+            slug=slug,
+            description="3 bed house with sewaka kamara and sewaka wasikili in Rajagiriya. Call 0771234567",
+        )
+
+    monkeypatch.setattr("app.api.prospects.IkmanClient.fetch_ad_detail", mock_fetch_ad_detail)
+
+    mock_extraction = GeminiPropertyExtraction(
+        title="Spacious 3BR House in Rajagiriya",
+        description="Spacious 3 bedroom house with maids room in prime location.",
+        listing_type=ListingType.SALE,
+        property_type=PropertyType.HOUSE,
+        price=35000000.0,
+        location="Rajagiriya",
+        bedrooms=3,
+        bathrooms=2,
+    )
+
+    class MockExtractor:
+        def generate_structured(self, prompt: str, schema: type) -> GeminiPropertyExtraction:
+            return mock_extraction
+
+    monkeypatch.setattr("app.api.prospects.get_gemini_extractor_client", lambda: MockExtractor())
+
+    resp = authenticated_client.post(f"/admin/prospects/{prospect.id}/convert-draft")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["title"] == "Spacious 3BR House in Rajagiriya"
+    assert data["price"] == 35000000.0
+    assert data["prospect_id"] == str(prospect.id)
+    assert data["has_maids_room"] is True
+    assert data["has_maids_toilet"] is True
+
+
 

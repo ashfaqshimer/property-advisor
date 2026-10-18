@@ -1409,6 +1409,12 @@ async def generate_property_draft(
             await client.close()
         raw_data = detail.model_dump_json(exclude_none=True)
     
+    raw_desc = (
+        (detail.full_description or detail.description_snippet or "")
+        if is_lpw
+        else (detail.description or "")
+    )
+    
     prompt = f"""
     Extract a structured real estate property listing from this raw data.
     The data is scraped from an online classifieds site.
@@ -1445,6 +1451,9 @@ async def generate_property_draft(
             "source_id": prospect.source_id or prospect.ikman_ad_id,
             "prospect_id": prospect.id,
         }
+        if agent_redact:
+            extra_overrides["contact_phones"] = []
+
         return clean_and_build_draft(
             raw_draft,
             raw_text=raw_desc,
