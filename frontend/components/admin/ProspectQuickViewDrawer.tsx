@@ -343,20 +343,20 @@ export function ProspectQuickViewDrawer({
                     type="button"
                     variant="default"
                     onClick={handleOpenWhatsApp}
-                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9"
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 justify-center"
                   >
-                    <IoLogoWhatsapp className="h-4 w-4 text-white" />
-                    <span>WhatsApp Chat</span>
+                    <IoLogoWhatsapp className="h-4 w-4 text-white shrink-0" />
+                    <span className="truncate">WhatsApp Chat</span>
                   </Button>
 
                   <Button
                     asChild
                     variant="outline"
-                    className="gap-2 font-semibold text-xs h-9"
+                    className="gap-2 font-semibold text-xs h-9 justify-center"
                   >
                     <a href={`tel:${prospect.phone_number}`}>
-                      <PhoneCall className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span>Direct Call</span>
+                      <PhoneCall className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="truncate">Direct Call</span>
                     </a>
                   </Button>
                 </div>
@@ -386,8 +386,8 @@ export function ProspectQuickViewDrawer({
 
             {/* Field Agent Telegram Assignment Status */}
             {isAdminOrRoot && telegramAgentConfigured && (
-              <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
-                <div className="flex flex-col gap-0.5">
+              <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center justify-between sm:justify-start gap-2">
                   <span className="text-[11px] text-muted-foreground font-medium">Field Outreach</span>
                   <div className="flex items-center gap-1.5">
                     {prospect.assignment_status ? (
@@ -411,15 +411,15 @@ export function ProspectQuickViewDrawer({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
                   {prospect.assignment_id && onEditAssignment && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onEditAssignment(prospect)}
-                      className="h-7 px-2 text-xs gap-1"
+                      className="h-8 sm:h-7 px-2.5 text-xs gap-1 flex-1 sm:flex-none justify-center"
                     >
-                      <Pencil className="h-3 w-3" />
+                      <Pencil className="h-3 w-3 shrink-0" />
                       <span>Edit Outcome</span>
                     </Button>
                   )}
@@ -429,10 +429,10 @@ export function ProspectQuickViewDrawer({
                       size="sm"
                       onClick={() => onAssignToAgent(prospect.id)}
                       disabled={isAssigning}
-                      className="h-7 px-2.5 text-xs gap-1.5 font-semibold"
+                      className="h-8 sm:h-7 px-2.5 text-xs gap-1.5 font-semibold flex-1 sm:flex-none justify-center"
                     >
-                      <Send className="h-3 w-3" />
-                      <span>Dispatch to Agent</span>
+                      <Send className="h-3 w-3 shrink-0" />
+                      <span className="truncate">Dispatch to Agent</span>
                     </Button>
                   )}
                   {!isTerminal && onShortlistOnTelegram && telegramShortlistConfigured && (
@@ -440,10 +440,10 @@ export function ProspectQuickViewDrawer({
                       variant="outline"
                       size="sm"
                       onClick={() => onShortlistOnTelegram(prospect.id)}
-                      className="h-7 px-2.5 text-xs gap-1.5 font-semibold text-amber-700 dark:text-amber-400 border-amber-500/40 hover:bg-amber-500/10 cursor-pointer"
+                      className="h-8 sm:h-7 px-2.5 text-xs gap-1.5 font-semibold text-amber-700 dark:text-amber-400 border-amber-500/40 hover:bg-amber-500/10 cursor-pointer flex-1 sm:flex-none justify-center"
                     >
-                      <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                      <span>Shortlist on Telegram</span>
+                      <Star className="h-3 w-3 fill-amber-500 text-amber-500 shrink-0" />
+                      <span className="truncate">Shortlist on Telegram</span>
                     </Button>
                   )}
                 </div>
@@ -545,8 +545,8 @@ export function ProspectQuickViewDrawer({
         </div>
 
         {/* Drawer Sticky Footer with Core Actions */}
-        <div className="p-3 sm:p-4 border-t border-border bg-card shrink-0 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="p-3 sm:p-4 border-t border-border bg-card shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {isDiscarded ? (
               <Button
                 type="button"
@@ -555,9 +555,9 @@ export function ProspectQuickViewDrawer({
                   onUpdateStatus(prospect.id, "new");
                   onClose();
                 }}
-                className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none h-9 justify-center"
               >
-                <Undo2 className="h-3.5 w-3.5" />
+                <Undo2 className="h-3.5 w-3.5 shrink-0" />
                 <span>Restore to Pipeline</span>
               </Button>
             ) : (
@@ -568,9 +568,9 @@ export function ProspectQuickViewDrawer({
                   onClick={() => {
                     onDiscard(prospect);
                   }}
-                  className="gap-1.5 text-xs font-medium text-destructive border-destructive/30 hover:bg-destructive/10"
+                  className="gap-1.5 text-xs font-medium text-destructive border-destructive/30 hover:bg-destructive/10 flex-1 sm:flex-none min-w-[110px] sm:min-w-0 h-9 justify-center"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
                   <span>Discard...</span>
                 </Button>
               )
@@ -581,15 +581,15 @@ export function ProspectQuickViewDrawer({
                 type="button"
                 variant={prospect.status === "shortlisted" ? "outline" : "default"}
                 onClick={() => onShortlistOnTelegram(prospect.id)}
-                className={`gap-1.5 text-xs font-semibold cursor-pointer ${
+                className={`gap-1.5 text-xs font-semibold cursor-pointer flex-1 sm:flex-none min-w-[125px] sm:min-w-0 h-9 justify-center ${
                   prospect.status === "shortlisted"
                     ? "border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
                     : "bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-xs"
                 }`}
                 title="Send prospect to Telegram shortlist topic for review"
               >
-                <Star className={`h-3.5 w-3.5 ${prospect.status === "shortlisted" ? "fill-amber-500 text-amber-500" : "fill-zinc-950 text-zinc-950"}`} />
-                <span>{prospect.status === "shortlisted" ? "Shortlisted" : "Shortlist on TG"}</span>
+                <Star className={`h-3.5 w-3.5 shrink-0 ${prospect.status === "shortlisted" ? "fill-amber-500 text-amber-500" : "fill-zinc-950 text-zinc-950"}`} />
+                <span className="truncate">{prospect.status === "shortlisted" ? "Shortlisted" : "Shortlist on TG"}</span>
               </Button>
             )}
 
@@ -598,10 +598,10 @@ export function ProspectQuickViewDrawer({
                 type="button"
                 variant="outline"
                 onClick={handleOpenWhatsApp}
-                className="gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
+                className="gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer flex-1 sm:flex-none min-w-[110px] sm:min-w-0 h-9 justify-center"
                 title="Open WhatsApp chat"
               >
-                <IoLogoWhatsapp className="h-3.5 w-3.5 text-[#25D366]" />
+                <IoLogoWhatsapp className="h-3.5 w-3.5 text-[#25D366] shrink-0" />
                 <span>WhatsApp</span>
               </Button>
             )}
@@ -613,21 +613,21 @@ export function ProspectQuickViewDrawer({
                 onClick={() => {
                   onUpdateStatus(prospect.id, "contacted");
                 }}
-                className="gap-1.5 text-xs font-medium"
+                className="gap-1.5 text-xs font-medium flex-1 sm:flex-none min-w-[130px] sm:min-w-0 h-9 justify-center"
               >
-                <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                <span>Mark Contacted</span>
+                <PhoneCall className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span className="truncate">Mark Contacted</span>
               </Button>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={onClose}
-              className="text-xs"
+              className="text-xs h-9 flex-1 sm:flex-none sm:px-3 justify-center"
             >
               Close
             </Button>
@@ -639,14 +639,14 @@ export function ProspectQuickViewDrawer({
                   onConvert(prospect);
                 }}
                 disabled={isConverting}
-                className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white h-9 px-4 flex-[2] sm:flex-none justify-center shadow-xs"
               >
                 {isConverting ? (
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" />
                 ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
                 )}
-                <span>Convert to Listing ⚡</span>
+                <span className="truncate">Convert to Listing ⚡</span>
               </Button>
             )}
           </div>
