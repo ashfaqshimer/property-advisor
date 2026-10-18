@@ -1442,9 +1442,12 @@ async def generate_property_draft(
         is_owner = contact_type == "owner"
         agent_redact = _admin.role not in (StaffRole.ROOT, StaffRole.ADMIN) and is_owner
 
+        poster_name = prospect.poster_name or getattr(raw_draft, "contact_name", None)
+        poster_phone = prospect.phone_number or getattr(raw_draft, "contact_phone", None)
+
         extra_overrides = {
-            "contact_name": None if agent_redact else prospect.poster_name,
-            "contact_phone": None if agent_redact else prospect.phone_number,
+            "contact_name": None if agent_redact else poster_name,
+            "contact_phone": None if agent_redact else poster_phone,
             "contact_type": None if agent_redact else contact_type,
             "source_platform": "lankapropertyweb.com" if is_lpw else "ikman.lk",
             "source_url": prospect.source_url or prospect.ikman_url,

@@ -314,6 +314,22 @@ export default function NewPropertyPage() {
 				? await uploadPropertyImages(images.map((image) => image.file))
 				: [];
 			const amenityNames = form.amenities.filter(Boolean);
+
+			let contactId = form.propertyContactId || null;
+			if (!contactId && extractedContact && (extractedContact.phone || extractedContact.name) && !(isAgent && extractedContact.type === 'owner')) {
+				try {
+					const autoContact = await createPropertyContact({
+						full_name: extractedContact.name || 'Owner',
+						contact_type: extractedContact.type === 'broker' ? 'broker' : 'owner',
+						phones: extractedContact.phone ? [{ phone: extractedContact.phone, is_whatsapp: true }] : [],
+						notes: 'Auto-saved via listing conversion.',
+					});
+					contactId = autoContact.id;
+				} catch (cErr) {
+					console.error('Could not auto-create contact on property save', cErr);
+				}
+			}
+
 			const created = await createProperty({
 				title: form.title.trim(),
 				description: form.description.trim(),
@@ -345,7 +361,7 @@ export default function NewPropertyPage() {
 				featured_image_url: imageUrls[0] ?? null,
 				is_featured: form.isFeatured,
 				status: form.status as 'available' | 'under_offer' | 'sold',
-				property_contact_id: form.propertyContactId || null,
+				property_contact_id: contactId,
 			});
 			setSavedPropertyCode(created.property_code);
 			setSavedPropertyId(created.id);

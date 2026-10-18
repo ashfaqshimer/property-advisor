@@ -660,6 +660,36 @@ export function ProspectQuickViewDrawer({
                 <span className="truncate">Mark Contacted</span>
               </Button>
             )}
+
+            {prospect.status !== "converted" && !isDiscarded && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onUpdateStatus(prospect.id, "converted");
+                }}
+                className="gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 flex-1 sm:flex-none min-w-[130px] sm:min-w-0 h-9 justify-center cursor-pointer"
+                title="Manually mark prospect as converted to a listing"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="truncate">Mark Converted</span>
+              </Button>
+            )}
+
+            {prospect.status === "converted" && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onUpdateStatus(prospect.id, "contacted");
+                }}
+                className="gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground flex-1 sm:flex-none h-9 justify-center cursor-pointer"
+                title="Move prospect back to contacted stage"
+              >
+                <Undo2 className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Move to Contacted</span>
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -673,7 +703,7 @@ export function ProspectQuickViewDrawer({
               Close
             </Button>
 
-            {prospect.status !== "converted" && (
+            {prospect.status !== "converted" ? (
               <Button
                 type="button"
                 onClick={() => {
@@ -689,6 +719,11 @@ export function ProspectQuickViewDrawer({
                 )}
                 <span className="truncate">Convert to Listing ⚡</span>
               </Button>
+            ) : (
+              <Badge variant="success" className="gap-1.5 py-1.5 px-3 text-xs font-semibold h-9 shrink-0 flex items-center justify-center">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>Converted</span>
+              </Badge>
             )}
           </div>
         </div>

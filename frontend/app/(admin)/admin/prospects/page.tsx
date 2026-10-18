@@ -88,6 +88,7 @@ import { SourceBadge } from "../../../../components/admin/SourceBadge";
 import DiscardProspectModal, { getDiscardReasonLabel, isBrokerSignalReason } from "../../../../components/admin/DiscardProspectModal";
 import { ProspectQuickViewDrawer } from "../../../../components/admin/ProspectQuickViewDrawer";
 import { WhatsAppTemplateDialog } from "../../../../components/admin/WhatsAppTemplateDialog";
+import { ConvertPropertyDraftModal } from "../../../../components/admin/ConvertPropertyDraftModal";
 import { getProspectWhatsAppUrl, setStoredWhatsAppTemplate } from "../../../../lib/whatsapp";
 
 function ProspectsContent() {
@@ -348,6 +349,25 @@ function ProspectsContent() {
     }
   };
 
+  const handleBulkMarkConverted = async () => {
+    if (selectedProspectIds.size === 0) return;
+    setIsBulkUpdating(true);
+    const ids = Array.from(selectedProspectIds);
+    try {
+      await bulkUpdateProspects({ ids, status: "converted" });
+      toast.success(`Marked ${ids.length} prospect(s) as converted`);
+      setProspects((prev) =>
+        prev.map((p) => (selectedProspectIds.has(p.id) ? { ...p, status: "converted" } : p))
+      );
+      setSelectedProspectIds(new Set());
+      fetchMetrics();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update prospects");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
   const handleBulkConfirmDiscard = async (discardReason: string) => {
     if (selectedProspectIds.size === 0) return;
     setIsBulkUpdating(true);
@@ -505,7 +525,6 @@ function ProspectsContent() {
   const [draftLoading, setDraftLoading] = useState<string | null>(null);
   const [draftModalData, setDraftModalData] = useState<any>(null);
   const [draftProspectId, setDraftProspectId] = useState<string | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [discardModalProspect, setDiscardModalProspect] = useState<Prospect | null>(null);
   const [isDiscarding, setIsDiscarding] = useState(false);
@@ -531,52 +550,6 @@ function ProspectsContent() {
       toast.error(err.message || "Failed to generate draft");
     } finally {
       setDraftLoading(null);
-    }
-  };
-
-  const handlePublishDraft = async () => {
-    if (!draftModalData || !draftProspectId) return;
-    setIsPublishing(true);
-    try {
-      let contactId = null;
-      if (draftModalData.contact_name && draftModalData.contact_phone) {
-        try {
-          const contact = await createPropertyContact({
-            full_name: draftModalData.contact_name,
-            contact_type: draftModalData.contact_type === "broker" ? "broker" : "owner",
-            phones: [{ phone: draftModalData.contact_phone }],
-            notes: "Auto-created from prospect conversion.",
-          });
-          contactId = contact.id;
-        } catch (err: any) {
-          toast.error("Failed to create property contact, but continuing with property creation...");
-          console.error(err);
-        }
-      }
-
-      await createProperty({
-        ...draftModalData,
-        price: draftModalData.price ? Number(draftModalData.price) : 0,
-        bedrooms: draftModalData.bedrooms ? Number(draftModalData.bedrooms) : null,
-        bathrooms: draftModalData.bathrooms ? Number(draftModalData.bathrooms) : null,
-        land_size_perches: draftModalData.land_size_perches ? Number(draftModalData.land_size_perches) : null,
-        parking_spaces: draftModalData.parking_spaces ? Number(draftModalData.parking_spaces) : null,
-        build_year: draftModalData.build_year ? Number(draftModalData.build_year) : null,
-        status: "available",
-        image_urls: [],
-        image_alt: draftModalData.image_alt || "Property",
-        property_contact_id: contactId,
-      });
-      await updateProspect(draftProspectId, "converted");
-      toast.success("Property created successfully!");
-      setDraftModalData(null);
-      setDraftProspectId(null);
-      fetchProspects();
-      fetchMetrics();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create property");
-    } finally {
-      setIsPublishing(false);
     }
   };
 
@@ -734,6 +707,8 @@ function ProspectsContent() {
         toast.success(`Prospect restored to active! Status: ${newStatus}`);
       } else if (oldStatus !== "discarded" && newStatus === "discarded") {
         toast.info("Prospect moved to discarded");
+      } else if (newStatus === "converted") {
+        toast.success("Prospect marked as converted!");
       } else {
         toast.success("Status updated");
       }
@@ -1640,11 +1615,23 @@ function ProspectsContent() {
                           )}
                         </Button>
                       ) : prospect.status === "converted" ? (
-                        <div className="w-full flex items-center justify-center min-h-[38px]">
-                          <Badge variant="success" className="w-full justify-center gap-1.5 py-2 text-xs font-bold">
+                        <div className="w-full flex items-center justify-between gap-2 min-h-[38px]">
+                          <Badge variant="success" className="flex-1 justify-center gap-1.5 py-2 text-xs font-bold">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             <span>Converted to Listing</span>
                           </Badge>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                            disabled={updatingStatusId === prospect.id}
+                            className="min-h-[38px] text-xs font-medium gap-1 text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
+                            title="Move back to Contacted stage"
+                          >
+                            <Undo2 className="h-3.5 w-3.5" />
+                            <span>Revert</span>
+                          </Button>
                         </div>
                       ) : prospect.status === "shortlisted" ? (
                         <Button
@@ -1762,6 +1749,15 @@ function ProspectsContent() {
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
+                        {prospect.status !== "converted" && !isDiscarded && (
+                          <DropdownMenuItem
+                            onClick={() => handleUpdateStatus(prospect.id, "converted")}
+                            className="cursor-pointer text-emerald-600 dark:text-emerald-400 font-medium"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
+                            <span>Mark as Converted</span>
+                          </DropdownMenuItem>
+                        )}
                         {prospect.status === "new" && (
                           <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "contacted")}>
                             <PhoneCall className="h-3.5 w-3.5 mr-2 text-blue-600" />
@@ -1773,6 +1769,18 @@ function ProspectsContent() {
                             <Undo2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                             <span>Mark as New</span>
                           </DropdownMenuItem>
+                        )}
+                        {prospect.status === "converted" && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "contacted")}>
+                              <PhoneCall className="h-3.5 w-3.5 mr-2 text-blue-600" />
+                              <span>Move to Contacted</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "new")}>
+                              <Undo2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                              <span>Move to New</span>
+                            </DropdownMenuItem>
+                          </>
                         )}
                         {isAdminOrRoot && telegramAgentConfigured && (
                           <>
@@ -2105,10 +2113,23 @@ function ProspectsContent() {
                               <span>Convert ⚡</span>
                             </Button>
                           ) : prospect.status === "converted" ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              <span>Ready</span>
-                            </span>
+                            <div className="inline-flex items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <span>Converted</span>
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleUpdateStatus(prospect.id, "contacted")}
+                                disabled={updatingStatusId === prospect.id}
+                                className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+                                title="Move back to Contacted stage"
+                              >
+                                <Undo2 className="h-3 w-3" />
+                                <span>Revert</span>
+                              </Button>
+                            </div>
                           ) : prospect.status === "shortlisted" ? (
                             <Button
                               size="sm"
@@ -2220,6 +2241,15 @@ function ProspectsContent() {
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />
+                              {prospect.status !== "converted" && !isDiscarded && (
+                                <DropdownMenuItem
+                                  onClick={() => handleUpdateStatus(prospect.id, "converted")}
+                                  className="cursor-pointer text-emerald-600 dark:text-emerald-400 font-medium"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
+                                  <span>Mark as Converted</span>
+                                </DropdownMenuItem>
+                              )}
                               {prospect.status === "new" && (
                                 <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "contacted")} className="cursor-pointer">
                                   <PhoneCall className="h-3.5 w-3.5 mr-2 text-blue-600" />
@@ -2231,6 +2261,18 @@ function ProspectsContent() {
                                   <Undo2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                                   <span>Mark as New</span>
                                 </DropdownMenuItem>
+                              )}
+                              {prospect.status === "converted" && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "contacted")} className="cursor-pointer">
+                                    <PhoneCall className="h-3.5 w-3.5 mr-2 text-blue-600" />
+                                    <span>Move to Contacted</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleUpdateStatus(prospect.id, "new")} className="cursor-pointer">
+                                    <Undo2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                                    <span>Move to New</span>
+                                  </DropdownMenuItem>
+                                </>
                               )}
                               {isAdminOrRoot && telegramAgentConfigured && (
                                 <>
@@ -2361,6 +2403,17 @@ function ProspectsContent() {
             <span>Mark Contacted</span>
           </button>
 
+          <button
+            type="button"
+            onClick={handleBulkMarkConverted}
+            disabled={isAssigning || isShortlisting || isBulkUpdating || isBulkFetchingPhones}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 text-xs shadow transition disabled:opacity-50 cursor-pointer"
+            title="Mark all selected prospects as converted"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>Mark Converted</span>
+          </button>
+
           {telegramAgentConfigured && (
             <button
               type="button"
@@ -2425,104 +2478,21 @@ function ProspectsContent() {
       )}
 
       {/* Draft Modal */}
-      {draftModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl rounded-xl border border-border bg-card p-6 shadow-2xl">
-            <h2 className="mb-4 text-lg font-bold text-foreground">Review Property Draft</h2>
-            <div className="max-h-[60vh] overflow-y-auto space-y-4 text-sm text-foreground">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground">Title</label>
-                <input className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.title} onChange={(e) => setDraftModalData({...draftModalData, title: e.target.value})} />
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Price (Numeric)</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.price ?? ""} onChange={(e) => setDraftModalData({...draftModalData, price: e.target.value})} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Location</label>
-                  <input className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.location || ""} onChange={(e) => setDraftModalData({...draftModalData, location: e.target.value})} />
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Bedrooms</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.bedrooms ?? ""} onChange={(e) => setDraftModalData({...draftModalData, bedrooms: e.target.value})} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Bathrooms</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.bathrooms ?? ""} onChange={(e) => setDraftModalData({...draftModalData, bathrooms: e.target.value})} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Property Type</label>
-                  <Select className="w-full" value={draftModalData.property_type || "house"} onChange={(e) => setDraftModalData({...draftModalData, property_type: e.target.value})}>
-                    <option value="house">House</option>
-                    <option value="apartment">Apartment</option>
-                    <option value="land">Land</option>
-                    <option value="commercial">Commercial</option>
-                    <option value="mixed_use">Mixed Use</option>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Contact Name</label>
-                  <input className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.contact_name || ""} onChange={(e) => setDraftModalData({...draftModalData, contact_name: e.target.value})} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Contact Phone</label>
-                  <input className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.contact_phone || ""} onChange={(e) => setDraftModalData({...draftModalData, contact_phone: e.target.value})} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Contact Type</label>
-                  <Select className="w-full" value={draftModalData.contact_type || "owner"} onChange={(e) => setDraftModalData({...draftModalData, contact_type: e.target.value})}>
-                    <option value="owner">Owner</option>
-                    <option value="broker">Broker</option>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Land Size (Perches)</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.land_size_perches ?? ""} onChange={(e) => setDraftModalData({...draftModalData, land_size_perches: e.target.value})} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Parking Spaces</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.parking_spaces ?? ""} onChange={(e) => setDraftModalData({...draftModalData, parking_spaces: e.target.value})} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-muted-foreground">Build Year</label>
-                  <input type="number" className="w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.build_year ?? ""} onChange={(e) => setDraftModalData({...draftModalData, build_year: e.target.value})} />
-                </div>
-              </div>
-              <div className="flex gap-6 py-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={draftModalData.has_maids_room || false} onChange={(e) => setDraftModalData({...draftModalData, has_maids_room: e.target.checked})} className="rounded border-border text-primary" />
-                  <span className="text-xs font-medium text-foreground">Maid's Room</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={draftModalData.has_maids_toilet || false} onChange={(e) => setDraftModalData({...draftModalData, has_maids_toilet: e.target.checked})} className="rounded border-border text-primary" />
-                  <span className="text-xs font-medium text-foreground">Maid's Toilet</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={draftModalData.is_gated_community || false} onChange={(e) => setDraftModalData({...draftModalData, is_gated_community: e.target.checked})} className="rounded border-border text-primary" />
-                  <span className="text-xs font-medium text-foreground">Gated Community</span>
-                </label>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground">Description</label>
-                <textarea className="h-32 w-full rounded-lg border border-input bg-background p-2 outline-none focus:border-primary text-foreground" value={draftModalData.description} onChange={(e) => setDraftModalData({...draftModalData, description: e.target.value})} />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <Button variant="outline" onClick={() => { setDraftModalData(null); fetchProspects(); }} disabled={isPublishing}>Cancel</Button>
-              <Button onClick={handlePublishDraft} disabled={isPublishing}>
-                {isPublishing ? "Publishing..." : "Approve & Publish"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConvertPropertyDraftModal
+        isOpen={!!draftModalData}
+        draft={draftModalData}
+        prospectId={draftProspectId}
+        onClose={() => {
+          setDraftModalData(null);
+          setDraftProspectId(null);
+        }}
+        onSuccess={() => {
+          setDraftModalData(null);
+          setDraftProspectId(null);
+          fetchProspects();
+          fetchMetrics();
+        }}
+      />
 
       {/* Discard Reason Modal */}
       <DiscardProspectModal

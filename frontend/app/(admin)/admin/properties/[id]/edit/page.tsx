@@ -412,6 +412,21 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 			const allImageUrls = [...existingImages, ...uploadedUrls];
 			const amenityNames = form.amenities.filter(Boolean);
 
+			let contactId = form.propertyContactId || null;
+			if (!contactId && extractedContact && (extractedContact.phone || extractedContact.name) && !(isAgent && extractedContact.type === 'owner')) {
+				try {
+					const autoContact = await createPropertyContact({
+						full_name: extractedContact.name || 'Owner',
+						contact_type: extractedContact.type === 'broker' ? 'broker' : 'owner',
+						phones: extractedContact.phone ? [{ phone: extractedContact.phone, is_whatsapp: true }] : [],
+						notes: 'Auto-saved via listing conversion.',
+					});
+					contactId = autoContact.id;
+				} catch (cErr) {
+					console.error('Could not auto-create contact on property edit save', cErr);
+				}
+			}
+
 			const updatedRecord = await updateAdminProperty(propertyId, {
 				title: form.title.trim(),
 				description: form.description.trim(),
@@ -448,7 +463,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 				featured_image_url: form.featuredImageUrl || (allImageUrls[0] ?? null),
 				is_featured: form.isFeatured,
 				status: form.status as 'available' | 'under_offer' | 'sold',
-				property_contact_id: isAgent ? (form.propertyContactId || undefined) : (form.propertyContactId || null),
+				property_contact_id: isAgent ? (contactId || undefined) : (contactId || null),
 			});
 
 			setExistingImages(allImageUrls);

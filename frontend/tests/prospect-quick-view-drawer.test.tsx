@@ -159,4 +159,45 @@ describe("ProspectQuickViewDrawer", () => {
     expect(handleUpdateStatus).toHaveBeenCalledWith("prospect-123", "contacted");
     windowOpenSpy.mockRestore();
   });
+
+  it("calls onUpdateStatus with converted when Mark Converted button is clicked", () => {
+    const handleUpdateStatus = vi.fn();
+    render(
+      <ProspectQuickViewDrawer
+        prospect={mockProspect}
+        isOpen={true}
+        onClose={vi.fn()}
+        onConvert={vi.fn()}
+        onUpdateStatus={handleUpdateStatus}
+        onDiscard={vi.fn()}
+        onFetchPhone={vi.fn()}
+      />
+    );
+
+    const markConvertedBtn = screen.getByRole("button", { name: /mark converted/i });
+    expect(markConvertedBtn).toBeInTheDocument();
+    fireEvent.click(markConvertedBtn);
+    expect(handleUpdateStatus).toHaveBeenCalledWith("prospect-123", "converted");
+  });
+
+  it("renders Converted badge and allows moving back to Contacted stage", () => {
+    const handleUpdateStatus = vi.fn();
+    render(
+      <ProspectQuickViewDrawer
+        prospect={{ ...mockProspect, status: "converted" }}
+        isOpen={true}
+        onClose={vi.fn()}
+        onConvert={vi.fn()}
+        onUpdateStatus={handleUpdateStatus}
+        onDiscard={vi.fn()}
+        onFetchPhone={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText("Converted").length).toBeGreaterThan(0);
+    const moveToContactedBtn = screen.getByRole("button", { name: /move to contacted/i });
+    expect(moveToContactedBtn).toBeInTheDocument();
+    fireEvent.click(moveToContactedBtn);
+    expect(handleUpdateStatus).toHaveBeenCalledWith("prospect-123", "contacted");
+  });
 });

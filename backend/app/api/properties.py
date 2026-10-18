@@ -154,6 +154,10 @@ def create_property(payload: PropertyCreate, db: DbSession, _user: CurrentStaffU
         longitude=coordinates.longitude,
     )
     db.add(property_record)
+    if property_record.prospect_id:
+        prospect = db.get(Prospect, property_record.prospect_id)
+        if prospect and prospect.status != "converted":
+            prospect.status = "converted"
     db.commit()
     db.refresh(property_record)
     grade_info = grade_property_pricing(db, property_record)

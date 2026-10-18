@@ -45,6 +45,7 @@ import {
 } from "../../../../../lib/api";
 import { SourceBadge } from "../../../../../components/admin/SourceBadge";
 import DiscardProspectModal, { getDiscardReasonLabel, isBrokerSignalReason } from "../../../../../components/admin/DiscardProspectModal";
+import { ConvertPropertyDraftModal } from "../../../../../components/admin/ConvertPropertyDraftModal";
 
 export default function ScanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -81,7 +82,6 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
   const [draftLoading, setDraftLoading] = useState<string | null>(null);
   const [draftModalData, setDraftModalData] = useState<any>(null);
   const [draftProspectId, setDraftProspectId] = useState<string | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [discardModalProspect, setDiscardModalProspect] = useState<Prospect | null>(null);
   const [isDiscarding, setIsDiscarding] = useState(false);
@@ -262,48 +262,6 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
       toast.error(err.message || "Failed to generate draft");
     } finally {
       setDraftLoading(null);
-    }
-  };
-
-  const handlePublishDraft = async () => {
-    if (!draftModalData || !draftProspectId) return;
-    setIsPublishing(true);
-    try {
-      let contactId = null;
-      if (draftModalData.contact_name && draftModalData.contact_phone) {
-        try {
-          const contact = await createPropertyContact({
-            full_name: draftModalData.contact_name,
-            contact_type: draftModalData.contact_type === "broker" ? "broker" : "owner",
-            phones: [{ phone: draftModalData.contact_phone }],
-            notes: "Auto-created from prospect conversion.",
-          });
-          contactId = contact.id;
-        } catch {
-          // ignore contact creation failure and continue
-        }
-      }
-
-      await createProperty({
-        ...draftModalData,
-        price: draftModalData.price ? Number(draftModalData.price) : 0,
-        bedrooms: draftModalData.bedrooms ? Number(draftModalData.bedrooms) : null,
-        bathrooms: draftModalData.bathrooms ? Number(draftModalData.bathrooms) : null,
-        status: "available",
-        image_urls: [],
-        image_alt: draftModalData.image_alt || "Property",
-        property_contact_id: contactId,
-      });
-
-      await updateProspect(draftProspectId, "converted");
-      toast.success("Property created and published!");
-      setDraftModalData(null);
-      setDraftProspectId(null);
-      fetchProspectsData();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create property");
-    } finally {
-      setIsPublishing(false);
     }
   };
 
@@ -989,120 +947,20 @@ export default function ScanDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* Review Property Draft Modal */}
-      {draftModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-zinc-950 p-6 shadow-2xl">
-            <h2 className="mb-4 text-lg font-bold text-[#1a2923] dark:text-zinc-200">
-              Review Property Draft
-            </h2>
-            <div className="max-h-[60vh] overflow-y-auto space-y-4 text-sm text-[#1a2923] dark:text-zinc-200">
-              <div>
-                <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Title</label>
-                <input
-                  className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                  value={draftModalData.title}
-                  onChange={(e) => setDraftModalData({ ...draftModalData, title: e.target.value })}
-                />
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Price (Numeric)</label>
-                  <input
-                    type="number"
-                    className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.price ?? ""}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, price: e.target.value })}
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Location</label>
-                  <input
-                    className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.location || ""}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, location: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Bedrooms</label>
-                  <input
-                    type="number"
-                    className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.bedrooms ?? ""}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, bedrooms: e.target.value })}
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Bathrooms</label>
-                  <input
-                    type="number"
-                    className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.bathrooms ?? ""}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, bathrooms: e.target.value })}
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Property Type</label>
-                  <select
-                    className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.property_type || "house"}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, property_type: e.target.value })}
-                  >
-                    <option value="house">House</option>
-                    <option value="apartment">Apartment</option>
-                    <option value="land">Land</option>
-                    <option value="commercial">Commercial</option>
-                    <option value="mixed_use">Mixed Use</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Contact Name</label>
-                  <input
-                    className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.contact_name || ""}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, contact_name: e.target.value })}
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Contact Phone</label>
-                  <input
-                    className="w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                    value={draftModalData.contact_phone || ""}
-                    onChange={(e) => setDraftModalData({ ...draftModalData, contact_phone: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#64736b] dark:text-zinc-400">Description</label>
-                <textarea
-                  className="h-32 w-full rounded border border-[#dce4df] dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 outline-none focus:border-[#28513f] dark:focus:border-emerald-600"
-                  value={draftModalData.description}
-                  onChange={(e) => setDraftModalData({ ...draftModalData, description: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setDraftModalData(null)}
-                disabled={isPublishing}
-                className="cursor-pointer rounded px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handlePublishDraft}
-                disabled={isPublishing}
-                className="cursor-pointer rounded bg-[#19352b] dark:bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-[#2a4d40] dark:hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-70"
-              >
-                {isPublishing ? "Publishing..." : "Approve & Publish"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConvertPropertyDraftModal
+        isOpen={!!draftModalData}
+        draft={draftModalData}
+        prospectId={draftProspectId}
+        onClose={() => {
+          setDraftModalData(null);
+          setDraftProspectId(null);
+        }}
+        onSuccess={() => {
+          setDraftModalData(null);
+          setDraftProspectId(null);
+          fetchProspectsData();
+        }}
+      />
 
       {/* Discard Reason Modal */}
       <DiscardProspectModal

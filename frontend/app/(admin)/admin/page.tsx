@@ -9,10 +9,12 @@ import {
 	deleteAdminProperty,
 	getAdminProperties,
 	getPropertyContacts,
+	createPropertyContact,
 	getCurrentUser,
 	updateAdminProperty,
 	type PropertyContact,
 } from '@/lib/api';
+import { ContactForm } from '@/components/admin/ContactForm';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import {
@@ -68,6 +70,8 @@ export default function AdminPropertiesPage() {
 	const [savingPhotoId, setSavingPhotoId] = useState<string | null>(null);
 	const [savingPhotoUrl, setSavingPhotoUrl] = useState<string | null>(null);
 	const [copiedCode, setCopiedCode] = useState<string | null>(null);
+	const [newContactForPropertyId, setNewContactForPropertyId] = useState<string | null>(null);
+	const [creatingContact, setCreatingContact] = useState(false);
 
 	function copyPropertyCode(code: string) {
 		navigator.clipboard.writeText(code);
@@ -416,13 +420,20 @@ export default function AdminPropertiesPage() {
 										) : (
 											<Select
 												value={property.contactId ?? ''}
-												onChange={(e) => assignContact(property.id, e.target.value || null)}
+												onChange={(e) => {
+													if (e.target.value === '__new__') {
+														setNewContactForPropertyId(property.id);
+													} else {
+														assignContact(property.id, e.target.value || null);
+													}
+												}}
 												className='h-8 max-w-[160px] truncate text-xs'
 											>
 												<option value=''>— none —</option>
 												{contacts.map((c) => (
 													<option key={c.id} value={c.id}>{c.full_name}</option>
 												))}
+												<option value='__new__'>+ Add new contact...</option>
 											</Select>
 										)}
 									</TableCell>
@@ -574,13 +585,20 @@ export default function AdminPropertiesPage() {
 								) : (
 									<Select
 										value={property.contactId ?? ''}
-										onChange={(e) => assignContact(property.id, e.target.value || null)}
+										onChange={(e) => {
+											if (e.target.value === '__new__') {
+												setNewContactForPropertyId(property.id);
+											} else {
+												assignContact(property.id, e.target.value || null);
+											}
+										}}
 										className='h-8 flex-1 text-xs'
 									>
 										<option value=''>— none —</option>
 										{contacts.map((c) => (
 											<option key={c.id} value={c.id}>{c.full_name}</option>
 										))}
+										<option value='__new__'>+ Add new contact...</option>
 									</Select>
 								)}
 							</div>
@@ -826,6 +844,33 @@ export default function AdminPropertiesPage() {
 								Close
 							</Button>
 						</div>
+					</div>
+				</div>
+			)}
+
+			{newContactForPropertyId && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+					<div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+						<h3 className="mb-4 text-lg font-semibold text-foreground">Add &amp; Link New Contact</h3>
+						<ContactForm
+							onSave={async (data) => {
+								setCreatingContact(true);
+								try {
+									const created = await createPropertyContact(data);
+									setContacts((prev) => [created, ...prev]);
+									await assignContact(newContactForPropertyId, created.id);
+									setNewContactForPropertyId(null);
+									toast.success(`Contact "${created.full_name}" created and linked.`);
+								} catch (err: any) {
+									toast.error(err.message || 'Could not create contact.');
+								} finally {
+									setCreatingContact(false);
+								}
+							}}
+							onCancel={() => setNewContactForPropertyId(null)}
+							saving={creatingContact}
+							disableOwner={isAgent}
+						/>
 					</div>
 				</div>
 			)}
