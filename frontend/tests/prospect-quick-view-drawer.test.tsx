@@ -136,15 +136,16 @@ describe("ProspectQuickViewDrawer", () => {
     expect(screen.getByText("Shortlisted")).toBeInTheDocument();
   });
 
-  it("opens WhatsApp link when WhatsApp button is clicked", () => {
+  it("opens WhatsApp link with pre-filled message and marks new prospect as contacted", () => {
     const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const handleUpdateStatus = vi.fn();
     render(
       <ProspectQuickViewDrawer
         prospect={mockProspect}
         isOpen={true}
         onClose={vi.fn()}
         onConvert={vi.fn()}
-        onUpdateStatus={vi.fn()}
+        onUpdateStatus={handleUpdateStatus}
         onDiscard={vi.fn()}
         onFetchPhone={vi.fn()}
       />
@@ -153,7 +154,9 @@ describe("ProspectQuickViewDrawer", () => {
     const waButtons = screen.getAllByRole("button", { name: /whatsapp/i });
     expect(waButtons.length).toBeGreaterThan(0);
     fireEvent.click(waButtons[0]);
-    expect(windowOpenSpy).toHaveBeenCalledWith(expect.stringContaining("wa.me/94771234567"), "_blank");
+    expect(windowOpenSpy).toHaveBeenCalledWith(expect.stringContaining("wa.me/94771234567?text="), "_blank");
+    expect(windowOpenSpy).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("ikman.lk")), "_blank");
+    expect(handleUpdateStatus).toHaveBeenCalledWith("prospect-123", "contacted");
     windowOpenSpy.mockRestore();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
@@ -37,6 +37,7 @@ import {
 import { IoLogoWhatsapp } from "react-icons/io";
 
 import { Prospect } from "@/lib/api";
+import { getProspectWhatsAppUrl, buildProspectOutreachMessage } from "@/lib/whatsapp";
 import {
   Sheet,
   SheetContent,
@@ -48,6 +49,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SourceBadge } from "./SourceBadge";
 import { getDiscardReasonLabel, isBrokerSignalReason } from "./DiscardProspectModal";
+import { WhatsAppTemplateDialog } from "./WhatsAppTemplateDialog";
 
 export interface ProspectQuickViewDrawerProps {
   prospect: Prospect | null;
@@ -86,6 +88,8 @@ export function ProspectQuickViewDrawer({
   telegramShortlistConfigured = false,
   isAdminOrRoot = false,
 }: ProspectQuickViewDrawerProps) {
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+
   if (!prospect) return null;
 
   const isOwner = prospect.classification === "owner";
@@ -107,13 +111,19 @@ export function ProspectQuickViewDrawer({
 
   const handleOpenWhatsApp = () => {
     if (!prospect.phone_number) return;
-    let cleaned = prospect.phone_number.replace(/\D/g, "");
-    if (cleaned.startsWith("0")) {
-      cleaned = "94" + cleaned.slice(1);
-    } else if (!cleaned.startsWith("94")) {
-      cleaned = "94" + cleaned;
+    const url = getProspectWhatsAppUrl(prospect.phone_number, prospect);
+    if (!url) return;
+    window.open(url, "_blank");
+    if (prospect.status === "new") {
+      onUpdateStatus(prospect.id, "contacted");
+      toast.success("Opened WhatsApp and marked prospect as contacted");
     }
-    window.open(`https://wa.me/${cleaned}`, "_blank");
+  };
+
+  const handleCopyOutreachMessage = () => {
+    const msg = buildProspectOutreachMessage(prospect);
+    navigator.clipboard.writeText(msg);
+    toast.success("WhatsApp outreach message copied to clipboard");
   };
 
   const getPropertyTypeIcon = (type: string) => {
@@ -343,10 +353,10 @@ export function ProspectQuickViewDrawer({
                     type="button"
                     variant="default"
                     onClick={handleOpenWhatsApp}
-                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 justify-center"
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 justify-center cursor-pointer"
                   >
                     <IoLogoWhatsapp className="h-4 w-4 text-white shrink-0" />
-                    <span className="truncate">WhatsApp Chat</span>
+                    <span className="truncate">WhatsApp Outreach</span>
                   </Button>
 
                   <Button
@@ -359,6 +369,37 @@ export function ProspectQuickViewDrawer({
                       <span className="truncate">Direct Call</span>
                     </a>
                   </Button>
+                </div>
+
+                <div className="rounded-md border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 p-2.5 text-xs text-muted-foreground space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-950 dark:text-emerald-200">
+                    <span className="flex items-center gap-1.5">
+                      <IoLogoWhatsapp className="h-3.5 w-3.5 text-[#25D366] shrink-0" />
+                      Auto WhatsApp Outreach
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsTemplateDialogOpen(true)}
+                        className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-0.5"
+                        title="Customize message template"
+                      >
+                        <Pencil className="h-3 w-3" />
+                        <span>Edit Template</span>
+                      </button>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={handleCopyOutreachMessage}
+                        className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+                      >
+                        Copy Message
+                      </button>
+                    </div>
+                  </div>
+                  <p className="line-clamp-2 italic text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">
+                    &ldquo;{buildProspectOutreachMessage(prospect)}&rdquo;
+                  </p>
                 </div>
               </div>
             ) : (
@@ -652,6 +693,12 @@ export function ProspectQuickViewDrawer({
           </div>
         </div>
       </SheetContent>
+
+      <WhatsAppTemplateDialog
+        isOpen={isTemplateDialogOpen}
+        onClose={() => setIsTemplateDialogOpen(false)}
+        sampleProspect={prospect}
+      />
     </Sheet>
   );
 }

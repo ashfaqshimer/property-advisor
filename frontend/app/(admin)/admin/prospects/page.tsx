@@ -80,11 +80,14 @@ import {
   bulkUpdateProspects,
   ProspectMetrics,
   dispatchProspectsToShortlist,
+  getSiteConfiguration,
 } from "../../../../lib/api";
 import { ScanLauncherDrawer } from "../../../../components/admin/ScanLauncherDrawer";
 import { SourceBadge } from "../../../../components/admin/SourceBadge";
 import DiscardProspectModal, { getDiscardReasonLabel, isBrokerSignalReason } from "../../../../components/admin/DiscardProspectModal";
 import { ProspectQuickViewDrawer } from "../../../../components/admin/ProspectQuickViewDrawer";
+import { WhatsAppTemplateDialog } from "../../../../components/admin/WhatsAppTemplateDialog";
+import { getProspectWhatsAppUrl, setStoredWhatsAppTemplate } from "../../../../lib/whatsapp";
 
 export default function ProspectsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -139,8 +142,18 @@ export default function ProspectsPage() {
   const [showExactTime, setShowExactTime] = useState(false);
 
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+
   useEffect(() => {
     getCurrentUser().then(setUser).catch(() => {});
+    getSiteConfiguration()
+      .then((cfg) => {
+        const remoteTemplate = cfg?.extra_settings?.whatsapp_outreach_template as string | undefined;
+        if (remoteTemplate) {
+          setStoredWhatsAppTemplate(remoteTemplate);
+        }
+      })
+      .catch(() => {});
   }, []);
   const isAdminOrRoot = user?.role === "admin" || user?.role === "root";
 
@@ -729,15 +742,27 @@ export default function ProspectsPage() {
     toast.success("Phone number copied to clipboard");
   };
 
-  const handleOpenWhatsApp = (phone?: string | null) => {
-    if (!phone) return;
-    let cleaned = phone.replace(/\D/g, "");
-    if (cleaned.startsWith("0")) {
-      cleaned = "94" + cleaned.slice(1);
-    } else if (!cleaned.startsWith("94")) {
-      cleaned = "94" + cleaned;
+  const handleOpenWhatsApp = (prospectOrPhone?: Prospect | string | null, maybeProspect?: Prospect | null) => {
+    let targetProspect: Prospect | null = null;
+    let targetPhone: string | null = null;
+
+    if (typeof prospectOrPhone === "string") {
+      targetPhone = prospectOrPhone;
+      targetProspect = maybeProspect || null;
+    } else if (prospectOrPhone && typeof prospectOrPhone === "object") {
+      targetProspect = prospectOrPhone;
+      targetPhone = prospectOrPhone.phone_number || null;
     }
-    window.open(`https://wa.me/${cleaned}`, "_blank");
+
+    if (!targetPhone) return;
+    const url = getProspectWhatsAppUrl(targetPhone, targetProspect);
+    if (!url) return;
+
+    window.open(url, "_blank");
+    if (targetProspect && targetProspect.status === "new") {
+      handleUpdateStatus(targetProspect.id, "contacted");
+      toast.success("Opened WhatsApp and marked prospect as contacted");
+    }
   };
 
   const renderStatusBadge = (prospect: Prospect) => {
@@ -853,6 +878,16 @@ export default function ProspectsPage() {
               >
                 <PhoneCall className="h-4 w-4" />
                 {activePhoneJobId ? "Syncing..." : "Sync Phone Numbers"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsTemplateDialogOpen(true)}
+                className="w-full sm:w-auto gap-1.5 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
+                title="Configure WhatsApp outreach message template"
+              >
+                <IoLogoWhatsapp className="h-4 w-4 text-[#25D366]" />
+                <span>WhatsApp Template</span>
               </Button>
               <Button
                 asChild
@@ -1436,11 +1471,11 @@ export default function ProspectsPage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleOpenWhatsApp(prospect.phone_number);
+                                handleOpenWhatsApp(prospect);
                               }}
                               className="p-0.5 text-[#25D366] hover:opacity-80 transition cursor-pointer rounded"
-                              title="Open WhatsApp chat"
-                              aria-label="Open WhatsApp chat"
+                              title="Open WhatsApp outreach"
+                              aria-label="Open WhatsApp outreach"
                             >
                               <IoLogoWhatsapp className="h-3.5 w-3.5" />
                             </button>
@@ -1576,10 +1611,10 @@ export default function ProspectsPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => handleOpenWhatsApp(prospect.phone_number)}
+                        onClick={() => handleOpenWhatsApp(prospect)}
                         className="min-h-[38px] w-10 p-0 text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-500/30 cursor-pointer shrink-0"
-                        title="Open WhatsApp chat"
-                        aria-label="Open WhatsApp chat"
+                        title="Open WhatsApp outreach"
+                        aria-label="Open WhatsApp outreach"
                       >
                         <IoLogoWhatsapp className="h-4 w-4 text-[#25D366]" />
                       </Button>
@@ -1630,9 +1665,9 @@ export default function ProspectsPage() {
                               <Copy className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                               <span>Copy Phone</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleOpenWhatsApp(prospect.phone_number)}>
+                            <DropdownMenuItem onClick={() => handleOpenWhatsApp(prospect)}>
                               <IoLogoWhatsapp className="h-3.5 w-3.5 mr-2 text-[#25D366]" />
-                              <span>WhatsApp Chat</span>
+                              <span>WhatsApp Outreach</span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                           </>
@@ -1920,11 +1955,11 @@ export default function ProspectsPage() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleOpenWhatsApp(prospect.phone_number);
+                                    handleOpenWhatsApp(prospect);
                                   }}
                                   className="p-0.5 text-[#25D366] hover:opacity-80 transition cursor-pointer rounded"
-                                  title="Open WhatsApp chat"
-                                  aria-label="Open WhatsApp chat"
+                                  title="Open WhatsApp outreach"
+                                  aria-label="Open WhatsApp outreach"
                                 >
                                   <IoLogoWhatsapp className="h-3.5 w-3.5" />
                                 </button>
@@ -2034,11 +2069,11 @@ export default function ProspectsPage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleOpenWhatsApp(prospect.phone_number);
+                                handleOpenWhatsApp(prospect);
                               }}
                               className="h-7 w-7 rounded-md inline-flex items-center justify-center transition-colors cursor-pointer text-[#25D366] hover:bg-emerald-500/10 border border-emerald-500/20"
-                              title="Open WhatsApp chat"
-                              aria-label="Open WhatsApp chat"
+                              title="Open WhatsApp outreach"
+                              aria-label="Open WhatsApp outreach"
                             >
                               <IoLogoWhatsapp className="h-3.5 w-3.5" />
                             </button>
@@ -2088,9 +2123,9 @@ export default function ProspectsPage() {
                                     <Copy className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                                     <span>Copy Phone</span>
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleOpenWhatsApp(prospect.phone_number)} className="cursor-pointer">
+                                  <DropdownMenuItem onClick={() => handleOpenWhatsApp(prospect)} className="cursor-pointer">
                                     <IoLogoWhatsapp className="h-3.5 w-3.5 mr-2 text-[#25D366]" />
-                                    <span>WhatsApp Chat</span>
+                                    <span>WhatsApp Outreach</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                 </>
@@ -2548,6 +2583,12 @@ export default function ProspectsPage() {
         isAdminOrRoot={isAdminOrRoot}
         telegramAgentConfigured={telegramAgentConfigured}
         telegramShortlistConfigured={telegramShortlistConfigured}
+      />
+
+      {/* WhatsApp Template Configuration Dialog */}
+      <WhatsAppTemplateDialog
+        isOpen={isTemplateDialogOpen}
+        onClose={() => setIsTemplateDialogOpen(false)}
       />
     </div>
   );

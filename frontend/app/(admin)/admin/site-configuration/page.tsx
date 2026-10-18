@@ -11,7 +11,10 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Sparkles,
+  RotateCcw,
 } from "lucide-react";
+import { IoLogoWhatsapp } from "react-icons/io";
 
 import {
   getCurrentUser,
@@ -28,6 +31,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  DEFAULT_WHATSAPP_OUTREACH_TEMPLATE,
+  renderOutreachTemplate,
+  getStoredWhatsAppTemplate,
+  setStoredWhatsAppTemplate,
+  clearStoredWhatsAppTemplate,
+} from "@/lib/whatsapp";
 
 function ConfigField({
   label,
@@ -91,6 +103,7 @@ export default function SiteConfigurationPage() {
   const [siteConfig, setSiteConfig] = useState<Partial<SiteConfiguration>>({});
   const [updatingSiteConfig, setUpdatingSiteConfig] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
+  const [whatsAppTemplate, setWhatsAppTemplate] = useState<string>(DEFAULT_WHATSAPP_OUTREACH_TEMPLATE);
   const [loading, setLoading] = useState(true);
 
   const [syncingBenchmarks, setSyncingBenchmarks] = useState(false);
@@ -170,6 +183,13 @@ export default function SiteConfigurationPage() {
             if (config) {
               setSiteConfig(config);
               setPhoneInput(config.phone_numbers?.values?.join(", ") || "");
+              const templateFromConfig =
+                (config.extra_settings?.whatsapp_outreach_template as string) ||
+                getStoredWhatsAppTemplate();
+              if (templateFromConfig) {
+                setWhatsAppTemplate(templateFromConfig);
+                setStoredWhatsAppTemplate(templateFromConfig);
+              }
             }
           })
           .catch(() => {})
@@ -200,11 +220,15 @@ export default function SiteConfigurationPage() {
         tiktok_link: siteConfig.tiktok_link,
         scanner_settings: siteConfig.scanner_settings,
         benchmark_sync_settings: siteConfig.benchmark_sync_settings,
-        extra_settings: siteConfig.extra_settings || {},
+        extra_settings: {
+          ...(siteConfig.extra_settings || {}),
+          whatsapp_outreach_template: whatsAppTemplate.trim(),
+        },
         prospect_retention_days: Number(siteConfig.prospect_retention_days) || 30,
       });
       setSiteConfig(updated);
       setPhoneInput(updated.phone_numbers?.values?.join(", ") || "");
+      setStoredWhatsAppTemplate(whatsAppTemplate.trim());
       toast.success("Site configuration updated.");
     } catch (caught) {
       toast.error(
@@ -331,6 +355,85 @@ export default function SiteConfigurationPage() {
               show={siteConfig.tiktok_link?.show ?? true}
               onShowChange={(v) => updateStringShow("tiktok_link", v)}
             />
+
+            <div className="pt-4 border-t space-y-3">
+              <div className="flex items-center gap-2">
+                <IoLogoWhatsapp className="h-4 w-4 text-[#25D366]" />
+                <Label className="text-sm font-semibold">Prospect WhatsApp Outreach Template</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Message template for reaching out to scraped owners on WhatsApp. Placeholders: &#123;name&#125;, &#123;title&#125;, &#123;url&#125;, &#123;area&#125;.
+              </p>
+
+              <div className="flex flex-wrap gap-1.5">
+                <Badge
+                  variant="outline"
+                  className="cursor-pointer hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono text-[11px] py-0.5"
+                  onClick={() => setWhatsAppTemplate((prev) => prev + "{name}")}
+                >
+                  + &#123;name&#125;
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="cursor-pointer hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono text-[11px] py-0.5"
+                  onClick={() => setWhatsAppTemplate((prev) => prev + "{title}")}
+                >
+                  + &#123;title&#125;
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="cursor-pointer hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono text-[11px] py-0.5"
+                  onClick={() => setWhatsAppTemplate((prev) => prev + "{url}")}
+                >
+                  + &#123;url&#125;
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="cursor-pointer hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono text-[11px] py-0.5"
+                  onClick={() => setWhatsAppTemplate((prev) => prev + "{area}")}
+                >
+                  + &#123;area&#125;
+                </Badge>
+              </div>
+
+              <Textarea
+                id="site_config_wa_template"
+                rows={6}
+                value={whatsAppTemplate}
+                onChange={(e) => setWhatsAppTemplate(e.target.value)}
+                className="text-xs leading-relaxed"
+                placeholder="Enter WhatsApp template..."
+              />
+
+              <div className="rounded-lg border bg-muted/30 p-2.5 text-xs text-muted-foreground space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-foreground">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-emerald-600" />
+                    Preview with sample data
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWhatsAppTemplate(DEFAULT_WHATSAPP_OUTREACH_TEMPLATE);
+                      clearStoredWhatsAppTemplate();
+                      toast.info("Reset to default template");
+                    }}
+                    className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
+                  >
+                    <RotateCcw className="h-2.5 w-2.5" />
+                    <span>Reset</span>
+                  </button>
+                </div>
+                <div className="whitespace-pre-wrap font-sans text-xs italic text-foreground/80 leading-relaxed max-h-32 overflow-y-auto">
+                  {renderOutreachTemplate(whatsAppTemplate, {
+                    poster_name: "Kamal Perera",
+                    title: "Modern 3 Bedroom House in Thalawathugoda",
+                    ikman_url: "https://ikman.lk/en/ad/modern-3-bedroom-house-for-sale",
+                    suburb: "Thalawathugoda",
+                  })}
+                </div>
+              </div>
+            </div>
 
             <Button
               type="submit"
