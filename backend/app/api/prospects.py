@@ -1,4 +1,5 @@
 import asyncio
+import re
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Annotated, Any
@@ -6,7 +7,7 @@ from typing import Annotated, Any
 import csv
 import io
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
-from sqlalchemy import delete, select, func, case, and_
+from sqlalchemy import delete, select, func, case, and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -1491,10 +1492,48 @@ def list_prospects(
     # Terminal statuses that are hidden from the default working list.
     TERMINAL_STATUSES = ("discarded", "converted", "unavailable", "agent_no_deal", "agent_co_broke")
 
-    if status:
-        stmt = stmt.where(Prospect.status == status)
+    # Inspect search query for phone number / digits
+    phone_filter = None
+    is_phone_lookup = False
+    if q:
+        term = q.strip()
+        digits = re.sub(r"\D", "", term)
+        if len(digits) >= 4:
+            if digits.startswith("94") and len(digits) >= 9:
+                core_phone = digits[2:]
+            elif digits.startswith("0") and len(digits) >= 9:
+                core_phone = digits[1:]
+            else:
+                core_phone = digits
+
+            clean_db_phone = func.replace(
+                func.replace(
+                    func.replace(
+                        func.replace(
+                            func.coalesce(Prospect.phone_number, ""),
+                            " ", ""
+                        ),
+                        "-", ""
+                    ),
+                    "+", ""
+                ),
+                "(", ""
+            )
+            phone_filter = clean_db_phone.ilike(f"%{core_phone}%") | Prospect.phone_number.ilike(f"%{term}%")
+            if len(digits) >= 7:
+                is_phone_lookup = True
+        else:
+            phone_filter = Prospect.phone_number.ilike(f"%{term}%")
+
+    if status and status != "all":
+        if is_phone_lookup and phone_filter is not None:
+            # Phone lookup: match either the specified status or any prospect matching this phone number
+            stmt = stmt.where(or_(Prospect.status == status, phone_filter))
+        else:
+            stmt = stmt.where(Prospect.status == status)
     else:
-        stmt = stmt.where(Prospect.status.notin_(TERMINAL_STATUSES))
+        if not is_phone_lookup:
+            stmt = stmt.where(Prospect.status.notin_(TERMINAL_STATUSES))
 
     if property_type:
         stmt = stmt.where(Prospect.property_type == property_type)
@@ -1508,6 +1547,7 @@ def list_prospects(
     if q:
         term = q.strip()
         is_postgres = db.bind.dialect.name == "postgresql" if db.bind else False
+        phone_match_condition = phone_filter if phone_filter is not None else Prospect.phone_number.ilike(f"%{term}%")
         if is_postgres:
             # Trigram fuzzy search: use the pg_trgm `%` similarity operator across
             # location, suburb, title, and poster_name. Fallback to ILIKE so that short
@@ -1523,11 +1563,14 @@ def list_prospects(
                 | Prospect.suburb.ilike(f"%{term}%")
                 | Prospect.title.ilike(f"%{term}%")
                 | Prospect.poster_name.ilike(f"%{term}%")
+                | phone_match_condition
             )
             stmt = stmt.where(trgm_match | ilike_match)
 
+            phone_boost = case((phone_match_condition, 2.0), else_=0.0)
             similarity_score = (
-                func.greatest(
+                phone_boost
+                + func.greatest(
                     func.similarity(Prospect.location, term),
                     func.coalesce(func.similarity(Prospect.suburb, term), 0.0),
                     func.similarity(Prospect.title, term),
@@ -1542,8 +1585,10 @@ def list_prospects(
                 | Prospect.suburb.ilike(f"%{term}%")
                 | Prospect.title.ilike(f"%{term}%")
                 | Prospect.poster_name.ilike(f"%{term}%")
+                | phone_match_condition
             )
-            stmt = stmt.where(ilike_match).order_by(Prospect.first_seen_at.desc())
+            phone_boost = case((phone_match_condition, 2), else_=0)
+            stmt = stmt.where(ilike_match).order_by(phone_boost.desc(), Prospect.first_seen_at.desc())
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = db.execute(count_stmt).scalar_one()

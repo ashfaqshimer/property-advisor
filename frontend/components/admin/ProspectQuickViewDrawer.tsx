@@ -114,7 +114,7 @@ export function ProspectQuickViewDrawer({
     const url = getProspectWhatsAppUrl(prospect.phone_number, prospect);
     if (!url) return;
     window.open(url, "_blank");
-    if (prospect.status === "new") {
+    if (prospect.status === "new" || prospect.status === "shortlisted") {
       onUpdateStatus(prospect.id, "contacted");
       toast.success("Opened WhatsApp and marked prospect as contacted");
     }

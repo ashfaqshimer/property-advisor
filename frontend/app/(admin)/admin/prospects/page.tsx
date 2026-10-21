@@ -817,7 +817,7 @@ function ProspectsContent() {
     if (!url) return;
 
     window.open(url, "_blank");
-    if (targetProspect && targetProspect.status === "new") {
+    if (targetProspect && (targetProspect.status === "new" || targetProspect.status === "shortlisted")) {
       handleUpdateStatus(targetProspect.id, "contacted");
       toast.success("Opened WhatsApp and marked prospect as contacted");
     }
@@ -1077,7 +1077,7 @@ function ProspectsContent() {
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search location, title or poster..."
+              placeholder="Search location, title, poster, or phone..."
               className="w-full rounded-lg border border-input bg-background pl-9 pr-9 py-2 text-sm outline-none focus:border-primary placeholder:text-muted-foreground text-foreground"
             />
             {searchQuery && (

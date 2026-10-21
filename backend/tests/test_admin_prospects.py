@@ -508,5 +508,69 @@ def test_list_prospects_with_source_filter(
     assert not any(item["id"] == str(p1.id) for item in lpw_items)
 
 
+def test_list_prospects_search_by_phone(
+    authenticated_client: TestClient,
+    db_session: Session,
+) -> None:
+    from app.models.prospect import Prospect
+
+    target_prospect = Prospect(
+        id=uuid.uuid4(),
+        source="ikman",
+        title="Modern Villa in Battaramulla",
+        price="Rs 65,000,000",
+        location="Battaramulla",
+        property_type="house",
+        listing_type="sale",
+        classification="owner",
+        confidence=95,
+        classification_reasons=[],
+        classification_method="rule_based",
+        status="contacted",
+        phone_number="0771234567",
+        first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    other_prospect = Prospect(
+        id=uuid.uuid4(),
+        source="ikman",
+        title="Luxury Penthouse in Colombo 07",
+        price="Rs 120,000,000",
+        location="Colombo 07",
+        property_type="apartment",
+        listing_type="sale",
+        classification="owner",
+        confidence=95,
+        classification_reasons=[],
+        classification_method="rule_based",
+        status="new",
+        phone_number="0719876543",
+        first_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([target_prospect, other_prospect])
+    db_session.commit()
+
+    # 1. Search with direct local number
+    resp1 = authenticated_client.get("/admin/prospects?q=0771234567")
+    assert resp1.status_code == 200
+    items1 = resp1.json()["items"]
+    assert any(item["id"] == str(target_prospect.id) for item in items1)
+    assert not any(item["id"] == str(other_prospect.id) for item in items1)
+
+    # 2. Search with international formatted number (+94 77 123 4567)
+    resp2 = authenticated_client.get("/admin/prospects?q=%2B94+77+123+4567")
+    assert resp2.status_code == 200
+    items2 = resp2.json()["items"]
+    assert any(item["id"] == str(target_prospect.id) for item in items2)
+
+    # 3. Search when status=new filter is set, phone lookup should still find contacted prospect
+    resp3 = authenticated_client.get("/admin/prospects?status=new&q=0771234567")
+    assert resp3.status_code == 200
+    items3 = resp3.json()["items"]
+    assert any(item["id"] == str(target_prospect.id) for item in items3)
+
+
+
 
 
