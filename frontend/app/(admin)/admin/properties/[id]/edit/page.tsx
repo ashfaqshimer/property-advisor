@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, use, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2, ArrowLeft, Copy, Check, Download, FolderArchive } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, UserPlus, CheckCircle2, ArrowLeft, Copy, Check, Download, FolderArchive, ZoomIn, LayoutGrid, StretchHorizontal } from 'lucide-react';
 import { downloadPhoto, downloadAllPhotosZip } from '@/lib/download';
+import { PhotoLightboxModal } from '@/components/admin/PhotoLightboxModal';
 import {
 	getAdminProperty,
 	updateAdminProperty,
@@ -118,6 +119,9 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 	const [isAgent, setIsAgent] = useState(false);
 	const [canDownload, setCanDownload] = useState(false);
 	const [isDragging, setIsDragging] = useState(false);
+	const [lightboxOpen, setLightboxOpen] = useState(false);
+	const [lightboxIndex, setLightboxIndex] = useState(0);
+	const [photoViewMode, setPhotoViewMode] = useState<'grid' | 'large'>('grid');
 
 	// AI Smart Autofill state
 	const [rawText, setRawText] = useState('');
@@ -1091,10 +1095,42 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 						{/* Existing images list */}
 						{existingImages.length > 0 && (
 							<div className='mb-6'>
-								<div className='flex items-center justify-between mb-2.5'>
-									<p className='text-xs font-medium text-muted-foreground'>
-										Current photos ({existingImages.length})
-									</p>
+								<div className='flex flex-wrap items-center justify-between gap-2 mb-3'>
+									<div className='flex items-center gap-2.5'>
+										<p className='text-xs font-medium text-muted-foreground'>
+											Current photos ({existingImages.length})
+										</p>
+										<div className='inline-flex items-center rounded-md border border-border bg-muted/50 p-0.5 text-muted-foreground'>
+											<button
+												type='button'
+												onClick={() => setPhotoViewMode('grid')}
+												className={`flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition cursor-pointer ${
+													photoViewMode === 'grid'
+														? 'bg-card text-foreground shadow-xs'
+														: 'hover:text-foreground'
+												}`}
+												title='Compact grid view'
+												aria-label='Compact grid view'
+											>
+												<LayoutGrid className='h-3 w-3' />
+												<span className='hidden sm:inline'>Grid</span>
+											</button>
+											<button
+												type='button'
+												onClick={() => setPhotoViewMode('large')}
+												className={`flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition cursor-pointer ${
+													photoViewMode === 'large'
+														? 'bg-card text-foreground shadow-xs'
+														: 'hover:text-foreground'
+												}`}
+												title='Large photo view'
+												aria-label='Large photo view'
+											>
+												<StretchHorizontal className='h-3 w-3' />
+												<span>Large</span>
+											</button>
+										</div>
+									</div>
 									{canDownload && (
 										<Button
 											type='button'
@@ -1108,7 +1144,13 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 										</Button>
 									)}
 								</div>
-								<div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
+								<div
+									className={
+										photoViewMode === 'large'
+											? 'grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3'
+											: 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
+									}
+								>
 									{existingImages.map((imageUrl, idx) => {
 										const isFeatured = form.featuredImageUrl
 											? form.featuredImageUrl === imageUrl
@@ -1116,26 +1158,56 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 										return (
 											<div
 												key={imageUrl + idx}
-												className={`group relative aspect-square overflow-hidden rounded-lg bg-muted border ${
+												onClick={() => {
+													setLightboxIndex(idx);
+													setLightboxOpen(true);
+												}}
+												className={`group relative overflow-hidden rounded-lg bg-muted border cursor-pointer transition ${
+													photoViewMode === 'large' ? 'aspect-[16/10]' : 'aspect-[4/3]'
+												} ${
 													isFeatured
 														? 'border-amber-500 ring-2 ring-amber-500/30'
-														: 'border-border'
+														: 'border-border hover:border-primary/50'
 												}`}
 											>
 												<img
 													src={imageUrl}
 													alt={`Property photo ${idx + 1}`}
-													className='h-full w-full object-cover'
+													className='h-full w-full object-cover transition-transform duration-200 group-hover:scale-102'
 												/>
+
+												{/* Center preview hint on hover */}
+												<div className='absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none'>
+													<span className='inline-flex items-center gap-1 rounded-full bg-black/75 px-2.5 py-1 text-xs font-medium text-white shadow-md'>
+														<ZoomIn className='h-3.5 w-3.5' />
+														Preview
+													</span>
+												</div>
+
+												{/* Tap / Click to preview button */}
+												<button
+													type='button'
+													onClick={(e) => {
+														e.stopPropagation();
+														setLightboxIndex(idx);
+														setLightboxOpen(true);
+													}}
+													className='absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer shadow-xs'
+													aria-label={`Preview photo ${idx + 1} full screen`}
+													title='Preview full screen'
+												>
+													<ZoomIn className='h-3.5 w-3.5' />
+												</button>
+
 												{/* Download photo button */}
 												{canDownload && (
 													<button
 														type='button'
 														onClick={(e) => {
-															e.preventDefault();
+															e.stopPropagation();
 															downloadPhoto(imageUrl, `${propertyCode || propertyId}-photo-${idx + 1}.jpg`);
 														}}
-														className='absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer'
+														className='absolute left-10 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer shadow-xs'
 														aria-label={`Download photo ${idx + 1}`}
 														title='Download photo'
 													>
@@ -1143,24 +1215,34 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 													</button>
 												)}
 
+												{/* Featured badge or button */}
 												{isFeatured ? (
-													<span className='absolute bottom-2 left-2 inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-xs'>
+													<span className='absolute bottom-2 left-2 inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-xs pointer-events-none'>
 														★ Featured
 													</span>
 												) : (
 													<button
 														type='button'
-														onClick={() => updateField('featuredImageUrl', imageUrl)}
-														className='absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white opacity-80 transition hover:bg-black hover:opacity-100 cursor-pointer'
+														onClick={(e) => {
+															e.stopPropagation();
+															updateField('featuredImageUrl', imageUrl);
+														}}
+														className='absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white opacity-90 transition hover:bg-black hover:opacity-100 cursor-pointer shadow-xs'
 													>
 														Set featured
 													</button>
 												)}
+
+												{/* Remove photo button */}
 												<button
 													type='button'
-													onClick={() => removeExistingImage(imageUrl)}
-													className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer'
+													onClick={(e) => {
+														e.stopPropagation();
+														removeExistingImage(imageUrl);
+													}}
+													className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer shadow-xs'
 													aria-label={`Remove photo ${idx + 1}`}
+													title='Remove photo'
 												>
 													×
 												</button>
@@ -1207,7 +1289,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 									{newImages.map((image) => (
 										<div
 											key={image.url}
-											className='group relative aspect-square overflow-hidden rounded-lg bg-muted border border-border'
+											className='group relative aspect-[4/3] overflow-hidden rounded-lg bg-muted border border-border'
 										>
 											<img
 												src={image.url}
@@ -1217,7 +1299,7 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 											<button
 												type='button'
 												onClick={() => removeNewImage(image.url)}
-												className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer'
+												className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 transition cursor-pointer shadow-xs'
 												aria-label={`Remove ${image.file.name}`}
 											>
 												×
@@ -1253,6 +1335,20 @@ export default function EditPropertyPage({ params }: { params: Promise<{ id: str
 					</Button>
 				</div>
 			</form>
+
+			<PhotoLightboxModal
+				isOpen={lightboxOpen}
+				onClose={() => setLightboxOpen(false)}
+				photos={existingImages}
+				initialIndex={lightboxIndex}
+				propertyTitle={form.title}
+				propertyCode={propertyCode}
+				featuredUrl={form.featuredImageUrl || existingImages[0]}
+				canDownload={canDownload}
+				onSetFeatured={(url) => updateField('featuredImageUrl', url)}
+				onDelete={(url) => removeExistingImage(url)}
+				onDownload={(url, filename) => downloadPhoto(url, filename)}
+			/>
 		</section>
 	);
 }

@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Trash2, Plus, Image as ImageIcon, Search, Copy, Check, Download, FolderArchive } from 'lucide-react';
+import { Pencil, Trash2, Plus, Image as ImageIcon, Search, Copy, Check, Download, FolderArchive, ZoomIn } from 'lucide-react';
 import { downloadPhoto, downloadAllPhotosZip } from '@/lib/download';
+import { PhotoLightboxModal } from '@/components/admin/PhotoLightboxModal';
 import {
 	deleteAdminProperty,
 	getAdminProperties,
@@ -72,6 +73,8 @@ export default function AdminPropertiesPage() {
 	const [copiedCode, setCopiedCode] = useState<string | null>(null);
 	const [newContactForPropertyId, setNewContactForPropertyId] = useState<string | null>(null);
 	const [creatingContact, setCreatingContact] = useState(false);
+	const [lightboxOpen, setLightboxOpen] = useState(false);
+	const [lightboxIndex, setLightboxIndex] = useState(0);
 
 	function copyPropertyCode(code: string) {
 		navigator.clipboard.writeText(code);
@@ -759,7 +762,7 @@ export default function AdminPropertiesPage() {
 												handleSelectFeaturedPhoto(selectingPhotoProperty.id, url);
 											}
 										}}
-										className={`group relative aspect-square overflow-hidden rounded-lg border text-left transition select-none ${
+										className={`group relative aspect-[4/3] overflow-hidden rounded-lg border text-left transition select-none ${
 											isProcessingThis
 												? 'border-amber-500 ring-2 ring-amber-500/50 cursor-wait'
 												: isCurrent
@@ -776,6 +779,19 @@ export default function AdminPropertiesPage() {
 												isProcessingThis ? 'brightness-50 filter' : ''
 											}`}
 										/>
+										<button
+											type="button"
+											onClick={(e) => {
+												e.stopPropagation();
+												setLightboxIndex(idx);
+												setLightboxOpen(true);
+											}}
+											className="absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black/90 transition cursor-pointer shadow-xs"
+											title="Preview photo full screen"
+											aria-label={`Preview photo ${idx + 1}`}
+										>
+											<ZoomIn className="h-3 w-3" />
+										</button>
 										{canDelete && (
 											<button
 												type="button"
@@ -846,6 +862,23 @@ export default function AdminPropertiesPage() {
 						</div>
 					</div>
 				</div>
+			)}
+
+			{selectingPhotoProperty && (
+				<PhotoLightboxModal
+					isOpen={lightboxOpen}
+					onClose={() => setLightboxOpen(false)}
+					photos={selectingPhotoProperty.imageUrls}
+					initialIndex={lightboxIndex}
+					propertyTitle={selectingPhotoProperty.title}
+					propertyCode={selectingPhotoProperty.propertyCode}
+					featuredUrl={selectingPhotoProperty.featuredImageUrl || selectingPhotoProperty.imageUrls[0]}
+					canDownload={canDelete}
+					onSetFeatured={(url) => {
+						handleSelectFeaturedPhoto(selectingPhotoProperty.id, url);
+					}}
+					onDownload={(url, filename) => downloadPhoto(url, filename)}
+				/>
 			)}
 
 			{newContactForPropertyId && (
